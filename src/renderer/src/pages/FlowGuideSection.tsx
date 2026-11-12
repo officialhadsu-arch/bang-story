@@ -98,7 +98,7 @@ export function FlowGuideSection() {
         itu dalam format yang sama dengan API OpenAI, server itu meneruskannya ke Flow memakai login Google kamu, lalu mengembalikan hasilnya.
         Alurnya:
       </P>
-      <Cmd>{'KenStory  →  server Flow2API (localhost:8000)  →  Google Flow  →  gambar/video kembali ke KenStory'}</Cmd>
+      <Cmd>{'KenStory  →  Flow2API (localhost:8000)  →  Google Flow  →  hasil'}</Cmd>
       <P>
         Login Google kamu disimpan di server Flow2API di komputer ini, bukan di KenStory — KenStory hanya menyimpan alamat server dan
         sakelar nyala/mati. Flow2API bukan produk Google; ia mengotomatisasi layanan Google dengan login kamu sendiri. Risiko dari hal itu
