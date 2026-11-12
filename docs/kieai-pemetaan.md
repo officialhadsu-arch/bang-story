@@ -224,12 +224,47 @@ Image 2.5 Rp100. Kurs kie.ai: Rp18.200/USD (12 Nov 2026).
   lebih murah; tidak ada alasan menawarkan model yang sama lewat jalur
   yang lebih mahal (K4-02).
 
-### Catatan jalur lain: kie.ai TTS sudah diriset di lane lain
+### Catatan jalur lain: kie.ai TTS — sudah diriset di lane lain, kini diverifikasi sebagian dari sumber primer
 
 Riset live 13 Nov 2026 (lane stack 1-7, catatan di MEMORY.md): kie.ai
-Gemini Flash TTS ±$0,018/menit VO → $5 ≈ 270–360 menit VO; tetapi Bos
-sudah punya Google AI Pro (Gemini TTS yang sama kemungkinan $0 tambahan)
-— rekomendasi lane itu: jangan deposit dulu, uji banding suara dulu.
+Gemini Flash TTS ±$0,018/menit VO → $5 ≈ 270–360 menit VO ("sampai
+muntah"); tetapi Bos sudah punya Google AI Pro (Gemini TTS yang sama
+kemungkinan $0 tambahan) — rekomendasi lane itu: jangan deposit dulu, uji
+banding suara dulu; deposit $5 wajib persetujuan Bos.
+
+Verifikasi dari sumber primer kie.ai (halaman model Gemini 2.5 Pro Preview
+TTS, `kie.ai/gemini-2.5-pro-preview-tts`, dibaca 13 Nov 2026):
+- Tarif: input teks 140 kredit/1M token (≈ $0,70); output audio **2.800
+  kredit/1M token (≈ $14,00)**; kie.ai menyebutnya ~30% di bawah tarif
+  standar Google ($1,00 input / $20,00 output per 1M token, Nov 2026).
+- Turunan per menit (audio Google = 25 token/detik → 1.500 token/menit):
+  1.500/1.000.000 × $14 ≈ **$0,021/menit** → $5 (1.000 kredit) ≈ **238
+  menit**. Angka turunan independen kie-mcp (~4,2 kredit/menit, sekunder)
+  konsisten dengan $0,021/menit.
+- **Vonis jujur: klaim lane "$0,018/menit → $5 ≈ 270–360 menit" TIDAK
+  terverifikasi persis dari tarif kie.ai sendiri** — angka kie.ai ~15–35%
+  lebih mahal per menit (238 vs 270–360 menit). Angka $0,018/menit cocok
+  dengan harga Google langsung seri 3.8 (Flash-Lite $12/1M token per Jan
+  2027 → $0,018/menit), bukan tarif kie.ai. Substansi "sampai muntah"
+  tetap benar (238 menit VO untuk $5 tetap sangat banyak), tetapi angka
+  pastinya lebih rendah.
+- Pembanding: harga peluncuran Google 3.8 Flash TTS langsung $9/1M token
+  (≈ $0,0135/menit → ~370 menit per $5) — LEBIH MURAH dari kie.ai
+  ($14/1M). Ini memperkuat rekomendasi lane: **jangan deposit dulu, uji
+  banding suara dulu** — jalur Google langsung (AI Pro Bos) kemungkinan
+  lebih murah daripada kie.ai untuk VO.
+- Model TTS di kie.ai: `google/gemini-2-5-pro-tts`,
+  `google/gemini-3-1-flash-tts` (tarif output sama 2.800 kredit/1M token
+  menurut halaman pricing), ElevenLabs TTS dari $0,03/1.000 karakter.
+  Pola API TTS sama dengan gambar/video (`POST /api/v1/jobs/createTask`
+  + `GET /api/v1/jobs/recordInfo`, galat HTTP 200 + `code`) — halaman
+  model ini mengonfirmasi pola itu secara independen, memperkuat K4-01.
+  Detail lain: 30 suara, aksen (Neutral/American/British/Transatlantic/
+  Australian), gaya, pace, maks 2 speaker, 10.000 karakter per giliran
+  dialog, output WAV 16-bit PCM 24 kHz mono.
+- Top-up minimum $5 = 1.000 kredit **tetap sekunder** (halaman billing
+  butuh login; laporan lane live) — bukan fakta terverifikasi primer.
+
 Tier 4 **tidak** membangun suara (K4-09) supaya pekerjaan tidak ganda;
 bila VO kie.ai dibutuhkan nanti, itu keputusan terpisah sesudah uji banding
 suara lane tersebut.
@@ -292,7 +327,10 @@ Tier 4 mengikuti Tier 3 persis, kecuali yang dicatat di bawah.
   `createTask` mendukung kunci idempotensi (tidak terlihat di docs).
   Mock mengimplementasikan bentuk yang sudah terverifikasi + asumsi yang
   dicatat, sehingga semua penyambungan terverifikasi; modul transport
-  adalah bagian yang wajib dikonfirmasi/dikoreksi di uji live PC.
+  adalah bagian yang wajib dikonfirmasi/dikoreksi di uji live PC. Pola
+  async + envelope galat yang sama dikonfirmasi independen oleh halaman
+  model Gemini 2.5 Pro Preview TTS kie.ai (`createTask` + `recordInfo` +
+  galat HTTP 200 + `code`) — lihat §2.
 - **K4-02 — Katalog (`src/shared/kieai.ts`).** Model awal (harga katalog,
   kurs Rp18.200/USD):
   gambar `kieai:gpt-image-2-5` (GPT Image 2.5 1K, Rp546, referensi maks —
