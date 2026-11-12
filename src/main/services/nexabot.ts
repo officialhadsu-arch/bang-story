@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { app } from 'electron'
 import { NEXA_DEFAULT_BASE_URL, NEXA_TIMEOUTS, getNexaImageModel, getNexaVideoModel } from '../../shared/nexabot'
 import { ApiError, downloadTo, readError, sleep } from './http'
@@ -100,7 +101,7 @@ function friendlyError(status: number, detail: string): ApiError {
   const d = detail?.trim()
   if (status === 401) return new ApiError('Kunci NexaBot tidak valid atau belum diisi. Periksa kunci di Pengaturan → NexaBot.', 401)
   if (status === 402 || status === 403)
-    return new ApiError('Kredit NexaBot tidak cukup untuk generate ini. Isi ulang di nexabot.id, lalu coba lagi.', status, false)
+    return new ApiError('Kredit NexaBot tidak cukup. Isi ulang di nexabot.id, lalu coba lagi.', status, false)
   if (status === 429) return new ApiError('NexaBot membatasi kecepatan (429). Tunggu sebentar, lalu coba lagi.', 429, true)
   if (status >= 500) return new ApiError('Server NexaBot bermasalah. Coba lagi beberapa saat lagi.', status, true)
   if (status === 404) return new ApiError('Endpoint NexaBot tidak ditemukan (404) — bentuk API mungkin berubah; laporkan ke pengembang.', 404)
@@ -153,12 +154,15 @@ function isRecord(x: unknown): x is Record<string, unknown> {
 export async function submitImage(opts: NexaSubmitOptions, modelId: string): Promise<NexaMedia> {
   const model = getNexaImageModel(modelId)
   const refs = opts.refs ?? []
+  // One idempotency key per submit (D3-07): a lost response followed by a manual retry must not charge twice.
+  const key = randomUUID()
   const body = await nexa<{ data?: { url?: string; b64_json?: string }[] }>('/v1/images/generations', {
     baseUrl: opts.baseUrl,
     apiKey: opts.apiKey,
     timeoutMs: NEXA_TIMEOUTS.image,
     init: {
       method: 'POST',
+      headers: { 'Idempotency-Key': key },
       body: JSON.stringify({ model: model.id, prompt: opts.prompt, aspect_ratio: opts.aspectRatio ?? '16:9', images: refs }),
       signal: opts.signal
     }
@@ -173,12 +177,15 @@ export async function submitVideo(opts: NexaSubmitOptions, modelId: string): Pro
   const model = getNexaVideoModel(modelId)
   const firstFrame = opts.refs?.[0]
   if (!firstFrame) throw new Error('Model video NexaBot membutuhkan gambar pertama.')
+  // One idempotency key per submit (D3-07): a lost response followed by a manual retry must not charge twice.
+  const key = randomUUID()
   const body = await nexa<{ id?: string; status?: string }>('/v1/videos/generations', {
     baseUrl: opts.baseUrl,
     apiKey: opts.apiKey,
     timeoutMs: NEXA_TIMEOUTS.video,
     init: {
       method: 'POST',
+      headers: { 'Idempotency-Key': key },
       body: JSON.stringify({ model: model.id, prompt: opts.prompt, image: firstFrame, duration: opts.seconds ?? 15 }),
       signal: opts.signal
     }
@@ -262,7 +269,9 @@ export async function testConnection(baseUrl?: string, apiKey?: string): Promise
     return { ok: true, message: 'Terhubung ke NexaBot.', models }
   } catch (e) {
     const err = e instanceof ApiError ? e : new Error(String(e))
-    if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+    // 401 means the key itself is wrong; any other status (402/403 credit, 429, 5xx) is reported with the
+    // same friendly message the generate path shows, so testConnection never contradicts friendlyError.
+    if (err instanceof ApiError && err.status === 401) {
       return { ok: false, message: 'Server NexaBot terjangkau, tapi kunci belum diisi atau tidak valid. Isi kunci di Pengaturan → NexaBot.' }
     }
     return { ok: false, message: err.message }

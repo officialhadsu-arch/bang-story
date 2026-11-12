@@ -110,6 +110,8 @@ export function ModelPicker({
   }, [models, tagFilters])
 
   // Higgsfield lists carry credit estimates (creditUnit marks them); known prices can be sorted cheapest first.
+  // "Cheapest first" compares the raw provider-credit numbers, so rows in different currencies (Higgsfield
+  // kr vs NexaBot credits) are ordered approximately — each row still shows its exact price with its unit.
   const priced = models.some((m) => m.credits != null)
 
   const filtered = useMemo(() => {
