@@ -50,6 +50,7 @@ import { clearSecret, keyStatuses, recordCheck, revealSecret, setSecret } from '
 import { dropCache, getSettings, setSettings } from './settings'
 import { probeDurationMs, probeSize } from './services/audio'
 import * as eleven from './services/elevenlabs'
+import * as flow from './services/flow2api'
 import * as gemini from './services/gemini'
 import * as hf from './services/higgsfield'
 import * as llm from './services/llm'
@@ -256,6 +257,7 @@ export function registerIpc(): void {
     if (provider === 'gemini') return gemini.listVoices()
     return eleven.listVoices()
   })
+  handle('flow2api:testConnection', (baseUrl: string) => flow.testConnection(baseUrl))
 
   handle('export:start', (projectId: string, opts: ExportOptions) => startExport(projectId, opts))
   handle('export:defaultFolder', () => defaultExportFolder())

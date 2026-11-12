@@ -66,6 +66,9 @@ const api: StudioApi = {
   models: {
     list: call('models:list')
   },
+  flow2api: {
+    testConnection: call('flow2api:testConnection')
+  },
   exporter: {
     start: call('export:start'),
     defaultFolder: call('export:defaultFolder'),

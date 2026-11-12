@@ -90,6 +90,33 @@ di API Higgsfield (hanya di aplikasi webnya). Satu entri:
   "butuh <field>" (`checkRequired`). Ikon keluarga model diatur di `components/ModelLogo.tsx`.
 - Model bawaan: `DEFAULT_IMAGE_MODEL` dan `DEFAULT_VIDEO_MODEL` di `shared/higgsfield.ts`.
 
+## Flow2API (`services/flow2api.ts`, `shared/flow2api.ts`)
+
+Tier 1 (0.3+): gambar dan video dari Google Flow (Nano Banana, Veo 3.1, Omni) lewat server Flow2API
+yang dijalankan pengguna sendiri di `http://localhost:8000` (bawaan). Polanya ditulis ulang dalam TypeScript
+dari klien Flow2API De-Story (`flow2api.rs`) — pola saja, bukan salinan kode.
+
+- Katalog model di `shared/flow2api.ts`: 3 model gambar, 4 model video, semuanya berawalan `flow:`. `getImageModel`/
+  `getVideoModel` jatuh ke katalog ini bila id berawalan `flow:`; `canonicalFlowId` memetakan id lama ke nama yang
+  dilayani server sekarang (misalnya `omni-1.1-flash` → `omni-1.2-flash`). Nama yang dikirim ke server memakai
+  akhiran aspek (`gemini-3.1-flash-image-landscape`) dan, untuk Veo, sisipan `-i2v-{4|6}s-` (`veo-3.1-fast-i2v-4s-landscape`).
+- Alur: `POST {base}/v1/chat/completions` dengan `stream: true` → baca aliran SSE (`data:` sampai `[DONE]`), lalu JSON
+  biasa, lalu URL/data media langsung. Galat dari Flow sering tiba sebagai potongan biasa di tengah aliran dengan HTTP 200,
+  jadi pembaca aliranlah yang menemukan alasannya, bukan status HTTP. Hasil berupa URL diunduh (timeout 180 dtk) atau
+  data URI yang didekode. Timeout: gambar 300 dtk, video 600 dtk, uji koneksi 8 dtk.
+- Referensi (lembar karakter) dan frame pertama video dikirim sebagai data URI dengan MIME dari ekstensi berkas
+  (PNG/JPEG/WebP) — tidak seperti Higgsfield, Flow2API tidak butuh URL publik. Prompt video selalu ditambahi
+  `Silent clip: no background music, no soundtrack, no singing or humming.` karena narasi dan musik datang dari editor.
+- Penyambungan (`generation.ts`): model `flow:` bercabang ke antrean `flow2api` (limit 1) dengan penyedia `flow2api`;
+  jalur Higgsfield tidak berubah. `estimateCredits` mengembalikan null untuk model flow — server tidak punya endpoint
+  estimasi; biayanya kredit Google Flow dari langganan AI Pro pengguna.
+- Pengaturan: `flow2apiEnabled` (mati bawaan) dan `flow2apiBaseUrl` (`AppSettings`). Sakelarnya terkunci di balik
+  peringatan risiko akun D-16 dan kotak persetujuan di Pengaturan (`Settings.tsx`, `FlowSection`). IPC
+  `flow2api:testConnection` memeriksa `GET /health`, cadangan `GET /v1/models`.
+- Tier 1 tidak memakai kunci Bearer dan tidak memakai layanan captcha berbayar; server yang butuh kunci Bearer belum
+  didukung. Tutorial lengkap berbahasa Indonesia ada di dalam aplikasi (Pengaturan › Panduan Flow2API,
+  `FlowGuideSection.tsx`) dan pemetaannya di `docs/flow2api-pemetaan-destory.md`.
+
 ## Whisper lokal (`src/main/whisper.ts`)
 
 - Biner: `resources/whisper/whisper-cli.exe` + DLL (whisper.cpp, lisensi MIT). Saat ini hanya untuk Windows.
