@@ -108,6 +108,10 @@ export interface StudioApi {
     /** Pings the Flow2API server at `baseUrl` (GET /health, fallback /v1/models). */
     testConnection(baseUrl: string): Promise<KeyTestResult>
   }
+  nexabot: {
+    /** Probes the NexaBot API at `baseUrl` with the stored key (GET /v1/models). */
+    testConnection(baseUrl: string): Promise<KeyTestResult>
+  }
   exporter: {
     start(projectId: string, options: ExportOptions): Promise<Job>
     defaultFolder(): Promise<string>

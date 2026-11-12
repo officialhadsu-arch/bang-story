@@ -23,6 +23,7 @@ import {
 } from 'lucide-react'
 import { effectiveResolution, fitDuration, getImageModel, getVideoModel } from '@shared/higgsfield'
 import { VISUAL_PROVIDERS, type ManualScanUnmatched } from '@shared/manual'
+import { idrLabel, isNexaModelId, nexaPriceIdr } from '@shared/nexabot'
 import { CAMERA_PRESETS, MOTION_STRENGTHS, cameraAt, cameraCss } from '@shared/motion'
 import { needsVisual } from '@shared/script'
 import { geminiVoiceName, geminiVoiceTone } from '@shared/models'
@@ -565,6 +566,12 @@ export function StoryboardStep() {
   if (!project) return null
   const selIndex = Math.max(0, clips.findIndex((c) => c.id === selectedClipId))
   const sel = clips[selIndex]
+  /** A NexaBot batch charges per generate, so its cost is shown in Rupiah and confirmed before it starts (D3-05b). */
+  const nexaImg = isNexaModelId(project.imageModel)
+  const nexaVid = isNexaModelId(project.videoModel)
+  /** Fixed catalog prices, used when the estimate has not arrived (yet) — the cost gate never depends on the estimate alone. */
+  const nexaImgPrice = nexaImg && project.imageModel ? nexaPriceIdr(project.imageModel) : null
+  const nexaVidPrice = nexaVid && project.videoModel ? nexaPriceIdr(project.videoModel) : null
 
   const bulk = async (fn: () => Promise<unknown>): Promise<void> => {
     try {
@@ -585,15 +592,45 @@ export function StoryboardStep() {
     !narration.running
   const makeVideos = async (): Promise<void> => {
     const n = stats.needVideo.length
+    // Total cost: the summed estimate when it arrived, else the fixed catalog price. The amount shown is
+    // always the batch total (videoCredits already sums every clip); the breakdown per video is shown too,
+    // so the total can never be mistaken for the per-video price.
+    const totalIdr = videoCredits != null ? Math.round(videoCredits * 1000) : nexaVid && nexaVidPrice != null ? nexaVidPrice * n : null
+    const costText =
+      totalIdr == null
+        ? ''
+        : nexaVid
+          ? ` Perkiraan biaya ${idrLabel(totalIdr)} (NexaBot, ${n} video × ${idrLabel(n > 0 ? Math.round(totalIdr / n) : 0)}). Biaya dipotong dari kredit NexaBot kamu saat setiap video dibuat; membatalkan di tengah jalan tidak mengembalikan kredit video yang sudah jadi.`
+          : ` Perkiraan biaya ${Math.round(videoCredits! * 10) / 10} kredit Higgsfield.`
     const ok = await confirmDialog({
       title: `Jadikan ${n} klip video AI?`,
       body:
         `Setiap gambar klip dianimasikan dengan ${getVideoModel(project!.videoModel).name}, panjangnya mengikuti suara narasi klip itu.` +
-        (videoCredits != null ? ` Perkiraan biaya ${Math.round(videoCredits * 10) / 10} kredit Higgsfield.` : '') +
+        costText +
         ' Klip yang sudah punya video tidak dibuat ulang.',
       confirm: `Buat ${n} video`
     })
     if (ok) await bulk(() => window.api.generate.missingVideos(project!.id))
+  }
+
+  // A NexaBot image batch charges per generate, so it gets the same cost confirmation as videos (D3-05b).
+  const makeImages = async (): Promise<void> => {
+    const n = stats.needImg
+    if (nexaImg && n > 0) {
+      // The catalog price is the fallback when the estimate has not arrived (yet) — the gate never depends on the estimate alone.
+      const perIdr = credits != null ? Math.round(credits * 1000) : nexaImgPrice
+      const ok = await confirmDialog({
+        title: `Generate ${n} gambar dengan NexaBot?`,
+        body:
+          (perIdr != null
+            ? `Perkiraan biaya ${idrLabel(perIdr * n)} (${n} gambar × ${idrLabel(perIdr)}). `
+            : 'Perkiraan biaya tidak dapat dihitung saat ini. ') +
+          'Biaya dipotong dari kredit NexaBot kamu saat setiap gambar dibuat; membatalkan di tengah jalan tidak mengembalikan kredit gambar yang sudah jadi.',
+        confirm: `Generate ${n} gambar`
+      })
+      if (!ok) return
+    }
+    await bulk(() => window.api.generate.missingImages(project!.id))
   }
 
   // Scenes added or rewritten in the script since the last visual plan.
@@ -745,11 +782,13 @@ export function StoryboardStep() {
           className="border-[1.5px] border-ink font-semibold"
           icon={<ImageIcon className="size-[17px]" />}
           disabled={!stats.needImg}
-          onClick={() => void bulk(() => window.api.generate.missingImages(project.id))}
+          onClick={() => void makeImages()}
         >
           Generate {stats.needImg} gambar
           {credits != null && stats.needImg > 0 && (
-            <span className="font-normal text-ink-2">≈ {Math.round(credits * stats.needImg * 10) / 10} kr</span>
+            <span className="font-normal text-ink-2">
+              ≈ {nexaImg ? idrLabel(credits * stats.needImg * 1000) : `${Math.round(credits * stats.needImg * 10) / 10} kr`}
+            </span>
           )}
         </Button>
         {readyForVideo && (
@@ -767,7 +806,9 @@ export function StoryboardStep() {
                 ? 'Semua klip sudah video'
                 : `Jadikan ${stats.needVideo.length} video`}
             {stats.videoRunning === 0 && videoCredits != null && stats.needVideo.length > 0 && (
-              <span className="font-normal text-white/80">≈ {Math.round(videoCredits * 10) / 10} kr</span>
+              <span className="font-normal text-white/80">
+                ≈ {nexaVid ? idrLabel(videoCredits * 1000) : `${Math.round(videoCredits * 10) / 10} kr`}
+              </span>
             )}
           </Button>
         )}

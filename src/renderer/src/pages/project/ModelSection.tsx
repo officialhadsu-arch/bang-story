@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Film, Image as ImageIcon, Move, Users } from 'lucide-react'
 import { isFlowModelId } from '@shared/flow2api'
 import { effectiveResolution, fitDuration, getImageModel, getVideoModel, hfModelOptions, maxRefs, resolutionOptions } from '@shared/higgsfield'
+import { idrLabel, isNexaModelId, nexaCredits, nexaPriceIdr } from '@shared/nexabot'
 import type { CreditEstimate, ModelOption, Project } from '@shared/types'
 import { ModelLogo } from '../../components/ModelLogo'
 import { ModelPicker } from '../../components/ModelPicker'
@@ -14,15 +15,19 @@ const VIDEO_OPTIONS = hfModelOptions('video')
 const IMAGE_IDS = IMAGE_OPTIONS.map((o) => o.id)
 const VIDEO_IDS = VIDEO_OPTIONS.map((o) => o.id)
 
-/** Adds each model's estimated credits to its picker row once a Higgsfield key is known to exist. */
+/** Adds each model's estimated credits to its picker row once a Higgsfield key is known to exist. NexaBot prices come from the fixed catalog instead, so they show even without any key. */
 function withCosts(options: ModelOption[], costs: Record<string, CreditEstimate | null>, unit: (id: string) => string, on: boolean): ModelOption[] {
-  if (!on) return options
-  return options.map((o) => ({
-    ...o,
-    credits: o.id in costs ? (costs[o.id]?.credits ?? null) : undefined,
-    usd: costs[o.id]?.usd ?? null,
-    creditUnit: unit(o.id)
-  }))
+  return options.map((o) => {
+    const nexaPrice = nexaCredits(o.id)
+    if (nexaPrice !== null) return { ...o, credits: nexaPrice, usd: null, creditUnit: unit(o.id), creditCurrency: 'Rp' as const }
+    if (!on) return o
+    return {
+      ...o,
+      credits: o.id in costs ? (costs[o.id]?.credits ?? null) : undefined,
+      usd: costs[o.id]?.usd ?? null,
+      creditUnit: unit(o.id)
+    }
+  })
 }
 
 function Cost({
@@ -74,6 +79,10 @@ export function ModelSection({
   const video = getVideoModel(project.videoModel)
   const imageIsFlow = isFlowModelId(image.id)
   const videoIsFlow = isFlowModelId(video.id)
+  const imageIsNexa = isNexaModelId(image.id)
+  const videoIsNexa = isNexaModelId(video.id)
+  const imageNexaPrice = imageIsNexa ? nexaPriceIdr(image.id) : null
+  const videoNexaPrice = videoIsNexa ? nexaPriceIdr(video.id) : null
   const seconds = fitDuration(video, perClip) ?? perClip
   const imageCost = useEstimate('image', image.id, project.aspectRatio)
   const resolutions = resolutionOptions(video)
@@ -98,7 +107,7 @@ export function ModelSection({
       <div className="flex items-baseline gap-2">
         <span className="text-sm font-semibold">Model AI</span>
         <span className="text-[13px] text-muted">
-          {IMAGE_OPTIONS.length} model gambar dan {VIDEO_OPTIONS.length} model video dari Higgsfield dan Google Flow
+          {IMAGE_OPTIONS.length} model gambar dan {VIDEO_OPTIONS.length} model video dari Higgsfield, Google Flow, dan NexaBot
         </span>
       </div>
       <div className="grid grid-cols-2 gap-3">
@@ -106,16 +115,21 @@ export function ModelSection({
           <ModelPicker
             value={image.id}
             models={imageModels}
-            footerNote={hasKey ? 'kredit per gambar, perkiraan Higgsfield untuk akunmu' : undefined}
+            footerNote={hasKey ? 'Higgsfield: perkiraan kredit untuk akunmu · NexaBot: harga tetap dalam Rupiah' : undefined}
             renderIcon={(m) => <ModelLogo family={m.family} />}
             detail="description"
-            tagFilters={['Rekomendasi', 'Referensi', 'GPT Image', 'Soul', 'Recraft', '4K', 'Google Flow']}
+            tagFilters={['Rekomendasi', 'Referensi', 'GPT Image', 'Soul', 'Recraft', '4K', 'Google Flow', 'NexaBot']}
             menuClassName="w-[430px]"
             onChange={(id) => onChange({ imageModel: id })}
           />
           <p className="text-[12.5px] leading-snug text-ink-2">
             {imageIsFlow ? (
               'Tanpa estimasi — kredit Google Flow dari langganan AI Pro kamu.'
+            ) : imageIsNexa && imageNexaPrice != null ? (
+              <>
+                ≈ {idrLabel(imageNexaPrice)} per gambar · {clipCount} gambar ≈{' '}
+                <b className="font-semibold text-ink">{idrLabel(imageNexaPrice * clipCount)}</b> (NexaBot, harga tetap)
+              </>
             ) : (
               <Cost value={imageCost} hasKey={hasKey}>
                 {(c) => (
@@ -137,10 +151,10 @@ export function ModelSection({
           <ModelPicker
             value={video.id}
             models={videoModels}
-            footerNote={hasKey ? `kredit per video untuk klip ±${perClip} detik` : undefined}
+            footerNote={hasKey ? `Higgsfield: perkiraan kredit untuk akunmu · NexaBot: harga tetap dalam Rupiah` : undefined}
             renderIcon={(m) => <ModelLogo family={m.family} />}
             detail="description"
-            tagFilters={['Rekomendasi', 'Kling', 'Seedance', 'Wan', 'Referensi', '4K', 'Google Flow']}
+            tagFilters={['Rekomendasi', 'Kling', 'Seedance', 'Wan', 'Referensi', '4K', 'Google Flow', 'NexaBot']}
             align="right"
             menuClassName="w-[430px]"
             onChange={(id) => onChange({ videoModel: id })}
@@ -162,6 +176,10 @@ export function ModelSection({
           <p className="text-[12.5px] leading-snug text-ink-2">
             {videoIsFlow ? (
               'Tanpa estimasi — kredit Google Flow dari langganan AI Pro kamu.'
+            ) : videoIsNexa && videoNexaPrice != null ? (
+              <>
+                ≈ {idrLabel(videoNexaPrice)} per video {seconds} detik{resolution ? `, ${resolution}` : ''} (NexaBot, harga tetap)
+              </>
             ) : (
               <Cost value={videoCost} hasKey={hasKey}>
                 {(c) => (

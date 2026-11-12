@@ -21,6 +21,12 @@ by bangtutorial, licensed under the MIT License (see LICENSE).
   copied). De-Story is published without a LICENSE file, so only its patterns
   were adopted, never its code.
   https://github.com/ikrammf7/de-story
+- **NexaBot** — pay-as-you-go image/video API at nexabot.id (tier 3, 0.3+).
+  KenStory calls its REST API with the user's own key; no NexaBot code is
+  vendored into this repository. The API is undocumented in public: the client
+  was written from the assumed wire shape labelled in
+  `src/main/services/nexabot.ts`, to be confirmed by the first live test.
+  https://nexabot.id
 - **GSAP** — GreenSock Animation Platform, used by the motion renderer.
   Standard "No Charge" License, effective 30 April 2025.
   Note on the Prohibited Uses clause: "Tidak tampak masuk: larangan punya

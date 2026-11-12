@@ -76,6 +76,9 @@ const api: StudioApi = {
   flow2api: {
     testConnection: call('flow2api:testConnection')
   },
+  nexabot: {
+    testConnection: call('nexabot:testConnection')
+  },
   exporter: {
     start: call('export:start'),
     defaultFolder: call('export:defaultFolder'),

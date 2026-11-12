@@ -4,9 +4,10 @@ import { dirname, extname } from 'node:path'
 import { estimateWordTimings } from '@shared/captions'
 import { isFlowModelId } from '@shared/flow2api'
 import { type VisualProvider } from '@shared/manual'
+import { isNexaModelId, nexaCredits } from '@shared/nexabot'
 import { clipPrompt, videoPromptForClip } from '@shared/prompts'
 import { stripVoiceTags } from '@shared/speech'
-import { getImageModel, getVideoModel, imageBody, maxRefs, promptLimit, videoBody, type HfModel } from '@shared/higgsfield'
+import { getImageModel, getVideoModel, fitDuration, imageBody, maxRefs, promptLimit, videoBody, type HfModel } from '@shared/higgsfield'
 import { getStyle } from '@shared/styles'
 import type { AspectRatio, Asset, Character, Clip, CreditEstimate, Job, Project, WordTiming } from '@shared/types'
 import { getDb } from './db'
@@ -32,6 +33,7 @@ import {
   updateJob
 } from './repo'
 import { dropCache, getSettings, readCache, writeCache } from './settings'
+import { getSecret } from './secrets'
 import { probeDurationMs, probeSize } from './services/audio'
 import * as eleven from './services/elevenlabs'
 import * as flow from './services/flow2api'
@@ -40,6 +42,8 @@ import * as gemini from './services/gemini'
 import * as hf from './services/higgsfield'
 import { downloadTo, sleep } from './services/http'
 import { completeManualJobs } from './services/manual'
+import * as nexa from './services/nexabot'
+import type { NexaMedia } from './services/nexabot'
 
 const DAY = 24 * 60 * 60 * 1000
 
@@ -217,6 +221,97 @@ function startFlow(
   })
 }
 
+// ---------- NexaBot (pay-as-you-go REST API, tier 3) ----------
+
+function toDataUri(bytes: Buffer, mime: string): string {
+  return `data:${mime};base64,${bytes.toString('base64')}`
+}
+
+/**
+ * NexaBot stays off until the user reads the cost warning and turns it on in Settings.
+ * A NexaBot model without a key fails hard here (D3-03) — it never falls back to another
+ * provider, so a paid generate can never start by accident. The key is BYOK, encrypted
+ * like every other key (D-07).
+ */
+function requireNexa(): { baseUrl: string; apiKey: string } {
+  const settings = getSettings()
+  if (!settings.nexabotEnabled)
+    throw new Error('NexaBot belum dinyalakan. Nyalakan di Pengaturan › Layanan AI dan kunci › NexaBot, lalu baca Panduan NexaBot.')
+  const apiKey = getSecret('nexabot')
+  if (!apiKey) throw new Error('Isi kunci NexaBot di Pengaturan › NexaBot sebelum generate. Kunci hanya tersimpan di perangkat ini.')
+  return { baseUrl: settings.nexabotBaseUrl, apiKey }
+}
+
+/** Saves a NexaBot result and attaches it to the clip or character, mirroring finishFlow's tail. */
+async function finishNexa(
+  ctx: TaskCtx,
+  job: Job,
+  target: 'clip-image' | 'sheet' | 'clip-video',
+  model: HfModel,
+  prompt: string,
+  out: NexaMedia,
+  remoteId: string | null
+): Promise<string> {
+  const isVideo = target === 'clip-video'
+  ctx.progress(0.93, 'Menyimpan hasil')
+  const rel = saveFile(job.projectId, isVideo ? 'videos' : 'images', extFromType(out.contentType, out.remoteUrl ?? '', isVideo ? '.mp4' : '.png'), out.bytes)
+  const abs = assetAbsPath(job.projectId, rel)
+  const size = await probeSize(abs)
+  const durationMs = isVideo ? await probeDurationMs(abs).catch(() => null) : null
+  const asset = insertAsset({
+    projectId: job.projectId,
+    clipId: job.clipId,
+    characterId: job.characterId,
+    kind: isVideo ? 'video' : 'image',
+    provider: 'nexabot',
+    model: model.id,
+    prompt,
+    remoteId,
+    remoteUrl: out.remoteUrl,
+    localPath: rel,
+    durationMs,
+    width: size?.width ?? null,
+    height: size?.height ?? null
+  })
+  emit.asset(asset)
+  if (target === 'sheet' && job.characterId) {
+    setCharacterSheet(job.characterId, asset.id)
+    emit.character({ characterId: job.characterId, patch: { sheetAssetId: asset.id } })
+  } else if (target === 'clip-image' && job.clipId) {
+    patchClip(job.clipId, { imageAssetId: asset.id })
+    emit.clip({ clipId: job.clipId, patch: { imageAssetId: asset.id } })
+    const project = getProject(job.projectId)
+    const first = clipsOf(job.projectId)[0]
+    if (!project.coverAssetId || first?.id === job.clipId) touchProject(job.projectId, { coverAssetId: asset.id })
+  } else if (target === 'clip-video' && job.clipId) {
+    const patch = { videoAssetId: asset.id, motionType: 'video' as const, mediaInMs: 0 }
+    patchClip(job.clipId, patch)
+    emit.clip({ clipId: job.clipId, patch })
+  }
+  touchProject(job.projectId)
+  return asset.id
+}
+
+function startNexa(
+  job: Job,
+  build: (ctx: TaskCtx) => Promise<{
+    target: 'clip-image' | 'sheet' | 'clip-video'
+    model: HfModel
+    prompt: string
+    run: (ctx: TaskCtx) => Promise<{ media: NexaMedia; remoteId: string | null }>
+  }>
+): Job {
+  emit.job(job)
+  return runJob(job, 'nexabot', async (ctx) => {
+    ctx.progress(0.04, 'Menyiapkan prompt')
+    const { target, model, prompt, run } = await build(ctx)
+    ctx.progress(0.08, 'Mengirim ke NexaBot')
+    updateJobPayload(job.id, { target, model: model.id, prompt })
+    const { media, remoteId } = await run(ctx)
+    return finishNexa(ctx, job, target, model, prompt, media, remoteId)
+  })
+}
+
 // ---------- finishing a Higgsfield request (also used to resume after a restart) ----------
 
 interface HfPayload {
@@ -299,12 +394,14 @@ function updateJobPayload(jobId: string, payload: HfPayload): void {
  * follows the project's model; an explicit provider wins over the model; anything else fails
  * hard (B5) instead of silently falling back to a provider the user did not pick.
  */
-function resolveVisualProvider(clip: Clip, project: Project, kind: 'image' | 'video'): 'higgsfield' | 'flow2api' | 'manual' | 'extension' {
+function resolveVisualProvider(clip: Clip, project: Project, kind: 'image' | 'video'): 'higgsfield' | 'flow2api' | 'manual' | 'extension' | 'nexabot' {
   const p = clip.visualProvider ?? 'auto'
-  if (p === 'manual' || p === 'extension' || p === 'higgsfield' || p === 'flow2api') return p
+  if (p === 'manual' || p === 'extension' || p === 'higgsfield' || p === 'flow2api' || p === 'nexabot') return p
   if (p === 'auto') {
     const modelId = kind === 'image' ? project.imageModel : project.videoModel
-    return isFlowModelId(modelId) ? 'flow2api' : 'higgsfield'
+    if (isFlowModelId(modelId)) return 'flow2api'
+    if (isNexaModelId(modelId)) return 'nexabot'
+    return 'higgsfield'
   }
   // Unreachable for clips read through toClip (it sanitises to 'auto'), but a stored value the
   // app does not know must fail here rather than silently pick a provider.
@@ -356,6 +453,27 @@ export function generateClipImage(clipId: string): Job {
       }
     })
   }
+  if (provider === 'nexabot') {
+    const job = insertJob({ projectId: clip.projectId, clipId, kind: 'image', provider: 'nexabot' })
+    return startNexa(job, async (ctx) => {
+      const { baseUrl, apiKey } = requireNexa()
+      const fresh = getClip(clipId)
+      const project = getProject(fresh.projectId)
+      const model = getImageModel(project.imageModel)
+      const chars = charactersOf(project.id).filter((c) => fresh.characterIds.includes(c.id))
+      const refs = await referenceImages(model, chars, ctx.signal)
+      const prompt = clipPrompt(project, fresh, chars, refs.names, promptLimit(model))
+      return {
+        target: 'clip-image' as const,
+        model,
+        prompt,
+        run: (c: TaskCtx) =>
+          nexa
+            .submitImage({ baseUrl, apiKey, prompt, refs: refs.images.map((r) => toDataUri(r.bytes, r.mime)), signal: c.signal }, model.id)
+            .then((media) => ({ media, remoteId: null }))
+      }
+    })
+  }
   const job = insertJob({ projectId: clip.projectId, clipId, kind: 'image', provider: 'higgsfield' })
   return startHiggsfield(job, async (ctx) => {
     const fresh = getClip(clipId)
@@ -388,6 +506,22 @@ export function generateCharacterSheet(characterId: string): Job {
         model,
         prompt,
         run: (ctx: TaskCtx) => flow.generateImage({ baseUrl, model, prompt, aspect: '16:9', refs: [], signal: ctx.signal })
+      }
+    })
+  }
+  if (isNexaModelId(getProject(c.projectId).imageModel)) {
+    const job = insertJob({ projectId: c.projectId, characterId, kind: 'sheet', provider: 'nexabot' })
+    return startNexa(job, async () => {
+      const { baseUrl, apiKey } = requireNexa()
+      const project = getProject(c.projectId)
+      const model = getImageModel(project.imageModel)
+      const prompt = sheetPrompt(project, getCharacter(characterId))
+      return {
+        target: 'sheet' as const,
+        model,
+        prompt,
+        run: (ctx: TaskCtx) =>
+          nexa.submitImage({ baseUrl, apiKey, prompt, refs: [], signal: ctx.signal }, model.id).then((media) => ({ media, remoteId: null }))
       }
     })
   }
@@ -431,6 +565,42 @@ export function generateClipVideo(clipId: string): Job {
         prompt,
         run: (c: TaskCtx) =>
           flow.generateVideo({ baseUrl, model, prompt, firstFrame, seconds: fresh.durationMs / 1000, aspect: project.aspectRatio, signal: c.signal })
+      }
+    })
+  }
+  if (provider === 'nexabot') {
+    const job = insertJob({ projectId: clip.projectId, clipId, kind: 'video', provider: 'nexabot' })
+    return startNexa(job, async (ctx) => {
+      const { baseUrl, apiKey } = requireNexa()
+      const fresh = getClip(clipId)
+      const image = getAsset(fresh.imageAssetId)
+      if (!image) throw new Error('Gambar klip tidak ditemukan')
+      const project = getProject(fresh.projectId)
+      const model = getVideoModel(project.videoModel)
+      ctx.progress(0.05, 'Menyiapkan gambar awal')
+      const abs = assetAbsPath(image.projectId, image.localPath)
+      const firstFrame: FlowImageRef = { bytes: readFileSync(abs), mime: mimeFromExt(abs) }
+      const prompt = videoPromptForClip(fresh, model.input.mode === 'reference')
+      return {
+        target: 'clip-video' as const,
+        model,
+        prompt,
+        run: async (c: TaskCtx) => {
+          const remoteId = await nexa.submitVideo(
+            { baseUrl, apiKey, prompt, refs: [toDataUri(firstFrame.bytes, firstFrame.mime)], seconds: fitDuration(model, fresh.durationMs / 1000) ?? 15, signal: c.signal },
+            model.id
+          )
+          c.setRemote(remoteId)
+          const media = await nexa.waitForVideo(
+            { baseUrl, apiKey, id: remoteId, signal: c.signal },
+            (s) =>
+              c.progress(
+                s === 'completed' ? 0.9 : 0.5,
+                s === 'queued' ? 'Mengantre di NexaBot' : s === 'processing' ? 'NexaBot sedang membuat video' : 'Mengunduh hasil'
+              )
+          )
+          return { media, remoteId }
+        }
       }
     })
   }
@@ -534,7 +704,7 @@ export function generateMissingTts(projectId: string): Job[] {
     .map((c) => generateClipTts(c.id))
 }
 
-/** After a restart, keep polling Higgsfield requests that were already submitted; fail the rest. Manual jobs are skipped: they keep waiting for the user to bring the file back. */
+/** After a restart, keep polling Higgsfield requests that were already submitted; fail the rest. Manual jobs are skipped: they keep waiting for the user to bring the file back. A submitted NexaBot video is also resumed by polling its remote id; a NexaBot image has no remote id to resume, so it fails like the rest. */
 export function resumeJobs(): void {
   for (const row of unfinishedJobs()) {
     if (row.provider === 'manual') continue
@@ -542,6 +712,21 @@ export function resumeJobs(): void {
     if (row.provider === 'higgsfield' && row.remote_id && payload.target) {
       const job = getJob(row.id)!
       runJob(job, 'higgsfield', (ctx) => finishHiggsfield(ctx, job, row.remote_id, payload as HfPayload))
+    } else if (row.provider === 'nexabot' && row.remote_id && payload.target === 'clip-video') {
+      const job = getJob(row.id)!
+      let creds: { baseUrl: string; apiKey: string }
+      try {
+        creds = requireNexa()
+      } catch (e) {
+        // The key may have been removed since the submit; fail the job instead of crashing startup.
+        emit.job(updateJob(row.id, { status: 'failed', error: (e as Error).message, message: null }))
+        continue
+      }
+      const remoteId = row.remote_id
+      runJob(job, 'nexabot', async (ctx) => {
+        const media = await nexa.waitForVideo({ baseUrl: creds.baseUrl, apiKey: creds.apiKey, id: remoteId, signal: ctx.signal })
+        return finishNexa(ctx, job, 'clip-video', getVideoModel(payload.model ?? ''), payload.prompt ?? '', media, remoteId)
+      })
     } else {
       emit.job(updateJob(row.id, { status: 'failed', error: 'Terhenti karena aplikasi ditutup. Coba lagi.', message: null }))
     }
@@ -572,7 +757,9 @@ const failedEstimates = new Map<string, number>()
  * Credits for one image, or one clip video of about `seconds`. The model pickers ask for every model,
  * so answers are kept for a day and failures for ten minutes. Flow2API models return null: the server
  * has no credit-estimate endpoint, and the cost is the user's own Google Flow credit, not a per-model price.
- * Manual/extension scenes return null for the same reason: no server, no per-model price.
+ * NexaBot models return their fixed catalog price (Rp300/video) without a server call — the price is
+ * in NexaBot credits, and the pickers convert it to Rupiah. Manual/extension scenes return null for
+ * the same reason: no server, no per-model price.
  */
 export async function estimateCredits(
   kind: 'image' | 'video',
@@ -584,6 +771,10 @@ export async function estimateCredits(
 ): Promise<CreditEstimate | null> {
   if (visualProvider === 'manual' || visualProvider === 'extension') return null
   if (isFlowModelId(modelId)) return null
+  if (isNexaModelId(modelId)) {
+    const credits = nexaCredits(modelId)
+    return credits === null ? null : { credits, usd: null }
+  }
   const model = kind === 'image' ? getImageModel(modelId) : getVideoModel(modelId)
   const body =
     kind === 'image'

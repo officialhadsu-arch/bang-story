@@ -4,7 +4,7 @@ export type ProjectStatus = 'draft' | 'script' | 'storyboard' | 'editing' | 'exp
 export type AspectRatio = '16:9' | '9:16'
 export type TtsProvider = 'gemini' | 'elevenlabs'
 export type LlmProvider = 'gemini' | 'openrouter' | 'groq' | 'custom'
-export type ApiProvider = 'higgsfield' | 'gemini' | 'elevenlabs' | 'openrouter' | 'groq' | 'custom'
+export type ApiProvider = 'higgsfield' | 'gemini' | 'elevenlabs' | 'openrouter' | 'groq' | 'custom' | 'nexabot'
 /** Where a live model list comes from: an LLM provider, or a TTS catalog. */
 export type ModelSource = LlmProvider | 'gemini-tts' | 'elevenlabs'
 export type MotionType = 'camera' | 'video'
@@ -302,6 +302,10 @@ export interface AppSettings {
   flow2apiEnabled: boolean
   /** Base URL of the Flow2API server, e.g. http://localhost:8000 */
   flow2apiBaseUrl: string
+  /** NexaBot (pay-as-you-go, Rp300/video) is off until the user reads the cost warning in Settings and turns it on. */
+  nexabotEnabled: boolean
+  /** Base URL of the NexaBot REST API (an assumption until the live PC test confirms it). */
+  nexabotBaseUrl: string
   /** Time captions against the real voice with Whisper after narration is made (when the model is present). */
   whisperAuto: boolean
 }
@@ -332,9 +336,11 @@ export interface ModelOption {
   tags: string[]
   /** Model family, e.g. "Kling", for a brand mark next to the name. */
   family?: string
-  /** Higgsfield credits (and dollars) for one request; undefined while unknown, null when it cannot be estimated. */
+  /** Provider credits for one request (Higgsfield credits, or NexaBot credits when `creditCurrency` is 'Rp'); undefined while unknown, null when it cannot be estimated. */
   credits?: number | null
   usd?: number | null
+  /** Currency the `credits` number is priced in. Default is Higgsfield credits ("kr"); 'Rp' is NexaBot credits at Rp1.000 each. */
+  creditCurrency?: 'Rp'
   /** What the credits pay for, e.g. "10 dtk". */
   creditUnit?: string
 }
