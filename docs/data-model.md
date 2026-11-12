@@ -33,6 +33,7 @@ dalam transaksi, lalu `user_version` dinaikkan.
 | 5 | `projects.video_resolution` |
 | 6 | `clips.video_camera`, `video_strength`, `transition_ms`, `voice_gain_db` |
 | 7 | `clips.media_in_ms`, `voice_in_ms`, `voice_out_ms`, `voice_start_ms` |
+| 8 | `clips.scene_key`, `clips.visual_provider` (tier 2, 0.3+); backfill `scene_key` dari `sort`, UNIQUE `(project_id, scene_key)` |
 
 **Aturan:** tambahkan migrasi baru di akhir. Jangan mengubah migrasi yang sudah ada, karena pengguna lama sudah
 menjalankannya.
@@ -57,6 +58,8 @@ Satu klip = satu adegan: gambar atau video, suara narasinya, dan geraknya.
 | Properti | Arti |
 |---|---|
 | `sort` | urutan di timeline (klip selalu bersambung tanpa celah) |
+| `sceneKey` | nomor adegan 2 digit yang stabil (`01`, `02`, …); folder kerja manual mencocokkan berkas hasil ke nomor ini |
+| `visualProvider` | jalur visual adegan: `auto` (mengikuti model proyek), `higgsfield`, `flow2api`, `manual`, `extension` |
 | `title`, `story`, `narration` | judul adegan, alur cerita (langkah Naskah), teks narasi (VO, boleh berisi tag `<short pause>` dll.) |
 | `visualPrompt` | prompt gambar berlabel: `Setting:`, `Action:`, `Wardrobe:`, `Framing:`, `Avoid:` |
 | `visualSource` | teks naskah saat rencana visual dibuat; kalau berbeda dari naskah sekarang, adegan perlu visual baru (`needsVisual`) |

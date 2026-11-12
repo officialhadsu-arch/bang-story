@@ -117,6 +117,39 @@ dari klien Flow2API De-Story (`flow2api.rs`) — pola saja, bukan salinan kode.
   didukung. Tutorial lengkap berbahasa Indonesia ada di dalam aplikasi (Pengaturan › Panduan Flow2API,
   `FlowGuideSection.tsx`) dan pemetaannya di `docs/flow2api-pemetaan-destory.md`.
 
+## Jalur manual & ekstensi (`services/manual.ts`, `shared/manual.ts`, `manualWatch.ts`)
+
+Tier 2 (0.3+): gambar dan video adegan dibuat di luar KenStory — oleh pengguna, agen, atau ekstensi browser — lalu
+dibawa kembali lewat folder kerja. Manual adalah provider (`visualProvider` per adegan: `auto` | `higgsfield` |
+`flow2api` | `manual` | `extension`), bukan mode; tiap adegan punya nomor stabil 2 digit (`sceneKey`, `01`, `02`, …,
+UNIQUE per proyek, backfill dari `sort`) yang dipakai untuk mencocokkan berkas hasil.
+
+- Skema: migrasi akhir di `db/index.ts` (`scene_key` + `visual_provider`, bawaan `auto`); `Clip` di `shared/types.ts`
+  + `VisualProvider` di `shared/manual.ts` (juga aturan pencocokan nama berkas + teks prompt bernomor + manifest).
+  `clipPrompt`/`videoPromptForClip` tinggal di `shared/prompts.ts` supaya jalur manual memakai pembangun prompt yang
+  sama dengan jalur otomatis.
+- Routing (`generation.ts`): diputus per adegan SEBELUM pemanggilan model (`resolveVisualProvider`); nilai tak dikenal
+  gagal keras. `manual`/`extension` membuat job manual (`insertJob` provider `manual`, `queued`, tanpa tugas jalan)
+  lewat `startManualJob`; `resumeJobs` melewatkan job manual (tetap menunggu, bukan gagal); `setActiveAsset`
+  menuntaskan job manual yang menunggu. `estimateCredits` mengembalikan null untuk manual/extension.
+- Folder kerja (`services/manual.ts`): `<folder aset proyek>/manual/`. `manual:prepareWorkFolder` menulis
+  `prompts.txt` (prompt bernomor adegan, untuk manusia) + `manual.json` (manifest mesin: sceneKey, clipId, judul,
+  kind, prompt, videoPrompt, aspek, durasi). `manual:scanWorkFolder` memasangkan berkas `<sceneKey>[-akhiran].<ext>`
+  (awalan `scene-`/`clip-` diabaikan; PNG/JPG/WebP, MP4/MOV/WebM) — disalin ke `images/`/`videos/`, `insertAsset`
+  provider `manual`/`extension` sesuai provider adegan, `patchClip`, job manual selesai; berkas tak cocok masuk
+  daftar "belum terpasang" dan dipasangkan lewat `manual:importFile`. Pindai dua kali tidak menduplikasi.
+  `manualWatch.ts` mengawasi folder (`fs.watch` non-rekursif, debounce 500 mdtk) dan hanya memberi tahu renderer
+  supaya menekan Pindai.
+- Ekstensi (D2-07): KenStory TIDAK membangun ekstensi browser dan TIDAK menjalankan WebSocket. Folder ekstensi ada
+  di checkout server Flow2API (`<folder server>/extension/`, Flow2API Captcha Worker, manifest v3); yang ditangkapnya
+  hanya token reCAPTCHA Enterprise dari Chrome pengguna, bukan hasil generate. Metode CAPTCHA (`browser` gratis,
+  `extension` gratis, berbayar butuh kunci, `flow2api_team`) adalah setelan panel admin server, bukan KenStory.
+- UI: Storyboard (`StoryboardStep.tsx`) — Salin Semua Prompt, Impor Gambar/Video, Pindai Folder Kerja, pemilih jalur
+  per adegan, lencana jalur + status "Menunggu hasil", panel folder kerja + daftar belum terpasang; Inspector —
+  Salin prompt gambar + status jalur manual. Tutorial lengkap berbahasa Indonesia ada di dalam aplikasi
+  (Pengaturan › Panduan Manual & Ekstensi, `ManualGuideSection.tsx`) dan pemetaannya di
+  `docs/manual-fadli-pemetaan.md`. Uji live 1 klip adalah gerbang PC (belum diuji di VM, seperti G3 tier 1).
+
 ## Whisper lokal (`src/main/whisper.ts`)
 
 - Biner: `resources/whisper/whisper-cli.exe` + DLL (whisper.cpp, lisensi MIT). Saat ini hanya untuk Windows.
