@@ -161,3 +161,10 @@ belum merge ke main):
     browser, langkah itu diserahkan ke induk dengan prosedur tertulis.
 - Belum diperiksa saat pemetaan: apakah picker model per adegan sudah ada. Hasil implementasi:
   model dipilih per proyek di `ModelSection`; tidak ada picker per adegan baru yang dibangun.
+- Verifikasi independen 12 Nov 2026 (laporan `laporan-0.3-tier1-flow2api.md` §6): LOLOS
+  dengan 3 perbaikan kecil yang sudah dikerjakan — angka uji service 34/34 → 35/35
+  (tes 401 ditambah terjemahan Mandarin), baris "Batas & limit — De-Story" di tabel §4
+  dikoreksi menjadi "Sebagian", dan dua butir rencana yang gugur diputuskan eksplisit:
+  pool kunci Gemini dijelaskan singkat di panduan (bukan rotasi — KenStory satu kunci
+  per penyedia), angka kredit per generate (Lite 10 / Fast 20 / Quality 100, dari
+  halaman bantuan Google Flow, dibaca Nov 2026) dimasukkan dengan peringatan bisa berubah.
