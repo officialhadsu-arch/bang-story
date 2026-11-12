@@ -220,7 +220,7 @@ function characterLook(c: { identity?: string; outfit?: string }): string {
 
 /**
  * The scene's image prompt as labelled lines the user can read and edit in the storyboard. The image
- * generator reads the Wardrobe and Avoid lines (see clipPrompt in generation.ts).
+ * generator reads the Wardrobe and Avoid lines (see clipPrompt in shared/prompts.ts).
  */
 function visualText(a: VisualScene): string {
   const wardrobe = (a.wardrobe ?? [])

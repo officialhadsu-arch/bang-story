@@ -15,6 +15,7 @@ import type {
   VoiceOption,
   WordTiming
 } from '@shared/types'
+import type { VisualProvider, WorkFileKind } from '@shared/manual'
 import { startExport } from './exporter'
 import {
   estimateCredits,
@@ -31,7 +32,7 @@ import {
 import { cancelJob } from './jobs'
 import { generateNarration, syncCaptions } from './narration'
 import { cancelDownload, downloadModel, openModelFolder, removeModel, whisperStatus } from './whisper'
-import { assetAbsPath } from './paths'
+import { assetAbsPath, manualWorkFolder } from './paths'
 import { detachVoice, splitClip } from './editing'
 import { emit } from './events'
 import {
@@ -54,6 +55,7 @@ import * as flow from './services/flow2api'
 import * as gemini from './services/gemini'
 import * as hf from './services/higgsfield'
 import * as llm from './services/llm'
+import { importManualFile, prepareWorkFolder, scanWorkFolder } from './services/manual'
 import { generateScript, generateVisuals, generateMusicPrompt } from './story'
 
 
@@ -111,9 +113,21 @@ export function registerIpc(): void {
   handle('whisper:remove', () => removeModel())
   handle('whisper:openFolder', () => openModelFolder())
   handle('generate:cancel', (jobId: string) => cancelJob(jobId))
-  handle('generate:estimate', (kind: 'image' | 'video', modelId: string, aspect: AspectRatio, seconds?: number, resolution?: string | null) =>
-    estimateCredits(kind, modelId, aspect, seconds, resolution)
+  handle(
+    'generate:estimate',
+    (kind: 'image' | 'video', modelId: string, aspect: AspectRatio, seconds?: number, resolution?: string | null, visualProvider?: VisualProvider) =>
+      estimateCredits(kind, modelId, aspect, seconds, resolution, visualProvider)
   )
+
+  // Tier 2 (0.3+): the manual / extension work folder.
+  handle('manual:prepareWorkFolder', (projectId: string) => prepareWorkFolder(projectId))
+  handle('manual:scanWorkFolder', (projectId: string) => scanWorkFolder(projectId))
+  handle('manual:importFile', (projectId: string, fileName: string, clipId: string, kind: WorkFileKind) => importManualFile(projectId, fileName, clipId, kind))
+  handle('manual:openWorkFolder', async (projectId: string) => {
+    getProject(projectId)
+    const err = await shell.openPath(manualWorkFolder(projectId))
+    if (err) throw new Error(`Folder kerja tidak bisa dibuka: ${err}`)
+  })
 
   handle('assets:setActive', (clipId: string, assetId: string) => setActiveAsset(clipId, assetId))
   handle('clips:split', (clipId: string, atMs: number) => splitClip(clipId, Number(atMs)))
@@ -209,6 +223,39 @@ export function registerIpc(): void {
       provider: 'local',
       prompt: basename(src),
       localPath: rel,
+      width: size.width,
+      height: size.height
+    })
+    await setActiveAsset(clipId, asset.id)
+    return asset
+  })
+
+  // Tier 2 (0.3+): the video twin of pickClipImage — a local video file for a clip, stored as the
+  // clip's video and linked at once. setActiveAsset also finishes a manual job waiting for it.
+  handle('assets:pickClipVideo', async (projectId: string, clipId: string) => {
+    const win = BrowserWindow.getFocusedWindow()
+    const res = await dialog.showOpenDialog(win!, {
+      title: 'Pilih video untuk klip',
+      filters: [{ name: 'Video', extensions: ['mp4', 'mov', 'webm'] }],
+      properties: ['openFile']
+    })
+    if (res.canceled || !res.filePaths[0]) return null
+    getProject(projectId)
+    const src = res.filePaths[0]
+    const rel = `videos/${randomUUID()}${extname(src).toLowerCase()}`
+    const abs = assetAbsPath(projectId, rel)
+    mkdirSync(dirname(abs), { recursive: true })
+    copyFileSync(src, abs)
+    const size = await probeSize(abs).catch(() => null)
+    if (!size) throw new Error('Video tidak bisa dibaca. Pakai file MP4, MOV, atau WebM.')
+    const asset = insertAsset({
+      projectId,
+      clipId,
+      kind: 'video',
+      provider: 'local',
+      prompt: basename(src),
+      localPath: rel,
+      durationMs: await probeDurationMs(abs).catch(() => null),
       width: size.width,
       height: size.height
     })

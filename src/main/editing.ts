@@ -3,12 +3,13 @@ import { randomUUID } from 'node:crypto'
 import { mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
 import ffmpegStatic from 'ffmpeg-static'
+import { nextSceneKey } from '@shared/manual'
 import { visualSourceOf } from '@shared/script'
 import { MIN_ITEM_MS, splitNarration, voiceSpan, wordGapNear } from '@shared/timeline'
 import type { Asset, Clip, ProjectBundle } from '@shared/types'
 import { emit } from './events'
 import { assetAbsPath, binPath } from './paths'
-import { getAsset, getBundle, getClip, insertAsset, insertClipAfter, patchClip, patchClipText, touchProject } from './repo'
+import { getAsset, getBundle, getClip, insertAsset, insertClipAfter, patchClip, patchClipText, touchProject, clipsOf } from './repo'
 
 /**
  * Timeline edits that touch files or several clips at once: splitting a clip in two and taking a voice off
@@ -107,6 +108,8 @@ export async function splitClip(clipId: string, atMs: number): Promise<ProjectBu
   const b: Clip = {
     ...clip,
     id: newId,
+    // The second half is a new scene, so it gets a fresh scene key (max+1); the first half keeps its own.
+    sceneKey: nextSceneKey(clipsOf(clip.projectId).map((c) => c.sceneKey)),
     title: `${clip.title} (2)`,
     story: '',
     narration: narrationB,

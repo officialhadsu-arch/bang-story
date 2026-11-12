@@ -1,14 +1,14 @@
 import { execFileSync } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { appendFileSync, copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { basename, dirname, extname } from 'node:path'
+import { basename, dirname, extname, join } from 'node:path'
 import { app, type BrowserWindow } from 'electron'
 import ffmpegStatic from 'ffmpeg-static'
 import { estimateWordTimings } from '@shared/captions'
 import { anchorPoint } from '@shared/overlays'
 import { startExport } from './exporter'
 import { setActiveAsset } from './generation'
-import { assetAbsPath, binPath } from './paths'
+import { assetAbsPath, binPath, manualWorkFolder } from './paths'
 import { probeDurationMs, probeSize } from './services/audio'
 import { createProject, getBundle, insertAsset, listProjects, patchClip, replaceStory, saveSnapshot, touchProject } from './repo'
 import { recordCheck, setTestKey } from './secrets'
@@ -197,7 +197,7 @@ export function attachDevHarness(win: BrowserWindow): void {
   const planPath = process.env.STUDIO_CAPTURE_PLAN
   if (!planPath) return
   let plan: {
-    main?: 'seed' | 'export' | 'key' | 'overlays' | 'speech' | 'videos' | 'importClipImages'
+    main?: 'seed' | 'export' | 'key' | 'overlays' | 'speech' | 'videos' | 'importClipImages' | 'manualFixture'
     exportTo?: string
     /** For main "export": an existing project instead of the seeded demo. */
     projectId?: string
@@ -266,6 +266,22 @@ export function attachDevHarness(win: BrowserWindow): void {
             })
             await setActiveAsset(clip.id, asset.id)
           }
+        }
+        if (step.main === 'manualFixture' && demoId) {
+          // Test-only: result files in the demo project's work folder, as if the user (or an
+          // outside agent) had generated them there — a still for scene 02, a short video for
+          // scene 03 (with a scene- prefix), and one file with no scene number, which must
+          // land in the "belum terpasang" list instead of attaching anywhere.
+          const dir = manualWorkFolder(demoId)
+          mkdirSync(dir, { recursive: true })
+          const ff = binPath(ffmpegStatic!)
+          execFileSync(ff, ['-y', '-f', 'lavfi', '-i', 'color=c=0x2E86AB:s=1280x720', '-frames:v', '1', join(dir, '02.png')], { windowsHide: true })
+          execFileSync(ff, ['-y', '-f', 'lavfi', '-i', 'testsrc2=s=1280x720:r=24:d=2', '-pix_fmt', 'yuv420p', join(dir, 'scene-03.mp4')], {
+            windowsHide: true
+          })
+          execFileSync(ff, ['-y', '-f', 'lavfi', '-i', 'color=c=0xE4572E:s=640x360', '-frames:v', '1', join(dir, 'hasil-tanpa-nomor.png')], {
+            windowsHide: true
+          })
         }
         if (step.main === 'key' && step.provider) {
           // Test-only key, kept in memory by setTestKey: it never touches

@@ -1,3 +1,4 @@
+import type { ManualScanResult, ManualWatchEvent, ManualWorkFolder, VisualProvider, WorkFileKind } from './manual'
 import type {
   ApiProvider,
   AspectRatio,
@@ -55,8 +56,18 @@ export interface StudioApi {
     /** Re-times caption words of voiced scenes against the audio with the local Whisper model. */
     syncCaptions(projectId: string, mode?: 'stale' | 'all'): Promise<Job>
     cancel(jobId: string): Promise<void>
-    /** Credits for one image, or one video of about `seconds`, with this model. Null without a working key. */
-    estimate(kind: 'image' | 'video', modelId: string, aspect: AspectRatio, seconds?: number, resolution?: string | null): Promise<CreditEstimate | null>
+    /** Credits for one image, or one video of about `seconds`, with this model. Null without a working key, for Flow2API models, and for manual/extension scenes. */
+    estimate(kind: 'image' | 'video', modelId: string, aspect: AspectRatio, seconds?: number, resolution?: string | null, visualProvider?: VisualProvider): Promise<CreditEstimate | null>
+  }
+  manual: {
+    /** Writes prompts.txt + manual.json into the project's work folder and returns the numbered prompt text. */
+    prepareWorkFolder(projectId: string): Promise<ManualWorkFolder>
+    /** Pairs result files in the work folder with their scenes; files with no scene come back as unmatched. */
+    scanWorkFolder(projectId: string): Promise<ManualScanResult>
+    /** Attaches one work-folder file to the scene the user picked. */
+    importFile(projectId: string, fileName: string, clipId: string, kind: WorkFileKind): Promise<Asset>
+    /** Opens the project's work folder in the file manager. */
+    openWorkFolder(projectId: string): Promise<void>
   }
   clips: {
     /** Splits a clip at `atMs` into two clips (picture, voice and narration divided at the nearest pause). */
@@ -73,6 +84,8 @@ export interface StudioApi {
     pickImage(projectId: string): Promise<Asset | null>
     /** A local image file to use as this clip's picture (also links it to the clip). */
     pickClipImage(projectId: string, clipId: string): Promise<Asset | null>
+    /** A local video file to use as this clip's video (also links it to the clip). */
+    pickClipVideo(projectId: string, clipId: string): Promise<Asset | null>
   }
   settings: {
     get(): Promise<AppSettings>
@@ -119,6 +132,8 @@ export interface StudioApi {
     clip(cb: (e: ClipPatchEvent) => void): () => void
     character(cb: (e: CharacterPatchEvent) => void): () => void
     asset(cb: (asset: Asset) => void): () => void
+    /** A file arrived or changed in a watched work folder (a hint to press Pindai). */
+    manual(cb: (e: ManualWatchEvent) => void): () => void
   }
 }
 
@@ -127,5 +142,6 @@ export const EVENTS = {
   clip: 'event:clip',
   character: 'event:character',
   asset: 'event:asset',
-  whisper: 'event:whisper'
+  whisper: 'event:whisper',
+  manual: 'event:manual'
 } as const

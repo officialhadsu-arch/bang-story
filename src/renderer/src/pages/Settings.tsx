@@ -29,13 +29,14 @@ import { ProviderLogo, type ProviderLogoId } from '../components/ProviderLogo'
 import { Select } from '../components/Select'
 import { AboutSection } from './AboutSection'
 import { FlowGuideSection } from './FlowGuideSection'
+import { ManualGuideSection } from './ManualGuideSection'
 import { WhisperSection } from './WhisperSection'
 import { Badge, Button, Field, IconButton, Switch, confirmDialog, cx, inputCls } from '../components/ui'
 import { errorText, relativeTime } from '../lib/format'
 import { useModels } from '../lib/useModels'
 import { useApp } from '../store/app'
 
-type Tab = 'services' | 'general' | 'about' | 'flow-guide'
+type Tab = 'services' | 'general' | 'about' | 'flow-guide' | 'manual-guide'
 
 interface ProviderOption<T extends string> {
   id: T
@@ -696,6 +697,7 @@ export function Settings() {
   const NAV: { id: Tab; label: string; icon: ReactNode }[] = [
     { id: 'services', label: 'Layanan AI dan kunci', icon: <KeyRound className="size-[18px]" /> },
     { id: 'flow-guide', label: 'Panduan Flow2API', icon: <BookOpenText className="size-[18px]" /> },
+    { id: 'manual-guide', label: 'Panduan Manual & Ekstensi', icon: <BookOpenText className="size-[18px]" /> },
     { id: 'general', label: 'Umum', icon: <SlidersHorizontal className="size-[18px]" /> },
     { id: 'about', label: 'Tentang aplikasi', icon: <Info className="size-[18px]" /> }
   ]
@@ -759,6 +761,8 @@ export function Settings() {
             )}
 
             {tab === 'flow-guide' && <FlowGuideSection />}
+
+            {tab === 'manual-guide' && settings && <ManualGuideSection baseUrl={settings.flow2apiBaseUrl} />}
 
             {tab === 'general' && settings && (
               <>

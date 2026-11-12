@@ -133,6 +133,14 @@ const MIGRATIONS: string[] = [
   ALTER TABLE clips ADD COLUMN voice_in_ms INTEGER NOT NULL DEFAULT 0;
   ALTER TABLE clips ADD COLUMN voice_out_ms INTEGER;
   ALTER TABLE clips ADD COLUMN voice_start_ms INTEGER NOT NULL DEFAULT 0;
+  `,
+  // Tier 2 (0.3+): per-scene visual path — a stable 2-digit scene key for the
+  // work folder, and the provider that makes this scene's picture/video.
+  `
+  ALTER TABLE clips ADD COLUMN scene_key TEXT;
+  ALTER TABLE clips ADD COLUMN visual_provider TEXT NOT NULL DEFAULT 'auto';
+  UPDATE clips SET scene_key = printf('%02d', sort + 1) WHERE scene_key IS NULL OR scene_key = '';
+  CREATE UNIQUE INDEX clips_project_scene_key ON clips(project_id, scene_key);
   `
 ]
 

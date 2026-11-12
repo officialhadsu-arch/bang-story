@@ -22,6 +22,11 @@ export function projectDir(projectId: string): string {
   return dir
 }
 
+/** Folder a project's manual work files live in: `<project folder>/manual/`. */
+export function manualWorkFolder(projectId: string): string {
+  return join(projectDir(projectId), 'manual')
+}
+
 /** Absolute path of an asset stored relative to its project folder. */
 export function assetAbsPath(projectId: string, localPath: string): string {
   return join(projectsRoot(), projectId, localPath)
