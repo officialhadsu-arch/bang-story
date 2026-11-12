@@ -611,7 +611,7 @@ export function Settings() {
                 <div>
                   <h1 className="font-display text-[34px] font-bold tracking-[-0.015em]">Layanan AI dan kunci</h1>
                   <p className="mt-2 max-w-[700px] text-[15px] text-ink-2">
-                    Bang Story memakai akun layanan milikmu sendiri. Kunci disimpan terenkripsi di komputer ini dan hanya dikirim langsung ke
+                    KenStory memakai akun layanan milikmu sendiri. Kunci disimpan terenkripsi di komputer ini dan hanya dikirim langsung ke
                     layanan yang bersangkutan.
                   </p>
                 </div>

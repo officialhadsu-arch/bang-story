@@ -95,7 +95,7 @@ di API Higgsfield (hanya di aplikasi webnya). Satu entri:
 Video tutorial diputar lewat iframe `https://www.youtube.com/embed/<id>`. Sejak 2025 YouTube mewajibkan pemutar
 embed mengirim identitas lewat header HTTP Referer (tanpa itu: Error 153). Aplikasi yang memuat halaman dari
 `file://` tidak mengirim Referer, jadi `identifyToYouTube()` (`src/main/index.ts`) menambahkan
-`Referer: https://id.bangtutorial.bangstory/` (ID aplikasi) hanya untuk permintaan embed. Iframe tanpa
+`Referer: https://id.kenstory.app/` (ID aplikasi) hanya untuk permintaan embed. Iframe tanpa
 autoplay, supaya putaran dari pengguna terhitung sebagai view.
 
 ## Membuka tautan

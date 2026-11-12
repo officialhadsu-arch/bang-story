@@ -19,7 +19,7 @@ export function Logo() {
     <span className="flex items-center gap-2.5">
       <LogoMark />
       <span className="flex flex-col leading-none">
-        <span className="font-display text-[21px] font-bold tracking-[-0.01em]">Bang Story</span>
+        <span className="font-display text-[21px] font-bold tracking-[-0.01em]">KenStory</span>
         <span className="mt-[3px] self-end text-[10.5px] font-medium text-muted">by Bang Tutorial</span>
       </span>
     </span>

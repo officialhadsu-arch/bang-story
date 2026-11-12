@@ -15,7 +15,7 @@ import { warmUpEncryption } from './secrets'
 function useDataFolder(): void {
   if (!app.isPackaged && process.env.STUDIO_USER_DATA) return app.setPath('userData', process.env.STUDIO_USER_DATA)
   const appData = app.getPath('appData')
-  const current = join(appData, 'Bang Story')
+  const current = join(appData, 'KenStory')
   const legacy = join(appData, 'Studio Cerita')
   if (!existsSync(current) && existsSync(join(legacy, 'studio.db'))) {
     try {
@@ -42,7 +42,7 @@ registerSchemes()
  */
 function identifyToYouTube(): void {
   session.defaultSession.webRequest.onBeforeSendHeaders({ urls: ['https://www.youtube.com/embed/*'] }, (details, done) => {
-    done({ requestHeaders: { ...details.requestHeaders, Referer: 'https://id.bangtutorial.bangstory/' } })
+    done({ requestHeaders: { ...details.requestHeaders, Referer: 'https://id.kenstory.app/' } })
   })
 }
 
@@ -55,7 +55,7 @@ function createWindow(): void {
     show: false,
     backgroundColor: '#FAF7F2',
     autoHideMenuBar: true,
-    title: 'Bang Story',
+    title: 'KenStory',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: true,
@@ -96,7 +96,7 @@ if (!single) {
   })
 
   void app.whenReady().then(() => {
-    app.setAppUserModelId('id.bangtutorial.bangstory')
+    app.setAppUserModelId('id.kenstory.app')
     warmUpEncryption()
     getDb()
     handleStudioProtocol()
