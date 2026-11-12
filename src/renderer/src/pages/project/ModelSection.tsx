@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Film, Image as ImageIcon, Move, Users } from 'lucide-react'
+import { isFlowModelId } from '@shared/flow2api'
 import { effectiveResolution, fitDuration, getImageModel, getVideoModel, hfModelOptions, maxRefs, resolutionOptions } from '@shared/higgsfield'
 import type { CreditEstimate, ModelOption, Project } from '@shared/types'
 import { ModelLogo } from '../../components/ModelLogo'
@@ -71,6 +72,8 @@ export function ModelSection({
 }) {
   const image = getImageModel(project.imageModel)
   const video = getVideoModel(project.videoModel)
+  const imageIsFlow = isFlowModelId(image.id)
+  const videoIsFlow = isFlowModelId(video.id)
   const seconds = fitDuration(video, perClip) ?? perClip
   const imageCost = useEstimate('image', image.id, project.aspectRatio)
   const resolutions = resolutionOptions(video)
@@ -95,7 +98,7 @@ export function ModelSection({
       <div className="flex items-baseline gap-2">
         <span className="text-sm font-semibold">Model AI</span>
         <span className="text-[13px] text-muted">
-          {IMAGE_OPTIONS.length} model gambar dan {VIDEO_OPTIONS.length} model video dari Higgsfield
+          {IMAGE_OPTIONS.length} model gambar dan {VIDEO_OPTIONS.length} model video dari Higgsfield dan Google Flow
         </span>
       </div>
       <div className="grid grid-cols-2 gap-3">
@@ -106,18 +109,22 @@ export function ModelSection({
             footerNote={hasKey ? 'kredit per gambar, perkiraan Higgsfield untuk akunmu' : undefined}
             renderIcon={(m) => <ModelLogo family={m.family} />}
             detail="description"
-            tagFilters={['Rekomendasi', 'Referensi', 'GPT Image', 'Soul', 'Recraft', '4K']}
+            tagFilters={['Rekomendasi', 'Referensi', 'GPT Image', 'Soul', 'Recraft', '4K', 'Google Flow']}
             menuClassName="w-[430px]"
             onChange={(id) => onChange({ imageModel: id })}
           />
           <p className="text-[12.5px] leading-snug text-ink-2">
-            <Cost value={imageCost} hasKey={hasKey}>
-              {(c) => (
-                <>
-                  ≈ {creditLabel(c)} kredit per gambar · {clipCount} gambar ≈ <b className="font-semibold text-ink">{creditLabel(c * clipCount)} kredit</b>
-                </>
-              )}
-            </Cost>
+            {imageIsFlow ? (
+              'Tanpa estimasi — kredit Google Flow dari langganan AI Pro kamu.'
+            ) : (
+              <Cost value={imageCost} hasKey={hasKey}>
+                {(c) => (
+                  <>
+                    ≈ {creditLabel(c)} kredit per gambar · {clipCount} gambar ≈ <b className="font-semibold text-ink">{creditLabel(c * clipCount)} kredit</b>
+                  </>
+                )}
+              </Cost>
+            )}
           </p>
           <p className="flex items-start gap-1.5 text-[12.5px] leading-snug text-muted">
             <Users className="mt-px size-3.5 shrink-0" />
@@ -133,7 +140,7 @@ export function ModelSection({
             footerNote={hasKey ? `kredit per video untuk klip ±${perClip} detik` : undefined}
             renderIcon={(m) => <ModelLogo family={m.family} />}
             detail="description"
-            tagFilters={['Rekomendasi', 'Kling', 'Seedance', 'Wan', 'Referensi', '4K']}
+            tagFilters={['Rekomendasi', 'Kling', 'Seedance', 'Wan', 'Referensi', '4K', 'Google Flow']}
             align="right"
             menuClassName="w-[430px]"
             onChange={(id) => onChange({ videoModel: id })}
@@ -153,13 +160,17 @@ export function ModelSection({
             resolution && <p className="text-[12.5px] text-ink-2">Resolusi {resolution} (satu-satunya pilihan model ini)</p>
           )}
           <p className="text-[12.5px] leading-snug text-ink-2">
-            <Cost value={videoCost} hasKey={hasKey}>
-              {(c) => (
-                <>
-                  ≈ {creditLabel(c)} kredit per video {seconds} detik{resolution ? `, ${resolution}` : ''}
-                </>
-              )}
-            </Cost>
+            {videoIsFlow ? (
+              'Tanpa estimasi — kredit Google Flow dari langganan AI Pro kamu.'
+            ) : (
+              <Cost value={videoCost} hasKey={hasKey}>
+                {(c) => (
+                  <>
+                    ≈ {creditLabel(c)} kredit per video {seconds} detik{resolution ? `, ${resolution}` : ''}
+                  </>
+                )}
+              </Cost>
+            )}
           </p>
           <p className="flex items-start gap-1.5 text-[12.5px] leading-snug text-muted">
             <Move className="mt-px size-3.5 shrink-0" />

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import {
   ArrowLeft,
+  BookOpenText,
   Check,
   ChevronDown,
   Cpu,
@@ -13,9 +14,12 @@ import {
   Info,
   KeyRound,
   Mic,
+  Server,
   SlidersHorizontal,
-  Trash2
+  Trash2,
+  TriangleAlert
 } from 'lucide-react'
+import { FLOW_DEFAULT_BASE_URL, FLOW_IMAGE_MODELS, FLOW_VIDEO_MODELS } from '@shared/flow2api'
 import { HF_IMAGE_MODELS, HF_VIDEO_MODELS } from '@shared/higgsfield'
 import { LANGUAGES, LLM_PROVIDERS } from '@shared/models'
 import type { ApiProvider, AppSettings, KeyStatus, KeyTestResult, LlmProvider, TtsProvider } from '@shared/types'
@@ -24,13 +28,14 @@ import { ModelPicker } from '../components/ModelPicker'
 import { ProviderLogo, type ProviderLogoId } from '../components/ProviderLogo'
 import { Select } from '../components/Select'
 import { AboutSection } from './AboutSection'
+import { FlowGuideSection } from './FlowGuideSection'
 import { WhisperSection } from './WhisperSection'
-import { Badge, Button, Field, IconButton, confirmDialog, cx, inputCls } from '../components/ui'
+import { Badge, Button, Field, IconButton, Switch, confirmDialog, cx, inputCls } from '../components/ui'
 import { errorText, relativeTime } from '../lib/format'
 import { useModels } from '../lib/useModels'
 import { useApp } from '../store/app'
 
-type Tab = 'services' | 'general' | 'about'
+type Tab = 'services' | 'general' | 'about' | 'flow-guide'
 
 interface ProviderOption<T extends string> {
   id: T
@@ -548,6 +553,127 @@ function HiggsfieldSection({ status, onChanged }: { status?: KeyStatus; onChange
   )
 }
 
+function FlowSection({
+  settings,
+  onSettings,
+  onOpenGuide
+}: {
+  settings: AppSettings
+  onSettings: (s: AppSettings) => void
+  onOpenGuide: () => void
+}) {
+  const { toast } = useApp()
+  const [ack, setAck] = useState(false)
+  const [url, setUrl] = useState(settings.flow2apiBaseUrl)
+  const [testing, setTesting] = useState(false)
+  const [test, setTest] = useState<KeyTestResult | null>(null)
+
+  const saveUrl = async (): Promise<void> => {
+    const clean = url.trim() || FLOW_DEFAULT_BASE_URL
+    setUrl(clean)
+    onSettings(await window.api.settings.set({ flow2apiBaseUrl: clean }))
+  }
+
+  const toggle = async (v: boolean): Promise<void> => {
+    if (v && !ack) {
+      toast('info', 'Baca dulu peringatan di atas, lalu centang kotak persetujuan sebelum menyalakan Google Flow.')
+      return
+    }
+    onSettings(await window.api.settings.set({ flow2apiEnabled: v }))
+    if (!v) setAck(false)
+    toast(
+      'success',
+      v
+        ? 'Google Flow dinyalakan. Model Google Flow kini bisa dipilih di langkah Ide cerita.'
+        : 'Google Flow dimatikan. Model Google Flow tidak bisa dipakai sampai dinyalakan lagi.'
+    )
+  }
+
+  const runTest = async (): Promise<void> => {
+    setTesting(true)
+    setTest(null)
+    try {
+      setTest(await window.api.flow2api.testConnection(url.trim() || FLOW_DEFAULT_BASE_URL))
+    } catch (e) {
+      setTest({ ok: false, message: errorText(e) })
+    } finally {
+      setTesting(false)
+    }
+  }
+
+  return (
+    <>
+      <SectionTitle
+        icon={<Server className="size-5" />}
+        title="Google Flow (Flow2API)"
+        sub="Pakai kredit Google Flow dari langganan AI Pro kamu — tanpa kunci Higgsfield."
+      />
+      <Card>
+        <div className="flex items-center gap-3">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-sand font-display text-lg font-bold">G</span>
+          <div className="flex min-w-0 flex-1 flex-col">
+            <span className="text-base font-bold">Google Flow</span>
+            <span className="text-[13px] text-ink-2">Nano Banana, Veo 3.1, dan Omni lewat server Flow2API di komputer kamu</span>
+          </div>
+          <div className={cx(!ack && !settings.flow2apiEnabled && 'pointer-events-none opacity-40')}>
+            <Switch on={settings.flow2apiEnabled} onChange={(v) => void toggle(v)} label="Nyalakan Google Flow" />
+          </div>
+        </div>
+        <div className="flex items-start gap-2.5 rounded-xl border border-amber-600/40 bg-amber-50 px-4 py-3.5 text-[13px] leading-relaxed text-amber-900">
+          <TriangleAlert className="mt-0.5 size-4 shrink-0" />
+          <div className="flex flex-col gap-2">
+            <span>
+              <strong>Peringatan risiko akun (D-16).</strong> Flow2API adalah alat tidak resmi yang mengotomatisasi layanan Google memakai
+              login Google kamu sendiri dan melewati pemeriksaan reCAPTCHA. Google bisa mendeteksi otomatisasi ini, membatasi (galat 429),
+              atau membatasi/menonaktifkan akses akun. Akun ini sama dengan akun kerja harianmu, jadi kredit, Gemini, dan layanan Google lain
+              yang terikat ke akun itu ikut terdampak. KenStory tidak menyimpan login Google kamu — login itu disimpan di server Flow2API di
+              komputer ini, bukan di KenStory.
+            </span>
+            <label className="flex cursor-pointer items-start gap-2 font-medium">
+              <input type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)} className="mt-0.5 size-4 accent-ink" />
+              <span>Saya sudah membaca peringatan di atas dan paham risikonya.</span>
+            </label>
+          </div>
+        </div>
+        <Field
+          label="Alamat server Flow2API"
+          hint="Biasanya http://localhost:8000 — server yang kamu jalankan di komputer ini. Kosongkan untuk memakai alamat bawaan."
+        >
+          <input
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            onBlur={() => void saveUrl()}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') void saveUrl()
+            }}
+            placeholder={FLOW_DEFAULT_BASE_URL}
+            className={inputCls}
+          />
+        </Field>
+        <div className="flex flex-wrap items-center gap-3">
+          <Button onClick={() => void runTest()} disabled={testing}>
+            {testing ? 'Menguji…' : 'Uji Koneksi'}
+          </Button>
+          <Button variant="ghost" onClick={onOpenGuide} icon={<BookOpenText className="size-4" />}>
+            Buka Panduan Flow2API
+          </Button>
+          {test && (
+            <span className={cx('text-[13px] font-medium', test.ok ? 'text-emerald-700' : 'text-red-700')}>{test.message}</span>
+          )}
+        </div>
+        <p className="flex items-start gap-2.5 border-t border-dashed border-line pt-4 text-[13px] leading-relaxed text-ink-2">
+          <Film className="mt-0.5 size-4 shrink-0" />
+          <span>
+            Semua {FLOW_IMAGE_MODELS.length} model gambar dan {FLOW_VIDEO_MODELS.length} model video Google Flow bisa dipakai. Modelnya dipilih
+            per proyek di langkah <strong className="text-ink">Ide cerita</strong>, bagian Model AI. Biayanya memakai kredit Google Flow dari
+            langganan AI Pro kamu — KenStory tidak menampilkan perkiraan kredit untuk model ini.
+          </span>
+        </p>
+      </Card>
+    </>
+  )
+}
+
 export function Settings() {
   const { go, route } = useApp()
   const back = route.name === 'settings' && route.back ? route.back : ({ name: 'home' } as const)
@@ -569,6 +695,7 @@ export function Settings() {
 
   const NAV: { id: Tab; label: string; icon: ReactNode }[] = [
     { id: 'services', label: 'Layanan AI dan kunci', icon: <KeyRound className="size-[18px]" /> },
+    { id: 'flow-guide', label: 'Panduan Flow2API', icon: <BookOpenText className="size-[18px]" /> },
     { id: 'general', label: 'Umum', icon: <SlidersHorizontal className="size-[18px]" /> },
     { id: 'about', label: 'Tentang aplikasi', icon: <Info className="size-[18px]" /> }
   ]
@@ -618,9 +745,12 @@ export function Settings() {
                 <LlmSection settings={settings} statusOf={statusOf} onChanged={reload} onSettings={setSettings} />
                 <TtsSection settings={settings} statusOf={statusOf} onChanged={reload} onSettings={setSettings} />
                 <HiggsfieldSection status={statusOf('higgsfield')} onChanged={reload} />
+                <FlowSection settings={settings} onSettings={setSettings} onOpenGuide={() => setTab('flow-guide')} />
                 <WhisperSection settings={settings} onSettings={setSettings} />
               </>
             )}
+
+            {tab === 'flow-guide' && <FlowGuideSection />}
 
             {tab === 'general' && settings && (
               <>
