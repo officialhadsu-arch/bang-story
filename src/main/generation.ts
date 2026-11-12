@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto'
-import { mkdirSync, writeFileSync } from 'node:fs'
-import { dirname } from 'node:path'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { dirname, extname } from 'node:path'
 import { estimateWordTimings } from '@shared/captions'
+import { isFlowModelId } from '@shared/flow2api'
 import { stripVoiceTags } from '@shared/speech'
 import { getImageModel, getVideoModel, imageBody, maxRefs, promptLimit, videoBody, type HfModel } from '@shared/higgsfield'
 import { getStyle } from '@shared/styles'
@@ -31,6 +32,8 @@ import {
 import { dropCache, getSettings, readCache, writeCache } from './settings'
 import { probeDurationMs, probeSize } from './services/audio'
 import * as eleven from './services/elevenlabs'
+import * as flow from './services/flow2api'
+import type { FlowImageRef, FlowMedia } from './services/flow2api'
 import * as gemini from './services/gemini'
 import * as hf from './services/higgsfield'
 import { downloadTo, sleep } from './services/http'
@@ -160,6 +163,104 @@ async function referenceUrls(model: HfModel, chars: Character[], signal: AbortSi
   return { urls, names }
 }
 
+// ---------- Flow2API (Google Flow through a self-hosted server) ----------
+
+/** Flow2API takes image bytes, not a public URL, so reference sheets are read from disk. The MIME comes from the file, not a hardcoded value. */
+function mimeFromExt(path: string): string {
+  switch (extname(path).toLowerCase()) {
+    case '.jpg':
+    case '.jpeg':
+      return 'image/jpeg'
+    case '.webp':
+      return 'image/webp'
+    case '.png':
+    default:
+      return 'image/png'
+  }
+}
+
+async function referenceImages(model: HfModel, chars: Character[], signal: AbortSignal): Promise<{ images: FlowImageRef[]; names: string[] }> {
+  const limit = maxRefs(model)
+  if (limit === 0) return { images: [], names: [] }
+  await waitForSheets(chars.map((c) => c.id), signal)
+  const images: FlowImageRef[] = []
+  const names: string[] = []
+  for (const c of chars) {
+    const fresh = getCharacter(c.id)
+    const sheet = getAsset(fresh.sheetAssetId)
+    if (!sheet || images.length >= limit) continue
+    const abs = assetAbsPath(sheet.projectId, sheet.localPath)
+    images.push({ bytes: readFileSync(abs), mime: mimeFromExt(abs) })
+    names.push(fresh.name)
+  }
+  return { images, names }
+}
+
+/** Flow2API stays off until the user reads the D-16 account-risk warning and turns it on in Settings. */
+function requireFlowEnabled(): string {
+  const settings = getSettings()
+  if (!settings.flow2apiEnabled)
+    throw new Error('Flow2API belum dinyalakan. Nyalakan di Pengaturan › Layanan AI dan kunci › Google Flow, lalu baca Panduan Flow2API.')
+  return settings.flow2apiBaseUrl
+}
+
+/** Saves a Flow2API result and attaches it to the clip or character, mirroring finishHiggsfield's tail. */
+async function finishFlow(ctx: TaskCtx, job: Job, target: 'clip-image' | 'sheet' | 'clip-video', model: HfModel, prompt: string, out: FlowMedia): Promise<string> {
+  const isVideo = target === 'clip-video'
+  ctx.progress(0.93, 'Menyimpan hasil')
+  const rel = saveFile(job.projectId, isVideo ? 'videos' : 'images', extFromType(out.contentType, out.remoteUrl ?? '', isVideo ? '.mp4' : '.png'), out.bytes)
+  const abs = assetAbsPath(job.projectId, rel)
+  const size = await probeSize(abs)
+  const durationMs = isVideo ? await probeDurationMs(abs).catch(() => null) : null
+  const asset = insertAsset({
+    projectId: job.projectId,
+    clipId: job.clipId,
+    characterId: job.characterId,
+    kind: isVideo ? 'video' : 'image',
+    provider: 'flow2api',
+    model: model.id,
+    prompt,
+    remoteId: null,
+    remoteUrl: out.remoteUrl,
+    localPath: rel,
+    durationMs,
+    width: size?.width ?? null,
+    height: size?.height ?? null
+  })
+  emit.asset(asset)
+  if (target === 'sheet' && job.characterId) {
+    setCharacterSheet(job.characterId, asset.id)
+    emit.character({ characterId: job.characterId, patch: { sheetAssetId: asset.id } })
+  } else if (target === 'clip-image' && job.clipId) {
+    patchClip(job.clipId, { imageAssetId: asset.id })
+    emit.clip({ clipId: job.clipId, patch: { imageAssetId: asset.id } })
+    const project = getProject(job.projectId)
+    const first = clipsOf(job.projectId)[0]
+    if (!project.coverAssetId || first?.id === job.clipId) touchProject(job.projectId, { coverAssetId: asset.id })
+  } else if (target === 'clip-video' && job.clipId) {
+    const patch = { videoAssetId: asset.id, motionType: 'video' as const, mediaInMs: 0 }
+    patchClip(job.clipId, patch)
+    emit.clip({ clipId: job.clipId, patch })
+  }
+  touchProject(job.projectId)
+  return asset.id
+}
+
+function startFlow(
+  job: Job,
+  build: (ctx: TaskCtx) => Promise<{ target: 'clip-image' | 'sheet' | 'clip-video'; model: HfModel; prompt: string; run: (ctx: TaskCtx) => Promise<FlowMedia> }>
+): Job {
+  emit.job(job)
+  return runJob(job, 'flow2api', async (ctx) => {
+    ctx.progress(0.04, 'Menyiapkan prompt')
+    const { target, model, prompt, run } = await build(ctx)
+    ctx.progress(0.08, 'Mengirim ke Flow2API')
+    updateJobPayload(job.id, { target, model: model.id, prompt })
+    const out = await run(ctx)
+    return finishFlow(ctx, job, target, model, prompt, out)
+  })
+}
+
 // ---------- finishing a Higgsfield request (also used to resume after a restart) ----------
 
 interface HfPayload {
@@ -241,6 +342,24 @@ export function generateClipImage(clipId: string): Job {
   const existing = activeJobFor({ clipId }, 'image')
   if (existing) return existing
   const clip = getClip(clipId)
+  if (isFlowModelId(getProject(clip.projectId).imageModel)) {
+    const job = insertJob({ projectId: clip.projectId, clipId, kind: 'image', provider: 'flow2api' })
+    return startFlow(job, async (ctx) => {
+      const baseUrl = requireFlowEnabled()
+      const fresh = getClip(clipId)
+      const project = getProject(fresh.projectId)
+      const model = getImageModel(project.imageModel)
+      const chars = charactersOf(project.id).filter((c) => fresh.characterIds.includes(c.id))
+      const refs = await referenceImages(model, chars, ctx.signal)
+      const prompt = clipPrompt(project, fresh, chars, refs.names, promptLimit(model))
+      return {
+        target: 'clip-image' as const,
+        model,
+        prompt,
+        run: (c: TaskCtx) => flow.generateImage({ baseUrl, model, prompt, aspect: project.aspectRatio, refs: refs.images, signal: c.signal })
+      }
+    })
+  }
   const job = insertJob({ projectId: clip.projectId, clipId, kind: 'image', provider: 'higgsfield' })
   return startHiggsfield(job, async (ctx) => {
     const fresh = getClip(clipId)
@@ -261,6 +380,21 @@ export function generateCharacterSheet(characterId: string): Job {
   const existing = activeJobFor({ characterId }, 'sheet')
   if (existing) return existing
   const c = getCharacter(characterId)
+  if (isFlowModelId(getProject(c.projectId).imageModel)) {
+    const job = insertJob({ projectId: c.projectId, characterId, kind: 'sheet', provider: 'flow2api' })
+    return startFlow(job, async () => {
+      const baseUrl = requireFlowEnabled()
+      const project = getProject(c.projectId)
+      const model = getImageModel(project.imageModel)
+      const prompt = sheetPrompt(project, getCharacter(characterId))
+      return {
+        target: 'sheet' as const,
+        model,
+        prompt,
+        run: (ctx: TaskCtx) => flow.generateImage({ baseUrl, model, prompt, aspect: '16:9', refs: [], signal: ctx.signal })
+      }
+    })
+  }
   const job = insertJob({ projectId: c.projectId, characterId, kind: 'sheet', provider: 'higgsfield' })
   return startHiggsfield(job, async () => {
     const project = getProject(c.projectId)
@@ -279,6 +413,32 @@ export function generateClipVideo(clipId: string): Job {
   if (existing) return existing
   const clip = getClip(clipId)
   if (!clip.imageAssetId) throw new Error('Buat gambar klip ini dulu sebelum membuat video AI.')
+  if (isFlowModelId(getProject(clip.projectId).videoModel)) {
+    const job = insertJob({ projectId: clip.projectId, clipId, kind: 'video', provider: 'flow2api' })
+    return startFlow(job, async (ctx) => {
+      const baseUrl = requireFlowEnabled()
+      const fresh = getClip(clipId)
+      const image = getAsset(fresh.imageAssetId)
+      if (!image) throw new Error('Gambar klip tidak ditemukan')
+      const project = getProject(fresh.projectId)
+      const model = getVideoModel(project.videoModel)
+      ctx.progress(0.05, 'Menyiapkan gambar awal')
+      const abs = assetAbsPath(image.projectId, image.localPath)
+      const firstFrame: FlowImageRef = { bytes: readFileSync(abs), mime: mimeFromExt(abs) }
+      let prompt =
+        fresh.videoPrompt.trim() ||
+        `${splitAvoid(fresh.visualPrompt).scene.replace(/\.$/, '')}. Subtle natural motion of the characters and environment, the camera slowly pushes in. Keep the art style of the first frame.`
+      if (model.input.mode === 'reference')
+        prompt = `Open on the exact scene of the reference image and keep its art style, characters and composition. ${prompt}`
+      return {
+        target: 'clip-video' as const,
+        model,
+        prompt,
+        run: (c: TaskCtx) =>
+          flow.generateVideo({ baseUrl, model, prompt, firstFrame, seconds: fresh.durationMs / 1000, aspect: project.aspectRatio, signal: c.signal })
+      }
+    })
+  }
   const job = insertJob({ projectId: clip.projectId, clipId, kind: 'video', provider: 'higgsfield' })
   return startHiggsfield(job, async (ctx) => {
     const fresh = getClip(clipId)
@@ -416,7 +576,8 @@ const failedEstimates = new Map<string, number>()
 
 /**
  * Credits for one image, or one clip video of about `seconds`. The model pickers ask for every model,
- * so answers are kept for a day and failures for ten minutes.
+ * so answers are kept for a day and failures for ten minutes. Flow2API models return null: the server
+ * has no credit-estimate endpoint, and the cost is the user's own Google Flow credit, not a per-model price.
  */
 export async function estimateCredits(
   kind: 'image' | 'video',
@@ -425,6 +586,7 @@ export async function estimateCredits(
   seconds = 5,
   resolution?: string | null
 ): Promise<CreditEstimate | null> {
+  if (isFlowModelId(modelId)) return null
   const model = kind === 'image' ? getImageModel(modelId) : getVideoModel(modelId)
   const body =
     kind === 'image'

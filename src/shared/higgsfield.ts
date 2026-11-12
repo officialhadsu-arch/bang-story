@@ -1,4 +1,5 @@
 import catalog from './higgsfield-catalog.json'
+import { FLOW_IMAGE_MODELS, FLOW_VIDEO_MODELS, canonicalFlowId, isFlowModelId } from './flow2api'
 import type { AspectRatio, ModelOption } from './types'
 
 /**
@@ -39,10 +40,18 @@ export const DEFAULT_IMAGE_MODEL = 'marketing-studio/image/sunburst'
 export const DEFAULT_VIDEO_MODEL = 'kling-video/v3.0/std/image-to-video'
 
 export function getImageModel(id: string | null | undefined): HfModel {
+  if (isFlowModelId(id)) {
+    const canonical = canonicalFlowId(id!)
+    return FLOW_IMAGE_MODELS.find((m) => m.id === canonical) ?? FLOW_IMAGE_MODELS[0]
+  }
   return HF_IMAGE_MODELS.find((m) => m.id === id) ?? HF_IMAGE_MODELS.find((m) => m.id === DEFAULT_IMAGE_MODEL)!
 }
 
 export function getVideoModel(id: string | null | undefined): HfModel {
+  if (isFlowModelId(id)) {
+    const canonical = canonicalFlowId(id!)
+    return FLOW_VIDEO_MODELS.find((m) => m.id === canonical) ?? FLOW_VIDEO_MODELS[0]
+  }
   return HF_VIDEO_MODELS.find((m) => m.id === id) ?? HF_VIDEO_MODELS.find((m) => m.id === DEFAULT_VIDEO_MODEL)!
 }
 
@@ -184,15 +193,17 @@ export function describeModel(m: HfModel): string {
   return [durationLabel(m), m.input.mode === 'reference' ? 'gambar klip jadi referensi' : 'mulai dari gambar klip'].filter(Boolean).join(' · ')
 }
 
-/** Picker rows, the default first with a "Rekomendasi" tag so first-time users have a safe choice. */
+/** Picker rows, the default first with a "Rekomendasi" tag so first-time users have a safe choice. Flow models follow the Higgsfield list; they carry no credit estimate (see estimateCredits). */
 export function hfModelOptions(kind: 'image' | 'video'): ModelOption[] {
   const list = kind === 'image' ? HF_IMAGE_MODELS : HF_VIDEO_MODELS
+  const flow = kind === 'image' ? FLOW_IMAGE_MODELS : FLOW_VIDEO_MODELS
   const recommended = kind === 'image' ? DEFAULT_IMAGE_MODEL : DEFAULT_VIDEO_MODEL
-  return [...list.filter((m) => m.id === recommended), ...list.filter((m) => m.id !== recommended)].map((m) => ({
+  const toOption = (m: HfModel): ModelOption => ({
     id: m.id,
     name: m.name,
     family: m.family,
     description: describeModel(m),
     tags: m.id === recommended ? ['Rekomendasi', ...m.tags] : m.tags
-  }))
+  })
+  return [...list.filter((m) => m.id === recommended), ...list.filter((m) => m.id !== recommended), ...flow].map(toOption)
 }

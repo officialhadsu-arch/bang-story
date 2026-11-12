@@ -290,6 +290,10 @@ export interface AppSettings {
   /** Higgsfield models for new projects: the last ones picked in the Idea step. */
   imageModel: string
   videoModel: string
+  /** Flow2API (Google Flow through a self-hosted server) is off until the user reads the D-16 account-risk warning in Settings and turns it on. */
+  flow2apiEnabled: boolean
+  /** Base URL of the Flow2API server, e.g. http://localhost:8000 */
+  flow2apiBaseUrl: string
   /** Time captions against the real voice with Whisper after narration is made (when the model is present). */
   whisperAuto: boolean
 }
