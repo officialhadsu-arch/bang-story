@@ -117,11 +117,48 @@ dari klien Flow2API De-Story (`flow2api.rs`) — pola saja, bukan salinan kode.
   didukung. Tutorial lengkap berbahasa Indonesia ada di dalam aplikasi (Pengaturan › Panduan Flow2API,
   `FlowGuideSection.tsx`) dan pemetaannya di `docs/flow2api-pemetaan-destory.md`.
 
+## NexaBot (`services/nexabot.ts`, `shared/nexabot.ts`)
+
+Tier 3 (0.3+): gambar dan video berbayar murah lewat REST API NexaBot (`api.nexabot.id`) dengan kunci pengguna
+sendiri (BYOK, terenkripsi seperti kunci lain). Tarif terverifikasi dari beranda nexabot.id (12 Nov 2026): 1 kredit =
+Rp1.000; Nano Banana Pro Rp150, GPT Image 2.5 Rp100, Omni Flash 1.2 Rp300 per generate. Angka Rp400/video dari konsep
+v2.1 sudah tidak berlaku.
+
+- Katalog model di `shared/nexabot.ts`: 2 model gambar, 1 model video, semuanya berawalan `nexabot:`. `getImageModel`/
+  `getVideoModel` jatuh ke katalog ini bila id berawalan `nexabot:`. Harga katalog dipakai estimasi biaya tanpa
+  panggilan server (`nexaPriceIdr`, `idrLabel`).
+- **Bentuk API adalah asumsi berlabel (D3-01)** — dokumentasi resmi tidak ditemukan di publik. Semua asumsi tinggal di
+  satu modul transport: `POST /v1/images/generations` `{model, prompt, aspect_ratio, images: [data URI]}` →
+  `{data: [{url | b64_json}]}`; `POST /v1/videos/generations` `{model, prompt, image: data URI, duration}` →
+  `{id, status}`; `GET /v1/videos/{id}` → `{status: queued|processing|completed|failed, video: {url}}`;
+  `POST /v1/videos/{id}/cancel`; probe `GET /v1/models`; auth `Authorization: Bearer <kunci>`. Daftar periksa pertama
+  uji live PC. Durasi video katalog `[15]` mengikuti dua produk yang memakai API ini (PAWARNA, tokogame.ai.id);
+  beranda alat web menyebut sampai 10 detik — uji live yang menentukan.
+- Alur: gambar satu POST lalu hasilnya diunduh (atau didekode dari `b64_json`); video submit → simpan remote id →
+  polling backoff 2 dtk → 10 dtk, timeout 20 menit, lalu unduh. Timeout: gambar 300 dtk, video 600 dtk, unduh 180 dtk,
+  probe 8 dtk. Referensi dan frame pertama dikirim sebagai data URI (bukan URL publik). Pesan galat ramah Bahasa
+  Indonesia (401 kunci tidak valid; 402/403 kredit tidak cukup; 429 batas rate; 5xx server); kunci tidak pernah bocor
+  ke pesan galat.
+- Penyambungan (`generation.ts`): model `nexabot:` bercabang ke antrean `nexabot` (limit 1) dengan penyedia `nexabot`.
+  `requireNexa` gagal keras bila sakelar mati atau kunci belum diisi — tanpa fallback diam-diam ke provider lain
+  (D3-03). `estimateCredits` mengembalikan harga katalog tetap tanpa panggilan server. `resumeJobs` melanjutkan polling
+  video yang sudah disubmit sesudah restart; gambar tidak punya remote id sehingga gagal seperti biasa. `cancelJob`
+  memberitahu server NexaBot agar berhenti (tagihan tidak jalan terus).
+- Pengaturan: `nexabotEnabled` (mati bawaan) dan `nexabotBaseUrl` (`AppSettings`). Sakelarnya terkunci di balik
+  peringatan biaya dan kotak persetujuan di Pengaturan (`Settings.tsx`, `NexaSection`); kunci BYOK lewat `KeyForm`
+  yang sama dengan provider lain. IPC `nexabot:testConnection` memeriksa `GET /v1/models` dengan kunci tersimpan, dan
+  `settings:testKey` punya cabang NexaBot.
+- Gerbang biaya batch (D3-05b): Storyboard menampilkan ringkasan biaya Rupiah dan meminta konfirmasi sebelum satu job
+  NexaBot pun dimulai; membatalkan di tengah jalan tidak mengembalikan kredit generate yang sudah jadi. Harga per
+  generate tampil di pemilih model (`creditCurrency: 'Rp'`) dan di kartu Model AI.
+- Suara/musik TIDAK dibangun untuk NexaBot (D3-09). Tutorial lengkap berbahasa Indonesia ada di dalam aplikasi
+  (Pengaturan › Panduan NexaBot, `NexaBotGuideSection.tsx`) dan pemetaannya di `docs/nexabot-pemetaan.md`.
+
 ## Jalur manual & ekstensi (`services/manual.ts`, `shared/manual.ts`, `manualWatch.ts`)
 
 Tier 2 (0.3+): gambar dan video adegan dibuat di luar KenStory — oleh pengguna, agen, atau ekstensi browser — lalu
 dibawa kembali lewat folder kerja. Manual adalah provider (`visualProvider` per adegan: `auto` | `higgsfield` |
-`flow2api` | `manual` | `extension`), bukan mode; tiap adegan punya nomor stabil 2 digit (`sceneKey`, `01`, `02`, …,
+`flow2api` | `nexabot` | `manual` | `extension`), bukan mode; tiap adegan punya nomor stabil 2 digit (`sceneKey`, `01`, `02`, …,
 UNIQUE per proyek, backfill dari `sort`) yang dipakai untuk mencocokkan berkas hasil.
 
 - Skema: migrasi akhir di `db/index.ts` (`scene_key` + `visual_provider`, bawaan `auto`); `Clip` di `shared/types.ts`
