@@ -12,18 +12,19 @@ import type { AspectRatio, Character, Clip, Project } from './types'
  */
 
 /** Which provider makes this scene's visuals. 'auto' follows the project's chosen model. */
-export type VisualProvider = 'auto' | 'higgsfield' | 'flow2api' | 'manual' | 'extension'
+export type VisualProvider = 'auto' | 'higgsfield' | 'flow2api' | 'manual' | 'extension' | 'nexabot'
 
 export const VISUAL_PROVIDERS: { id: VisualProvider; label: string; hint: string }[] = [
   { id: 'auto', label: 'Otomatis', hint: 'Mengikuti model proyek' },
   { id: 'higgsfield', label: 'Higgsfield', hint: 'Model Higgsfield proyek' },
   { id: 'flow2api', label: 'Google Flow', hint: 'Server Flow2API' },
   { id: 'manual', label: 'Manual', hint: 'Salin prompt, generate di mana pun' },
-  { id: 'extension', label: 'Ekstensi', hint: 'Generate lewat Flow di browser' }
+  { id: 'extension', label: 'Ekstensi', hint: 'Generate lewat Flow di browser' },
+  { id: 'nexabot', label: 'NexaBot', hint: 'Berbayar per generate (Rp300/video)' }
 ]
 
 export function isVisualProvider(v: unknown): v is VisualProvider {
-  return v === 'auto' || v === 'higgsfield' || v === 'flow2api' || v === 'manual' || v === 'extension'
+  return v === 'auto' || v === 'higgsfield' || v === 'flow2api' || v === 'manual' || v === 'extension' || v === 'nexabot'
 }
 
 /** A scene key is a 2-digit number ('01', '02', …); past 99 it simply grows ('100'). */

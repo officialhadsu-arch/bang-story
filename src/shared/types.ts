@@ -4,7 +4,7 @@ export type ProjectStatus = 'draft' | 'script' | 'storyboard' | 'editing' | 'exp
 export type AspectRatio = '16:9' | '9:16'
 export type TtsProvider = 'gemini' | 'elevenlabs'
 export type LlmProvider = 'gemini' | 'openrouter' | 'groq' | 'custom'
-export type ApiProvider = 'higgsfield' | 'gemini' | 'elevenlabs' | 'openrouter' | 'groq' | 'custom'
+export type ApiProvider = 'higgsfield' | 'gemini' | 'elevenlabs' | 'openrouter' | 'groq' | 'custom' | 'nexabot'
 /** Where a live model list comes from: an LLM provider, or a TTS catalog. */
 export type ModelSource = LlmProvider | 'gemini-tts' | 'elevenlabs'
 export type MotionType = 'camera' | 'video'
@@ -302,6 +302,10 @@ export interface AppSettings {
   flow2apiEnabled: boolean
   /** Base URL of the Flow2API server, e.g. http://localhost:8000 */
   flow2apiBaseUrl: string
+  /** NexaBot (pay-as-you-go, Rp300/video) is off until the user reads the cost warning in Settings and turns it on. */
+  nexabotEnabled: boolean
+  /** Base URL of the NexaBot REST API (an assumption until the live PC test confirms it). */
+  nexabotBaseUrl: string
   /** Time captions against the real voice with Whisper after narration is made (when the model is present). */
   whisperAuto: boolean
 }
