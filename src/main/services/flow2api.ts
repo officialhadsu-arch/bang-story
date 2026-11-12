@@ -339,10 +339,14 @@ async function chatCompletions(req: ChatRequest): Promise<string> {
     if (!res.ok) {
       const reason = bodyErrorReason(bodyText)
       if (reason) {
-        if (res.status === 401)
+        if (res.status === 401) {
+          // The server's wording for "no token configured" (observed Nov 2026) is
+          // Mandarin; translate the one known string so the message stays Indonesian.
+          const reasonText = reason === 'API Key 无效' ? 'kunci API server tidak valid' : reason
           throw new Error(
-            `Server Flow2API menolak permintaan (HTTP 401): ${reason}. Periksa login Google di halaman admin server — token mungkin belum ditambahkan atau sudah kedaluwarsa.`
+            `Server Flow2API menolak permintaan (HTTP 401): ${reasonText}. Periksa login Google di halaman admin server — token mungkin belum ditambahkan atau sudah kedaluwarsa.`
           )
+        }
         throw new Error(friendlyFlowError(reason))
       }
       const content = parseChatCompletionContent(bodyText)
