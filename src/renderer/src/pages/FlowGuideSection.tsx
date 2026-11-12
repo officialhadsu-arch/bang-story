@@ -173,6 +173,10 @@ python main.py`}</Cmd>
           <>
             Buka proyek, di langkah <strong className="text-ink">Ide cerita › Model AI</strong> pilih model Google Flow untuk gambar dan/atau
             video. Sejak itu tombol buat gambar/video memakai Flow2API, bukan Higgsfield.
+          </>,
+          <>
+            Bila tokohmu memakai lembar karakter, buat lembarnya dulu sebelum membuat gambar klip — gambar klip yang dibuat sebelum lembar
+            ada tidak memakai referensi tokoh (lembar yang sedang dibuat ditunggu dulu, tapi lembar yang belum ada sama sekali tidak dipakai).
           </>
         ]}
       />
@@ -213,6 +217,15 @@ python main.py`}</Cmd>
         ]}
       />
 
+      <H2>Kunci Gemini dan login Google — dua hal berbeda</H2>
+      <P>
+        Flow2API <strong className="text-ink">tidak memakai kunci API Gemini</strong>. Ia memakai login Google kamu (cookie + token ST)
+        yang tersimpan di server. Sebaliknya, fitur KenStory sendiri — penyusun naskah dan suara narator Gemini — memakai kunci API Gemini
+        dari <strong className="text-ink">Pengaturan › Layanan AI dan kunci</strong>. Memasukkan kunci Gemini tidak menyalakan Flow, dan
+        menyalakan Flow tidak menggantikan kunci Gemini. KenStory tidak punya pool rotasi multi-kunci seperti De-Story — satu kunci per
+        penyedia, disimpan terenkripsi di komputer ini.
+      </P>
+
       <H2>Model &amp; kredit</H2>
       <Table
         head={['Model', 'Jenis', 'Durasi / referensi', 'Catatan']}
@@ -232,6 +245,15 @@ python main.py`}</Cmd>
         endpoint estimasi; saldo dilihat di halaman admin server. Nama dan ketersediaan model bisa berubah dari sisi Google — daftar yang
         dilayani server saat ini bisa dicek di <Code>http://localhost:8000/v1/models</Code> atau halaman uji{' '}
         <Code>http://localhost:8000/test</Code>.
+      </P>
+      <P>
+        Biaya per generate video menurut halaman bantuan Google Flow ("Manage your Google Flow credits", dibaca Nov 2026): Veo 3.1 Lite{' '}
+        <strong className="text-ink">10 kredit</strong>, Fast <strong className="text-ink">20 kredit</strong>, Quality{' '}
+        <strong className="text-ink">100 kredit</strong> per generate (bukan per permintaan — satu permintaan yang menghasilkan dua video
+        ditagih dua kali). Langganan Google AI Pro mendapat 1.000 kredit Flow per bulan ditambah 50 kredit gratis per hari (tidak menumpuk).
+        Jadi 1.000 kredit membeli sekitar 100 klip Lite, 50 klip Fast, atau 10 klip Quality per bulan. Google menyatakan angka-angka ini bisa
+        berubah sewaktu-waktu — yang tampil di kotak prompt Flow adalah yang berlaku. Biaya per gambar (Nano Banana) tidak tercantum di tabel
+        yang sama; pantau saldo di halaman admin server.
       </P>
 
       <H2>Batas &amp; limit</H2>
