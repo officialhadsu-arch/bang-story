@@ -261,6 +261,8 @@ export interface KeyStatus {
   preview: string | null
   /** A key is stored but can no longer be decrypted and must be entered again. */
   unreadable: boolean
+  /** False when the OS cannot encrypt keys (D-07); the app then refuses to store keys. */
+  encryptionAvailable: boolean
 }
 
 export interface KeyTestResult {

@@ -11,7 +11,7 @@ import { setActiveAsset } from './generation'
 import { assetAbsPath, binPath } from './paths'
 import { probeDurationMs, probeSize } from './services/audio'
 import { createProject, getBundle, insertAsset, listProjects, patchClip, replaceStory, saveSnapshot, touchProject } from './repo'
-import { recordCheck, setSecret } from './secrets'
+import { recordCheck, setTestKey } from './secrets'
 import type { ApiProvider } from '@shared/types'
 
 /**
@@ -205,7 +205,8 @@ export function attachDevHarness(win: BrowserWindow): void {
     projectTitle?: string
     /** For main "importClipImages": local image files, one per clip without a picture. */
     images?: string[]
-    /** For main "key": store a fake key for this provider and mark its last check as passed or failed. */
+    /** For main "key": hold a fake key for this provider in memory only
+     * (setTestKey, never on disk) and mark its last check as passed or failed. */
     provider?: ApiProvider
     ok?: boolean
     js?: string
@@ -267,7 +268,9 @@ export function attachDevHarness(win: BrowserWindow): void {
           }
         }
         if (step.main === 'key' && step.provider) {
-          setSecret(step.provider, 'dev-harness-fake-key')
+          // Test-only key, kept in memory by setTestKey: it never touches
+          // disk, so this step works where setSecret() must refuse (D-07).
+          setTestKey(step.provider, 'dev-harness-fake-key')
           recordCheck(step.provider, step.ok !== false, step.ok === false ? 'Kunci ditolak (uji)' : 'Terhubung (uji)')
         }
         if (step.main === 'export' && (step.projectId ?? demoId)) {

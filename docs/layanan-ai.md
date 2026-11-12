@@ -11,6 +11,13 @@ Pengguna memasukkan kuncinya sendiri di **Pengaturan › Layanan AI dan kunci**.
   terikat ke akun Windows pengguna, jadi salinan `studio.db` di komputer lain tidak bisa membuka kuncinya.
 - Kunci kriptonya dibuat saat startup (`warmUpEncryption`) supaya tidak hilang kalau aplikasi ditutup paksa tepat
   setelah menyimpan kunci pertama.
+- **D-07 gagal-tertutup:** bila `safeStorage` tidak tersedia (mis. Linux tanpa keyring), `setSecret` MENOLAK
+  menyimpan dan melempar pesan jelas — kunci tidak pernah disimpan tanpa enkripsi. Nilai tersimpan memakai
+  amplop `KS1:` + hasil `encryptString`; nilai lama tanpa amplop (teks polos dari versi lama) ditolak dibaca
+  dan pengguna diminta memasukkan ulang kuncinya. Pengaturan menampilkan peringatan bila enkripsi tidak tersedia.
+- Kunci uji dev-harness hanya di memori (`setTestKey`, tidak pernah ke disk) supaya alur kunci tetap bisa diuji
+  di mesin tanpa keyring.
+- H7: `scripts/h7-check-no-secrets.mjs` (`npm run h7`) memeriksa repo, ekspor, dan log agar tidak ada kunci yang bocor.
 - `requireSecret(provider)` melempar error berbahasa Indonesia kalau kunci belum ada.
 - `revealSecret` hanya dipanggil tombol "tampilkan kunci" di Pengaturan.
 - **Jangan pernah** menulis kunci ke log, pesan error, file, URL, atau mengirimnya ke layanan lain.

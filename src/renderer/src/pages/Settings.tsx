@@ -615,6 +615,14 @@ export function Settings() {
                     layanan yang bersangkutan.
                   </p>
                 </div>
+                {keys.length > 0 && keys[0].encryptionAvailable === false && (
+                  <div className="rounded-2xl border border-line bg-surface p-4">
+                    <p className="text-[14px] font-semibold text-bad-ink">Enkripsi kunci tidak tersedia di perangkat ini</p>
+                    <p className="mt-1 text-[13px] text-ink-2">
+                      KenStory tidak bisa menyimpan kunci API sampai enkripsi sistem tersedia — kunci tidak pernah disimpan tanpa enkripsi.
+                    </p>
+                  </div>
+                )}
                 <LlmSection settings={settings} statusOf={statusOf} onChanged={reload} onSettings={setSettings} />
                 <TtsSection settings={settings} statusOf={statusOf} onChanged={reload} onSettings={setSettings} />
                 <HiggsfieldSection status={statusOf('higgsfield')} onChanged={reload} />
