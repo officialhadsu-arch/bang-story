@@ -138,3 +138,26 @@ LICENSE — ambil POLA saja, jangan salin kode mentah-mentah). Clone referensi:
 - **Yang tidak disentuh:** suara/TTS (`gemini.ts`, `elevenlabs.ts`), Whisper/caption,
   exporter/FFmpeg, `NOTICE.md`/`LICENSE` (selain menambah atribusi De-Story bila
   diputuskan), dan semua provider lain.
+
+## 6. Status implementasi (0.3+, 12 Nov 2026)
+
+Diimplementasikan di branch `0.3-tier1-flow2api` (commit `1cbd348` adaptor, `ed314c6` UI;
+belum merge ke main):
+
+- Katalog `src/shared/flow2api.ts` (3 gambar + 4 video), klien `src/main/services/flow2api.ts`
+  (tulis ulang TS pola De-Story), penyambungan `generation.ts` (jalur `flow:`, antrean `flow2api`
+  limit 1), pengaturan `flow2apiEnabled`/`flow2apiBaseUrl`, IPC `flow2api:testConnection`.
+- UI: `FlowSection` di Pengaturan (peringatan D-16 + kotak persetujuan + Uji Koneksi), tab
+  `Panduan Flow2API` (`FlowGuideSection.tsx`), baris biaya model di `ModelSection`.
+- Dokumen: atribusi De-Story + flow2api di `NOTICE.md`, bagian Flow2API di `docs/layanan-ai.md`.
+- Penyimpangan dari §5 yang diputuskan saat implementasi (dicatat, bukan diam-diam):
+  - Referensi dikirim dengan MIME benar dari ekstensi berkas, bukan `image/jpeg` seperti De-Story.
+  - `finishFlow` ditulis terpisah (meniru ekor `finishHiggsfield`), bukan refactor jalur Higgsfield.
+  - Tidak ada field kunci Bearer opsional di tier 1 (batas yang didokumentasikan).
+  - Tidak ada properti resolusi untuk model flow (resolusi bawaan server).
+  - Uji live: Bos mengizinkan uji live minimal 12 Nov 11:31 WIB (1 gambar + 1 klip video pendek,
+    memakai akun Google-nya) — jadi gerbang G3 bukan lagi "langkah PC Bos saja", melainkan
+    diuji dari VM bila server dan login tersedia; bila login/token belum bisa disiapkan tanpa
+    browser, langkah itu diserahkan ke induk dengan prosedur tertulis.
+- Belum diperiksa saat pemetaan: apakah picker model per adegan sudah ada. Hasil implementasi:
+  model dipilih per proyek di `ModelSection`; tidak ada picker per adegan baru yang dibangun.
