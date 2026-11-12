@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { ArrowDownNarrowWide, ChevronDown, RefreshCw, Search, X } from 'lucide-react'
+import { NEXA_CREDIT_IDR, idrLabel } from '@shared/nexabot'
 import type { ModelOption } from '@shared/types'
 import { creditLabel, relativeTime, usdLabel } from '../lib/format'
 import { Spinner, cx } from './ui'
@@ -308,7 +309,9 @@ export function ModelPicker({
                         </span>
                       ) : (
                         <>
-                          <span className="font-mono text-[12.5px] font-semibold text-ink">{creditLabel(m.credits)} kr</span>
+                          <span className="font-mono text-[12.5px] font-semibold text-ink">
+                            {m.creditCurrency === 'Rp' ? idrLabel(m.credits * NEXA_CREDIT_IDR) : `${creditLabel(m.credits)} kr`}
+                          </span>
                           <span className="font-mono text-muted">{[m.creditUnit, m.usd != null && usdLabel(m.usd)].filter(Boolean).join(' · ')}</span>
                         </>
                       ))}

@@ -23,6 +23,7 @@ import {
 } from 'lucide-react'
 import { effectiveResolution, fitDuration, getImageModel, getVideoModel } from '@shared/higgsfield'
 import { VISUAL_PROVIDERS, type ManualScanUnmatched } from '@shared/manual'
+import { idrLabel, isNexaModelId } from '@shared/nexabot'
 import { CAMERA_PRESETS, MOTION_STRENGTHS, cameraAt, cameraCss } from '@shared/motion'
 import { needsVisual } from '@shared/script'
 import { geminiVoiceName, geminiVoiceTone } from '@shared/models'
@@ -565,6 +566,9 @@ export function StoryboardStep() {
   if (!project) return null
   const selIndex = Math.max(0, clips.findIndex((c) => c.id === selectedClipId))
   const sel = clips[selIndex]
+  /** A NexaBot batch charges per generate, so its cost is shown in Rupiah and confirmed before it starts (D3-05b). */
+  const nexaImg = isNexaModelId(project.imageModel)
+  const nexaVid = isNexaModelId(project.videoModel)
 
   const bulk = async (fn: () => Promise<unknown>): Promise<void> => {
     try {
@@ -589,11 +593,31 @@ export function StoryboardStep() {
       title: `Jadikan ${n} klip video AI?`,
       body:
         `Setiap gambar klip dianimasikan dengan ${getVideoModel(project!.videoModel).name}, panjangnya mengikuti suara narasi klip itu.` +
-        (videoCredits != null ? ` Perkiraan biaya ${Math.round(videoCredits * 10) / 10} kredit Higgsfield.` : '') +
+        (videoCredits != null
+          ? nexaVid
+            ? ` Perkiraan biaya ${idrLabel(videoCredits * 1000)} (NexaBot, ${n} video). Biaya dipotong dari kredit NexaBot kamu saat setiap video dibuat; membatalkan di tengah jalan tidak mengembalikan kredit video yang sudah jadi.`
+            : ` Perkiraan biaya ${Math.round(videoCredits * 10) / 10} kredit Higgsfield.`
+          : '') +
         ' Klip yang sudah punya video tidak dibuat ulang.',
       confirm: `Buat ${n} video`
     })
     if (ok) await bulk(() => window.api.generate.missingVideos(project!.id))
+  }
+
+  // A NexaBot image batch charges per generate, so it gets the same cost confirmation as videos (D3-05b).
+  const makeImages = async (): Promise<void> => {
+    const n = stats.needImg
+    if (nexaImg && credits != null && n > 0) {
+      const ok = await confirmDialog({
+        title: `Generate ${n} gambar dengan NexaBot?`,
+        body:
+          `Perkiraan biaya ${idrLabel(credits * n * 1000)} (${n} gambar × ${idrLabel(credits * 1000)}). ` +
+          'Biaya dipotong dari kredit NexaBot kamu saat setiap gambar dibuat; membatalkan di tengah jalan tidak mengembalikan kredit gambar yang sudah jadi.',
+        confirm: `Generate ${n} gambar`
+      })
+      if (!ok) return
+    }
+    await bulk(() => window.api.generate.missingImages(project!.id))
   }
 
   // Scenes added or rewritten in the script since the last visual plan.
@@ -745,11 +769,13 @@ export function StoryboardStep() {
           className="border-[1.5px] border-ink font-semibold"
           icon={<ImageIcon className="size-[17px]" />}
           disabled={!stats.needImg}
-          onClick={() => void bulk(() => window.api.generate.missingImages(project.id))}
+          onClick={() => void makeImages()}
         >
           Generate {stats.needImg} gambar
           {credits != null && stats.needImg > 0 && (
-            <span className="font-normal text-ink-2">≈ {Math.round(credits * stats.needImg * 10) / 10} kr</span>
+            <span className="font-normal text-ink-2">
+              ≈ {nexaImg ? idrLabel(credits * stats.needImg * 1000) : `${Math.round(credits * stats.needImg * 10) / 10} kr`}
+            </span>
           )}
         </Button>
         {readyForVideo && (
@@ -767,7 +793,9 @@ export function StoryboardStep() {
                 ? 'Semua klip sudah video'
                 : `Jadikan ${stats.needVideo.length} video`}
             {stats.videoRunning === 0 && videoCredits != null && stats.needVideo.length > 0 && (
-              <span className="font-normal text-white/80">≈ {Math.round(videoCredits * 10) / 10} kr</span>
+              <span className="font-normal text-white/80">
+                ≈ {nexaVid ? idrLabel(videoCredits * 1000) : `${Math.round(videoCredits * 10) / 10} kr`}
+              </span>
             )}
           </Button>
         )}

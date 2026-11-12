@@ -21,6 +21,7 @@ import {
 } from 'lucide-react'
 import { FLOW_DEFAULT_BASE_URL, FLOW_IMAGE_MODELS, FLOW_VIDEO_MODELS } from '@shared/flow2api'
 import { HF_IMAGE_MODELS, HF_VIDEO_MODELS } from '@shared/higgsfield'
+import { NEXA_DEFAULT_BASE_URL, NEXA_IMAGE_MODELS, NEXA_VIDEO_MODELS } from '@shared/nexabot'
 import { LANGUAGES, LLM_PROVIDERS } from '@shared/models'
 import type { ApiProvider, AppSettings, KeyStatus, KeyTestResult, LlmProvider, TtsProvider } from '@shared/types'
 import { Logo } from '../components/Logo'
@@ -30,13 +31,14 @@ import { Select } from '../components/Select'
 import { AboutSection } from './AboutSection'
 import { FlowGuideSection } from './FlowGuideSection'
 import { ManualGuideSection } from './ManualGuideSection'
+import { NexaBotGuideSection } from './NexaBotGuideSection'
 import { WhisperSection } from './WhisperSection'
 import { Badge, Button, Field, IconButton, Switch, confirmDialog, cx, inputCls } from '../components/ui'
 import { errorText, relativeTime } from '../lib/format'
 import { useModels } from '../lib/useModels'
 import { useApp } from '../store/app'
 
-type Tab = 'services' | 'general' | 'about' | 'flow-guide' | 'manual-guide'
+type Tab = 'services' | 'general' | 'about' | 'flow-guide' | 'manual-guide' | 'nexabot-guide'
 
 interface ProviderOption<T extends string> {
   id: T
@@ -675,6 +677,138 @@ function FlowSection({
   )
 }
 
+function NexaSection({
+  settings,
+  statusOf,
+  onChanged,
+  onSettings,
+  onOpenGuide
+}: {
+  settings: AppSettings
+  statusOf: (p: ApiProvider) => KeyStatus | undefined
+  onChanged: () => void
+  onSettings: (s: AppSettings) => void
+  onOpenGuide: () => void
+}) {
+  const { toast } = useApp()
+  const [ack, setAck] = useState(false)
+  const [url, setUrl] = useState(settings.nexabotBaseUrl)
+  const [testing, setTesting] = useState(false)
+  const [test, setTest] = useState<KeyTestResult | null>(null)
+
+  const saveUrl = async (): Promise<void> => {
+    const clean = url.trim() || NEXA_DEFAULT_BASE_URL
+    setUrl(clean)
+    onSettings(await window.api.settings.set({ nexabotBaseUrl: clean }))
+  }
+
+  const toggle = async (v: boolean): Promise<void> => {
+    if (v && !ack) {
+      toast('info', 'Baca dulu peringatan biaya di atas, lalu centang kotak persetujuan sebelum menyalakan NexaBot.')
+      return
+    }
+    onSettings(await window.api.settings.set({ nexabotEnabled: v }))
+    if (!v) setAck(false)
+    toast(
+      'success',
+      v
+        ? 'NexaBot dinyalakan. Model NexaBot kini bisa dipilih di langkah Ide cerita.'
+        : 'NexaBot dimatikan. Model NexaBot tidak bisa dipakai sampai dinyalakan lagi.'
+    )
+  }
+
+  const runTest = async (): Promise<void> => {
+    setTesting(true)
+    setTest(null)
+    try {
+      setTest(await window.api.nexabot.testConnection(url.trim() || NEXA_DEFAULT_BASE_URL))
+    } catch (e) {
+      setTest({ ok: false, message: errorText(e) })
+    } finally {
+      setTesting(false)
+    }
+  }
+
+  return (
+    <>
+      <SectionTitle
+        icon={<Server className="size-5" />}
+        title="NexaBot (berbayar per generate)"
+        sub="Gambar dan video AI lewat API NexaBot — Rp100–Rp300 per generate, tanpa langganan."
+      />
+      <Card>
+        <div className="flex items-center gap-3">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-sand font-display text-lg font-bold">N</span>
+          <div className="flex min-w-0 flex-1 flex-col">
+            <span className="text-base font-bold">NexaBot</span>
+            <span className="text-[13px] text-ink-2">Nano Banana Pro, GPT Image 2.5, dan Omni Flash 1.2 lewat api.nexabot.id</span>
+          </div>
+          <div className={cx(!ack && !settings.nexabotEnabled && 'pointer-events-none opacity-40')}>
+            <Switch on={settings.nexabotEnabled} onChange={(v) => void toggle(v)} label="Nyalakan NexaBot" />
+          </div>
+        </div>
+        <div className="flex items-start gap-2.5 rounded-xl border border-amber-600/40 bg-amber-50 px-4 py-3.5 text-[13px] leading-relaxed text-amber-900">
+          <TriangleAlert className="mt-0.5 size-4 shrink-0" />
+          <div className="flex flex-col gap-2">
+            <span>
+              <strong>Peringatan biaya.</strong> NexaBot memotong kredit setiap generate: gambar Rp100–Rp150, video Rp300 (1 kredit =
+              Rp1.000). Batch 30 gambar + 30 video menghabiskan sekitar Rp13.500. Semua pembelian bersifat final, tanpa refund — isi saldo
+              secukupnya dan periksa ringkasan biaya sebelum batch. KenStory selalu menampilkan harga sebelum generate dimulai.
+            </span>
+            <label className="flex cursor-pointer items-start gap-2 font-medium">
+              <input type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)} className="mt-0.5 size-4 accent-ink" />
+              <span>Saya sudah membaca peringatan biaya di atas dan paham setiap generate memotong kredit.</span>
+            </label>
+          </div>
+        </div>
+        <KeyForm
+          provider="nexabot"
+          name="NexaBot"
+          status={statusOf('nexabot')}
+          help="Kunci API NexaBot dari dashboard nexabot.id. Kunci tersimpan terenkripsi di perangkat ini dan hanya dikirim ke api.nexabot.id."
+          link="https://nexabot.id"
+          linkLabel="Buka nexabot.id untuk mendapatkan kunci"
+          onChanged={onChanged}
+        />
+        <Field
+          label="Alamat API NexaBot"
+          hint="Biasanya https://api.nexabot.id — kosongkan untuk memakai alamat bawaan. Alamat ini masih asumsi sampai uji live pertama."
+        >
+          <input
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            onBlur={() => void saveUrl()}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') void saveUrl()
+            }}
+            placeholder={NEXA_DEFAULT_BASE_URL}
+            className={inputCls}
+          />
+        </Field>
+        <div className="flex flex-wrap items-center gap-3">
+          <Button onClick={() => void runTest()} disabled={testing}>
+            {testing ? 'Menguji…' : 'Uji Koneksi'}
+          </Button>
+          <Button variant="ghost" onClick={onOpenGuide} icon={<BookOpenText className="size-4" />}>
+            Buka Panduan NexaBot
+          </Button>
+          {test && (
+            <span className={cx('text-[13px] font-medium', test.ok ? 'text-emerald-700' : 'text-red-700')}>{test.message}</span>
+          )}
+        </div>
+        <p className="flex items-start gap-2.5 border-t border-dashed border-line pt-4 text-[13px] leading-relaxed text-ink-2">
+          <Film className="mt-0.5 size-4 shrink-0" />
+          <span>
+            Semua {NEXA_IMAGE_MODELS.length} model gambar dan {NEXA_VIDEO_MODELS.length} model video NexaBot bisa dipakai. Modelnya dipilih
+            per proyek di langkah <strong className="text-ink">Ide cerita</strong>, bagian Model AI — harganya tampil dalam Rupiah. Batch
+            selalu meminta konfirmasi dengan ringkasan biaya total sebelum satu job pun dimulai.
+          </span>
+        </p>
+      </Card>
+    </>
+  )
+}
+
 export function Settings() {
   const { go, route } = useApp()
   const back = route.name === 'settings' && route.back ? route.back : ({ name: 'home' } as const)
@@ -698,6 +832,7 @@ export function Settings() {
     { id: 'services', label: 'Layanan AI dan kunci', icon: <KeyRound className="size-[18px]" /> },
     { id: 'flow-guide', label: 'Panduan Flow2API', icon: <BookOpenText className="size-[18px]" /> },
     { id: 'manual-guide', label: 'Panduan Manual & Ekstensi', icon: <BookOpenText className="size-[18px]" /> },
+    { id: 'nexabot-guide', label: 'Panduan NexaBot', icon: <BookOpenText className="size-[18px]" /> },
     { id: 'general', label: 'Umum', icon: <SlidersHorizontal className="size-[18px]" /> },
     { id: 'about', label: 'Tentang aplikasi', icon: <Info className="size-[18px]" /> }
   ]
@@ -756,6 +891,7 @@ export function Settings() {
                 <TtsSection settings={settings} statusOf={statusOf} onChanged={reload} onSettings={setSettings} />
                 <HiggsfieldSection status={statusOf('higgsfield')} onChanged={reload} />
                 <FlowSection settings={settings} onSettings={setSettings} onOpenGuide={() => setTab('flow-guide')} />
+                <NexaSection settings={settings} statusOf={statusOf} onChanged={reload} onSettings={setSettings} onOpenGuide={() => setTab('nexabot-guide')} />
                 <WhisperSection settings={settings} onSettings={setSettings} />
               </>
             )}
@@ -763,6 +899,8 @@ export function Settings() {
             {tab === 'flow-guide' && <FlowGuideSection />}
 
             {tab === 'manual-guide' && settings && <ManualGuideSection baseUrl={settings.flow2apiBaseUrl} />}
+
+            {tab === 'nexabot-guide' && <NexaBotGuideSection />}
 
             {tab === 'general' && settings && (
               <>

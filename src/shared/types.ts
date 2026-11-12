@@ -336,9 +336,11 @@ export interface ModelOption {
   tags: string[]
   /** Model family, e.g. "Kling", for a brand mark next to the name. */
   family?: string
-  /** Higgsfield credits (and dollars) for one request; undefined while unknown, null when it cannot be estimated. */
+  /** Provider credits for one request (Higgsfield credits, or NexaBot credits when `creditCurrency` is 'Rp'); undefined while unknown, null when it cannot be estimated. */
   credits?: number | null
   usd?: number | null
+  /** Currency the `credits` number is priced in. Default is Higgsfield credits ("kr"); 'Rp' is NexaBot credits at Rp1.000 each. */
+  creditCurrency?: 'Rp'
   /** What the credits pay for, e.g. "10 dtk". */
   creditUnit?: string
 }
