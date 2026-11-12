@@ -85,6 +85,16 @@ Aturan edit (`renderer/src/pages/project/editor/Timeline.tsx`):
   `layoutCaptionLines` yang sama dengan pratinjau.
 - Kata yang sedang diucapkan diwarnai lewat event per kata (`\c`).
 
+### Gambar klip (impor berkas lokal)
+
+Ekspor menolak klip yang belum punya gambar (`Klip 01 ("…") belum punya gambar.`).
+Di tab Klip, bagian "Gambar klip" menawarkan berkas gambar dari komputer
+(`Pilih gambar`, atau `Ganti gambar` kalau sudah terpasang): dialog file
+native → `assets:pickClipImage` (IPC, `src/main/ipc.ts`) menyalin berkas ke
+folder aset proyek lalu `insertAsset` (kind `image`, `clipId` terisi) +
+`setActiveAsset`, persis seperti gambar dari AI. Tidak ada generate berbayar
+yang terlibat.
+
 ## Menambah fitur di editor: daftar periksa
 
 - Aturan baru yang memengaruhi hasil? Tulis di `src/shared/` dan pakai di Player **dan** exporter.

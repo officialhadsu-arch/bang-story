@@ -71,6 +71,8 @@ export interface StudioApi {
     pickMusic(projectId: string): Promise<Asset | null>
     /** A logo or watermark image for an overlay. */
     pickImage(projectId: string): Promise<Asset | null>
+    /** A local image file to use as this clip's picture (also links it to the clip). */
+    pickClipImage(projectId: string, clipId: string): Promise<Asset | null>
   }
   settings: {
     get(): Promise<AppSettings>

@@ -49,7 +49,8 @@ const api: StudioApi = {
     setActive: call('assets:setActive'),
     setWords: call('assets:setWords'),
     pickMusic: call('assets:pickMusic'),
-    pickImage: call('assets:pickImage')
+    pickImage: call('assets:pickImage'),
+    pickClipImage: call('assets:pickClipImage')
   },
   settings: {
     get: call('settings:get'),

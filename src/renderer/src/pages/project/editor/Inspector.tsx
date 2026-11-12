@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { AudioLines, Check, Clapperboard, Copy, ExternalLink, Film, Layers, Mic, Move, Music, Play, Sparkles, Type, Volume2, X } from 'lucide-react'
+import { AudioLines, Check, Clapperboard, Copy, ExternalLink, Film, Image, Layers, Mic, Move, Music, Play, Sparkles, Type, Volume2, X } from 'lucide-react'
 import {
   CAPTION_FONTS,
   CAPTION_POSITIONS,
@@ -62,7 +62,7 @@ const VIDEO_CAMERA_OPTIONS = [
 ]
 
 function ClipTab({ clip, index }: { clip: Clip; index: number }) {
-  const { assets, jobs, updateClip, flush } = useProject()
+  const { project, assets, jobs, updateClip, flush, addAsset } = useProject()
   const { toast } = useApp()
   const image = clip.imageAssetId ? assets[clip.imageAssetId] : null
   const video = clip.videoAssetId ? assets[clip.videoAssetId] : null
@@ -86,6 +86,31 @@ function ClipTab({ clip, index }: { clip: Clip; index: number }) {
   return (
     <>
       <ClipHeader clip={clip} index={index} />
+      {/* W6(b): a clip without a picture cannot be exported, so the clip tab
+          offers a local image file for it (no paid generation involved). */}
+      <Section title="Gambar klip">
+        {image ? (
+          <p className="text-[13px] text-ink-2">Gambar klip sudah terpasang.</p>
+        ) : (
+          <p className="text-[13px] text-ink-2">Klip ini belum punya gambar. Pilih berkas gambar dari komputermu.</p>
+        )}
+        <div className="flex flex-wrap gap-2">
+          <Button
+            size="sm"
+            variant={image ? 'secondary' : 'accent'}
+            icon={<Image className="size-4" />}
+            onClick={() =>
+              void run(async () => {
+                if (!project) return
+                const a = await window.api.assets.pickClipImage(project.id, clip.id)
+                if (a) addAsset(a)
+              })
+            }
+          >
+            {image ? 'Ganti gambar' : 'Pilih gambar'}
+          </Button>
+        </div>
+      </Section>
       {clip.motionType === 'video' ? (
         <Section title="Video AI">
           {video ? (

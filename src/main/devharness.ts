@@ -1,14 +1,16 @@
 import { execFileSync } from 'node:child_process'
-import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { dirname } from 'node:path'
+import { randomUUID } from 'node:crypto'
+import { appendFileSync, copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { basename, dirname, extname } from 'node:path'
 import { app, type BrowserWindow } from 'electron'
 import ffmpegStatic from 'ffmpeg-static'
 import { estimateWordTimings } from '@shared/captions'
 import { anchorPoint } from '@shared/overlays'
 import { startExport } from './exporter'
+import { setActiveAsset } from './generation'
 import { assetAbsPath, binPath } from './paths'
-import { probeDurationMs } from './services/audio'
-import { createProject, getBundle, insertAsset, patchClip, replaceStory, saveSnapshot, touchProject } from './repo'
+import { probeDurationMs, probeSize } from './services/audio'
+import { createProject, getBundle, insertAsset, listProjects, patchClip, replaceStory, saveSnapshot, touchProject } from './repo'
 import { recordCheck, setSecret } from './secrets'
 import type { ApiProvider } from '@shared/types'
 
@@ -195,10 +197,14 @@ export function attachDevHarness(win: BrowserWindow): void {
   const planPath = process.env.STUDIO_CAPTURE_PLAN
   if (!planPath) return
   let plan: {
-    main?: 'seed' | 'export' | 'key' | 'overlays' | 'speech' | 'videos'
+    main?: 'seed' | 'export' | 'key' | 'overlays' | 'speech' | 'videos' | 'importClipImages'
     exportTo?: string
     /** For main "export": an existing project instead of the seeded demo. */
     projectId?: string
+    /** For main "importClipImages": the project to fill, found by title. */
+    projectTitle?: string
+    /** For main "importClipImages": local image files, one per clip without a picture. */
+    images?: string[]
     /** For main "key": store a fake key for this provider and mark its last check as passed or failed. */
     provider?: ApiProvider
     ok?: boolean
@@ -229,6 +235,37 @@ export function attachDevHarness(win: BrowserWindow): void {
         if (step.main === 'overlays' && demoId) addDemoOverlays(demoId)
         if (step.main === 'videos' && demoId) addDemoVideos(demoId)
         if (step.main === 'speech' && demoId) await addDemoSpeech(demoId)
+        if (step.main === 'importClipImages' && step.projectTitle && step.images) {
+          // Test-only twin of the pickClipImage IPC handler: same insertAsset
+          // (kind 'image', clipId set) + setActiveAsset, but the file comes
+          // from the plan instead of a native file dialog, which the harness
+          // cannot click. The dialog and the button are covered by screenshot
+          // and code inspection instead.
+          const target = listProjects().find((p) => p.title === step.projectTitle)
+          if (!target) throw new Error(`proyek tidak ditemukan: ${step.projectTitle}`)
+          for (const src of step.images) {
+            const b = getBundle(target.id)
+            const clip = b.clips.find((c) => !c.imageAssetId)
+            if (!clip) break
+            const rel = `images/${randomUUID()}${extname(src).toLowerCase()}`
+            const abs = assetAbsPath(target.id, rel)
+            mkdirSync(dirname(abs), { recursive: true })
+            copyFileSync(src, abs)
+            const size = await probeSize(abs).catch(() => null)
+            if (!size) throw new Error(`gambar tidak bisa dibaca: ${src}`)
+            const asset = insertAsset({
+              projectId: target.id,
+              clipId: clip.id,
+              kind: 'image',
+              provider: 'local',
+              prompt: basename(src),
+              localPath: rel,
+              width: size.width,
+              height: size.height
+            })
+            await setActiveAsset(clip.id, asset.id)
+          }
+        }
         if (step.main === 'key' && step.provider) {
           setSecret(step.provider, 'dev-harness-fake-key')
           recordCheck(step.provider, step.ok !== false, step.ok === false ? 'Kunci ditolak (uji)' : 'Terhubung (uji)')

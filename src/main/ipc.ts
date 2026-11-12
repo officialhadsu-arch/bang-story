@@ -181,6 +181,40 @@ export function registerIpc(): void {
     })
   })
 
+  // W6(b): a local image file for a clip that has no picture yet. Unlike
+  // pickImage (overlay, no clip), the asset is stored as a clip image and
+  // linked to the clip at once, so the export can use it. setActiveAsset
+  // refuses assets whose clipId does not match, so the clipId is set here.
+  handle('assets:pickClipImage', async (projectId: string, clipId: string) => {
+    const win = BrowserWindow.getFocusedWindow()
+    const res = await dialog.showOpenDialog(win!, {
+      title: 'Pilih gambar untuk klip',
+      filters: [{ name: 'Gambar', extensions: ['png', 'jpg', 'jpeg', 'webp'] }],
+      properties: ['openFile']
+    })
+    if (res.canceled || !res.filePaths[0]) return null
+    getProject(projectId)
+    const src = res.filePaths[0]
+    const rel = `images/${randomUUID()}${extname(src).toLowerCase()}`
+    const abs = assetAbsPath(projectId, rel)
+    mkdirSync(dirname(abs), { recursive: true })
+    copyFileSync(src, abs)
+    const size = await probeSize(abs).catch(() => null)
+    if (!size) throw new Error('Gambar tidak bisa dibaca. Pakai file PNG, JPG, atau WebP.')
+    const asset = insertAsset({
+      projectId,
+      clipId,
+      kind: 'image',
+      provider: 'local',
+      prompt: basename(src),
+      localPath: rel,
+      width: size.width,
+      height: size.height
+    })
+    await setActiveAsset(clipId, asset.id)
+    return asset
+  })
+
   handle('settings:get', () => getSettings())
   handle('settings:set', (patch: Partial<AppSettings>) => setSettings(patch))
   handle('settings:keys', () => keyStatuses())
