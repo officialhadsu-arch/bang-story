@@ -22,7 +22,7 @@ import {
   Volume2
 } from 'lucide-react'
 import { effectiveResolution, fitDuration, getImageModel, getVideoModel } from '@shared/higgsfield'
-import { VISUAL_PROVIDERS, type ManualScanUnmatched } from '@shared/manual'
+import { VISUAL_PROVIDERS, kindOfWorkFileExtension, type ManualScanUnmatched } from '@shared/manual'
 import { idrLabel, isNexaModelId, nexaPriceIdr } from '@shared/nexabot'
 import { CAMERA_PRESETS, MOTION_STRENGTHS, cameraAt, cameraCss } from '@shared/motion'
 import { needsVisual } from '@shared/script'
@@ -877,7 +877,7 @@ export function StoryboardStep() {
                 <div key={u.file} className="flex flex-wrap items-center gap-2 border-t border-dashed border-line pt-2.5">
                   <span className="font-mono text-[13px]">{u.file}</span>
                   <span className="text-xs text-muted">
-                    {u.kind === 'image' ? 'gambar' : u.kind === 'video' ? 'video' : 'jenis tidak dikenal'}
+                    {u.kind === 'image' ? 'gambar' : u.kind === 'video' ? 'video' : kindOfWorkFileExtension(u.file) ? 'tanpa nomor adegan' : 'jenis tidak dikenal'}
                   </span>
                   <span className="flex-1" />
                   {u.kind ? (

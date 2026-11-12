@@ -55,6 +55,18 @@ const IMAGE_EXTS = new Set(['png', 'jpg', 'jpeg', 'webp'])
 const VIDEO_EXTS = new Set(['mp4', 'mov', 'webm'])
 
 /**
+ * The media kind of a file name from its extension alone, or null when the extension is not a
+ * picture/video the app can use. The work-folder panel uses it to tell "no scene number" apart
+ * from "unknown file type" for files the scan could not place.
+ */
+export function kindOfWorkFileExtension(fileName: string): WorkFileKind | null {
+  const dot = fileName.lastIndexOf('.')
+  if (dot <= 0) return null
+  const ext = fileName.slice(dot + 1).toLowerCase()
+  return IMAGE_EXTS.has(ext) ? 'image' : VIDEO_EXTS.has(ext) ? 'video' : null
+}
+
+/**
  * Matches a result file back to its scene: `<sceneKey>[-suffix].<ext>` (e.g. `03.png`, `03-v2.mp4`).
  * A `scene-`/`clip-` prefix is ignored; what counts is the leading number. Files whose name does not
  * start with a number, or whose extension is not a picture/video the app can use, do not match.
@@ -63,7 +75,7 @@ export function matchWorkFile(fileName: string): { sceneKey: string; kind: WorkF
   const dot = fileName.lastIndexOf('.')
   if (dot <= 0) return null
   const ext = fileName.slice(dot + 1).toLowerCase()
-  const kind: WorkFileKind | null = IMAGE_EXTS.has(ext) ? 'image' : VIDEO_EXTS.has(ext) ? 'video' : null
+  const kind = kindOfWorkFileExtension(fileName)
   if (!kind) return null
   const base = fileName.slice(0, dot).replace(/^(scene|clip)[-_ ]?/i, '')
   const m = /^(\d+)/.exec(base)
