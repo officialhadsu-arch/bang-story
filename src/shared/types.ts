@@ -1,3 +1,5 @@
+import type { VisualProvider } from './manual'
+
 export type ProjectStatus = 'draft' | 'script' | 'storyboard' | 'editing' | 'exported'
 export type AspectRatio = '16:9' | '9:16'
 export type TtsProvider = 'gemini' | 'elevenlabs'
@@ -128,6 +130,10 @@ export interface Clip {
   id: string
   projectId: string
   sort: number
+  /** Stable 2-digit scene number ('01', '02', …); the work-folder harness matches result files to it. */
+  sceneKey: string
+  /** Which provider makes this scene's picture/video; 'auto' follows the project's model. */
+  visualProvider: VisualProvider
   title: string
   /** What happens in the scene, in the script's language (the Naskah step). */
   story: string

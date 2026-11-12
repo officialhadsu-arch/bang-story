@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { nextSceneKey } from '@shared/manual'
 import type { Asset, Character, Clip, Job, Project, ProjectBundle, ProjectSnapshot } from '@shared/types'
 import { errorText } from '../lib/format'
 
@@ -118,6 +119,8 @@ export const useProject = create<ProjectState>((set, get) => {
         id: newId(),
         projectId: p.id,
         sort: at,
+        sceneKey: nextSceneKey(clips.map((c) => c.sceneKey)),
+        visualProvider: 'auto',
         title: 'Adegan baru',
         story: '',
         visualPrompt: '',

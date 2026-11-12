@@ -18,6 +18,7 @@ import type {
   ProjectSummary
 } from '@shared/types'
 import { visualSourceOf } from '@shared/script'
+import { formatSceneKey, isVisualProvider, sceneKeyOf } from '@shared/manual'
 import { getDb } from './db'
 import { assetUrl, projectDir, projectsRoot } from './paths'
 import { getSettings } from './settings'
@@ -68,6 +69,8 @@ const toClip = (r: Row): Clip => ({
   id: r.id,
   projectId: r.project_id,
   sort: r.sort,
+  sceneKey: r.scene_key ?? sceneKeyOf(r.sort ?? 0),
+  visualProvider: isVisualProvider(r.visual_provider) ? r.visual_provider : 'auto',
   title: r.title,
   story: r.story ?? '',
   visualPrompt: r.visual_prompt,
@@ -246,13 +249,13 @@ export function saveSnapshot(snap: ProjectSnapshot): number {
       ...clipIds
     )
     const upClip = db.prepare(
-      `INSERT INTO clips (id, project_id, sort, title, story, visual_prompt, narration, duration_ms, character_ids, motion_type,
+      `INSERT INTO clips (id, project_id, sort, scene_key, visual_provider, title, story, visual_prompt, narration, duration_ms, character_ids, motion_type,
          camera_preset, motion_strength, video_prompt, transition, video_camera, video_strength, transition_ms, voice_gain_db,
          media_in_ms, voice_in_ms, voice_out_ms, voice_start_ms)
-       VALUES (@id, @projectId, @sort, @title, @story, @visualPrompt, @narration, @durationMs, @characterIds, @motionType,
+       VALUES (@id, @projectId, @sort, @sceneKey, @visualProvider, @title, @story, @visualPrompt, @narration, @durationMs, @characterIds, @motionType,
          @cameraPreset, @motionStrength, @videoPrompt, @transition, @videoCamera, @videoStrength, @transitionMs, @voiceGainDb,
          @mediaInMs, @voiceInMs, @voiceOutMs, @voiceStartMs)
-       ON CONFLICT(id) DO UPDATE SET sort = excluded.sort, title = excluded.title, story = excluded.story, visual_prompt = excluded.visual_prompt,
+       ON CONFLICT(id) DO UPDATE SET sort = excluded.sort, scene_key = excluded.scene_key, visual_provider = excluded.visual_provider, title = excluded.title, story = excluded.story, visual_prompt = excluded.visual_prompt,
          narration = excluded.narration, duration_ms = excluded.duration_ms, character_ids = excluded.character_ids,
          motion_type = excluded.motion_type, camera_preset = excluded.camera_preset, motion_strength = excluded.motion_strength,
          video_prompt = excluded.video_prompt, transition = excluded.transition, video_camera = excluded.video_camera,
@@ -260,10 +263,17 @@ export function saveSnapshot(snap: ProjectSnapshot): number {
          media_in_ms = excluded.media_in_ms, voice_in_ms = excluded.voice_in_ms, voice_out_ms = excluded.voice_out_ms,
          voice_start_ms = excluded.voice_start_ms`
     )
+    // A clip without a scene key (e.g. from an older save) gets the next free number, so the
+    // UNIQUE (project_id, scene_key) index never sees two blank keys.
+    const usedKeys = new Set(snap.clips.map((c) => c.sceneKey).filter(Boolean))
+    let nextKey = 1
+    while (usedKeys.has(formatSceneKey(nextKey))) nextKey++
     for (const c of snap.clips)
       upClip.run({
         ...c,
         projectId: p.id,
+        sceneKey: c.sceneKey || formatSceneKey(nextKey++),
+        visualProvider: c.visualProvider ?? 'auto',
         characterIds: JSON.stringify(c.characterIds),
         videoCamera: c.videoCamera ?? 'static',
         videoStrength: c.videoStrength ?? 'halus',
@@ -339,15 +349,16 @@ export function duplicateProject(id: string): ProjectSummary {
     }
     for (const c of src.clips) {
       db.prepare(
-        `INSERT INTO clips (id, project_id, sort, title, story, visual_prompt, visual_source, narration, duration_ms, character_ids,
+        `INSERT INTO clips (id, project_id, sort, scene_key, visual_provider, title, story, visual_prompt, visual_source, narration, duration_ms, character_ids,
            motion_type, camera_preset, motion_strength, video_prompt, transition, image_asset_id, video_asset_id, audio_asset_id,
            video_camera, video_strength, transition_ms, voice_gain_db, media_in_ms, voice_in_ms, voice_out_ms, voice_start_ms)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(
         mapId(c.id),
         newId,
         c.sort,
-        c.title,
+        c.sceneKey,
+        c.visualProvider,
         c.story,
         c.visualPrompt,
         c.visualSource,
@@ -385,6 +396,8 @@ export type StoryClip = Omit<
   | 'id'
   | 'projectId'
   | 'sort'
+  | 'sceneKey'
+  | 'visualProvider'
   | 'imageAssetId'
   | 'videoAssetId'
   | 'audioAssetId'
@@ -428,13 +441,15 @@ export function replaceStory(
     clips.forEach((c, i) => {
       const ids = c.characterNames.map((n) => byName.get(n.trim().toLowerCase())).filter((x): x is string => !!x)
       db.prepare(
-        `INSERT INTO clips (id, project_id, sort, title, story, visual_prompt, visual_source, narration, duration_ms, character_ids,
+        `INSERT INTO clips (id, project_id, sort, scene_key, visual_provider, title, story, visual_prompt, visual_source, narration, duration_ms, character_ids,
            motion_type, camera_preset, motion_strength, video_prompt, transition)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(
         randomUUID(),
         projectId,
         i,
+        formatSceneKey(i + 1),
+        'auto',
         c.title,
         c.story,
         c.visualPrompt,
@@ -473,10 +488,10 @@ export function replaceScript(projectId: string, title: string, scenes: ScriptSc
   db.transaction(() => {
     db.prepare('DELETE FROM clips WHERE project_id = ?').run(projectId)
     const insert = db.prepare(
-      `INSERT INTO clips (id, project_id, sort, title, story, narration, duration_ms, character_ids)
-       VALUES (?, ?, ?, ?, ?, ?, ?, '[]')`
+      `INSERT INTO clips (id, project_id, sort, scene_key, visual_provider, title, story, narration, duration_ms, character_ids)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, '[]')`
     )
-    scenes.forEach((c, i) => insert.run(randomUUID(), projectId, i, c.title, c.story, c.narration, c.durationMs))
+    scenes.forEach((c, i) => insert.run(randomUUID(), projectId, i, formatSceneKey(i + 1), 'auto', c.title, c.story, c.narration, c.durationMs))
     db.prepare("UPDATE projects SET title = ?, status = 'script', step = 2, updated_at = ? WHERE id = ?").run(title, Date.now(), projectId)
   })()
 }
@@ -553,6 +568,8 @@ export function clipsOf(projectId: string): Clip[] {
 }
 
 const CLIP_COLS: Partial<Record<keyof Clip, string>> = {
+  sceneKey: 'scene_key',
+  visualProvider: 'visual_provider',
   imageAssetId: 'image_asset_id',
   videoAssetId: 'video_asset_id',
   audioAssetId: 'audio_asset_id',
@@ -581,14 +598,21 @@ export function insertClipAfter(afterId: string, c: Clip): void {
   db.transaction(() => {
     const after = getClip(afterId)
     db.prepare('UPDATE clips SET sort = sort + 1 WHERE project_id = ? AND sort > ?').run(after.projectId, after.sort)
+    // A clip without a scene key gets the next free number, so the
+    // UNIQUE (project_id, scene_key) index never sees two blank keys.
+    const sceneKey =
+      c.sceneKey ||
+      formatSceneKey(
+        (db.prepare('SELECT COALESCE(MAX(CAST(scene_key AS INTEGER)), 0) AS m FROM clips WHERE project_id = ?').get(after.projectId) as Row).m + 1
+      )
     db.prepare(
-      `INSERT INTO clips (id, project_id, sort, title, story, visual_prompt, visual_source, narration, duration_ms, character_ids,
+      `INSERT INTO clips (id, project_id, sort, scene_key, visual_provider, title, story, visual_prompt, visual_source, narration, duration_ms, character_ids,
          motion_type, camera_preset, motion_strength, video_prompt, transition, image_asset_id, video_asset_id, audio_asset_id,
          video_camera, video_strength, transition_ms, voice_gain_db, media_in_ms, voice_in_ms, voice_out_ms, voice_start_ms)
-       VALUES (@id, @projectId, @sort, @title, @story, @visualPrompt, @visualSource, @narration, @durationMs, @characterIds,
+       VALUES (@id, @projectId, @sort, @sceneKey, @visualProvider, @title, @story, @visualPrompt, @visualSource, @narration, @durationMs, @characterIds,
          @motionType, @cameraPreset, @motionStrength, @videoPrompt, @transition, @imageAssetId, @videoAssetId, @audioAssetId,
          @videoCamera, @videoStrength, @transitionMs, @voiceGainDb, @mediaInMs, @voiceInMs, @voiceOutMs, @voiceStartMs)`
-    ).run({ ...c, projectId: after.projectId, sort: after.sort + 1, characterIds: JSON.stringify(c.characterIds) })
+    ).run({ ...c, projectId: after.projectId, sort: after.sort + 1, sceneKey, visualProvider: c.visualProvider ?? 'auto', characterIds: JSON.stringify(c.characterIds) })
   })()
 }
 
