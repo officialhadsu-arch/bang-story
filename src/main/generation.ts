@@ -3,6 +3,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, extname } from 'node:path'
 import { estimateWordTimings } from '@shared/captions'
 import { isFlowModelId } from '@shared/flow2api'
+import { type VisualProvider } from '@shared/manual'
 import { clipPrompt, videoPromptForClip } from '@shared/prompts'
 import { stripVoiceTags } from '@shared/speech'
 import { getImageModel, getVideoModel, imageBody, maxRefs, promptLimit, videoBody, type HfModel } from '@shared/higgsfield'
@@ -38,6 +39,7 @@ import type { FlowImageRef, FlowMedia } from './services/flow2api'
 import * as gemini from './services/gemini'
 import * as hf from './services/higgsfield'
 import { downloadTo, sleep } from './services/http'
+import { completeManualJobs } from './services/manual'
 
 const DAY = 24 * 60 * 60 * 1000
 
@@ -290,13 +292,53 @@ function updateJobPayload(jobId: string, payload: HfPayload): void {
   getDb().prepare('UPDATE jobs SET payload_json = ? WHERE id = ?').run(JSON.stringify(payload), jobId)
 }
 
+// ---------- manual / extension routing (tier 2, D2-02, D2-03) ----------
+
+/**
+ * Which provider makes this scene's picture/video, decided BEFORE any model is called. 'auto'
+ * follows the project's model; an explicit provider wins over the model; anything else fails
+ * hard (B5) instead of silently falling back to a provider the user did not pick.
+ */
+function resolveVisualProvider(clip: Clip, project: Project, kind: 'image' | 'video'): 'higgsfield' | 'flow2api' | 'manual' | 'extension' {
+  const p = clip.visualProvider ?? 'auto'
+  if (p === 'manual' || p === 'extension' || p === 'higgsfield' || p === 'flow2api') return p
+  if (p === 'auto') {
+    const modelId = kind === 'image' ? project.imageModel : project.videoModel
+    return isFlowModelId(modelId) ? 'flow2api' : 'higgsfield'
+  }
+  // Unreachable for clips read through toClip (it sanitises to 'auto'), but a stored value the
+  // app does not know must fail here rather than silently pick a provider.
+  throw new Error(`Jalur visual tidak dikenal: ${String(p)}`)
+}
+
+/**
+ * A manual job waits in 'queued' with no running task: the user generates the media outside the
+ * app and brings the file back to the work folder. Importing the matching file marks it done;
+ * Cancel marks it canceled; a restart leaves it waiting (see resumeJobs).
+ */
+export function startManualJob(clipId: string, kind: 'image' | 'video'): Job {
+  const clip = getClip(clipId)
+  const project = getProject(clip.projectId)
+  const chars = charactersOf(project.id).filter((c) => clip.characterIds.includes(c.id))
+  const prompt =
+    kind === 'image'
+      ? clipPrompt(project, clip, chars, chars.filter((c) => c.sheetAssetId).map((c) => c.name), promptLimit(getImageModel(project.imageModel)))
+      : videoPromptForClip(clip, getVideoModel(project.videoModel).input.mode === 'reference')
+  const job = insertJob({ projectId: clip.projectId, clipId, kind, provider: 'manual', payload: { sceneKey: clip.sceneKey, prompt } })
+  emit.job(job)
+  return job
+}
+
 // ---------- public entry points ----------
 
 export function generateClipImage(clipId: string): Job {
   const existing = activeJobFor({ clipId }, 'image')
   if (existing) return existing
   const clip = getClip(clipId)
-  if (isFlowModelId(getProject(clip.projectId).imageModel)) {
+  const project = getProject(clip.projectId)
+  const provider = resolveVisualProvider(clip, project, 'image')
+  if (provider === 'manual' || provider === 'extension') return startManualJob(clipId, 'image')
+  if (provider === 'flow2api') {
     const job = insertJob({ projectId: clip.projectId, clipId, kind: 'image', provider: 'flow2api' })
     return startFlow(job, async (ctx) => {
       const baseUrl = requireFlowEnabled()
@@ -367,7 +409,10 @@ export function generateClipVideo(clipId: string): Job {
   if (existing) return existing
   const clip = getClip(clipId)
   if (!clip.imageAssetId) throw new Error('Buat gambar klip ini dulu sebelum membuat video AI.')
-  if (isFlowModelId(getProject(clip.projectId).videoModel)) {
+  const project = getProject(clip.projectId)
+  const provider = resolveVisualProvider(clip, project, 'video')
+  if (provider === 'manual' || provider === 'extension') return startManualJob(clipId, 'video')
+  if (provider === 'flow2api') {
     const job = insertJob({ projectId: clip.projectId, clipId, kind: 'video', provider: 'flow2api' })
     return startFlow(job, async (ctx) => {
       const baseUrl = requireFlowEnabled()
@@ -489,9 +534,10 @@ export function generateMissingTts(projectId: string): Job[] {
     .map((c) => generateClipTts(c.id))
 }
 
-/** After a restart, keep polling Higgsfield requests that were already submitted; fail the rest. */
+/** After a restart, keep polling Higgsfield requests that were already submitted; fail the rest. Manual jobs are skipped: they keep waiting for the user to bring the file back. */
 export function resumeJobs(): void {
   for (const row of unfinishedJobs()) {
+    if (row.provider === 'manual') continue
     const payload = JSON.parse(row.payload_json || '{}') as Partial<HfPayload>
     if (row.provider === 'higgsfield' && row.remote_id && payload.target) {
       const job = getJob(row.id)!
@@ -515,6 +561,8 @@ export async function setActiveAsset(clipId: string, assetId: string): Promise<v
           : {}
   patchClip(clipId, patch)
   emit.clip({ clipId, patch })
+  // Picking a picture or video by hand also finishes a manual job that was waiting for it.
+  if (asset.kind === 'image' || asset.kind === 'video') completeManualJobs(asset.projectId, clipId, asset.kind, asset.id)
 }
 
 /** Estimates that failed recently (no key, or a model the account cannot use), so pickers do not keep asking. */
@@ -524,14 +572,17 @@ const failedEstimates = new Map<string, number>()
  * Credits for one image, or one clip video of about `seconds`. The model pickers ask for every model,
  * so answers are kept for a day and failures for ten minutes. Flow2API models return null: the server
  * has no credit-estimate endpoint, and the cost is the user's own Google Flow credit, not a per-model price.
+ * Manual/extension scenes return null for the same reason: no server, no per-model price.
  */
 export async function estimateCredits(
   kind: 'image' | 'video',
   modelId: string,
   aspect: AspectRatio,
   seconds = 5,
-  resolution?: string | null
+  resolution?: string | null,
+  visualProvider?: VisualProvider
 ): Promise<CreditEstimate | null> {
+  if (visualProvider === 'manual' || visualProvider === 'extension') return null
   if (isFlowModelId(modelId)) return null
   const model = kind === 'image' ? getImageModel(modelId) : getVideoModel(modelId)
   const body =

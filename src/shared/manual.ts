@@ -93,6 +93,42 @@ export interface ManualManifest {
   clips: ManualPromptRow[]
 }
 
+/** What `manual:prepareWorkFolder` writes and returns (the text is what the renderer copies). */
+export interface ManualWorkFolder {
+  text: string
+  manifest: ManualManifest
+  workFolder: string
+  fileCount: number
+}
+
+/** One file the scan attached to a scene. */
+export interface ManualScanAttached {
+  file: string
+  clipId: string
+  sceneKey: string
+  kind: WorkFileKind
+  assetId: string
+}
+
+/** One file the scan could not place on its own; the user picks its scene in the UI. */
+export interface ManualScanUnmatched {
+  file: string
+  kind: WorkFileKind | null
+}
+
+/** What `manual:scanWorkFolder` returns. */
+export interface ManualScanResult {
+  workFolder: string
+  attached: ManualScanAttached[]
+  unmatched: ManualScanUnmatched[]
+}
+
+/** Emitted when the work-folder watcher sees a file arrive or change (a hint to press Pindai). */
+export interface ManualWatchEvent {
+  projectId: string
+  file: string
+}
+
 /**
  * One row per scene, in story order. The image prompt is the same `clipPrompt()` the automatic path
  * sends, so a manual generate and an automatic one start from identical words.

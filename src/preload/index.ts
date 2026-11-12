@@ -41,6 +41,12 @@ const api: StudioApi = {
     cancel: call('generate:cancel'),
     estimate: call('generate:estimate')
   },
+  manual: {
+    prepareWorkFolder: call('manual:prepareWorkFolder'),
+    scanWorkFolder: call('manual:scanWorkFolder'),
+    importFile: call('manual:importFile'),
+    openWorkFolder: call('manual:openWorkFolder')
+  },
   clips: {
     split: call('clips:split'),
     detachVoice: call('clips:detachVoice')
@@ -92,7 +98,8 @@ const api: StudioApi = {
     job: listen(EVENTS.job),
     clip: listen(EVENTS.clip),
     character: listen(EVENTS.character),
-    asset: listen(EVENTS.asset)
+    asset: listen(EVENTS.asset),
+    manual: listen(EVENTS.manual)
   }
 }
 
