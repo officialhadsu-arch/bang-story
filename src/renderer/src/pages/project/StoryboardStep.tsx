@@ -775,9 +775,9 @@ export function StoryboardStep() {
 
       <div className="grid min-h-0 grid-cols-[minmax(0,1fr)_540px]">
         <section className="scroll-thin flex min-h-0 flex-col gap-3.5 overflow-y-auto px-6 pb-6 pt-[18px]">
-          <div className="flex items-center gap-3">
-            <h1 className="font-display text-2xl font-bold">Storyboard</h1>
-            <span className="text-sm text-muted">
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="shrink-0 font-display text-2xl font-bold">Storyboard</h1>
+            <span className="shrink-0 whitespace-nowrap text-sm text-muted">
               {clips.length} klip · {mmss(stats.total)}
             </span>
             <div className="flex-1" />
