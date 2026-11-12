@@ -89,6 +89,22 @@ export async function testConnection(baseUrl: string): Promise<KeyTestResult> {
   }
 }
 
+/** The reason carried by a plain JSON error body, if it has one. FastAPI answers with `{"detail": "..."}`; chat-style errors use `error.message` or a plain `error` string. */
+function bodyErrorReason(body: string): string | null {
+  try {
+    const parsed = JSON.parse(body.trim()) as unknown
+    if (!parsed || typeof parsed !== 'object') return null
+    const record = parsed as Record<string, unknown>
+    if (typeof record.detail === 'string' && record.detail.trim() !== '') return record.detail
+    const err = record.error
+    if (typeof err === 'string' && err.trim() !== '') return err
+    if (err && typeof err === 'object' && typeof (err as Record<string, unknown>).message === 'string')
+      return (err as Record<string, unknown>).message as string
+    return null
+  } catch {
+    return null
+  }
+}
 /** The error text carried by one parsed chunk, if it has any. Flow2API reports an upstream failure as a normal chunk on a 200 stream, so this is the only place the real reason can be found. */
 function chunkError(v: unknown): string | null {
   if (!v || typeof v !== 'object') return null
@@ -321,6 +337,14 @@ async function chatCompletions(req: ChatRequest): Promise<string> {
     }
     const bodyText = await guard(res.text(), req.signal, t, timeoutMessage)
     if (!res.ok) {
+      const reason = bodyErrorReason(bodyText)
+      if (reason) {
+        if (res.status === 401)
+          throw new Error(
+            `Server Flow2API menolak permintaan (HTTP 401): ${reason}. Periksa login Google di halaman admin server — token mungkin belum ditambahkan atau sudah kedaluwarsa.`
+          )
+        throw new Error(friendlyFlowError(reason))
+      }
       const content = parseChatCompletionContent(bodyText)
       throw new Error(`Flow2API mengembalikan galat (HTTP ${res.status}): ${snippet(content)}`)
     }
