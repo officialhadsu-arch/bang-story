@@ -230,6 +230,39 @@ export function registerIpc(): void {
     return asset
   })
 
+  // Tier 2 (0.3+): the video twin of pickClipImage — a local video file for a clip, stored as the
+  // clip's video and linked at once. setActiveAsset also finishes a manual job waiting for it.
+  handle('assets:pickClipVideo', async (projectId: string, clipId: string) => {
+    const win = BrowserWindow.getFocusedWindow()
+    const res = await dialog.showOpenDialog(win!, {
+      title: 'Pilih video untuk klip',
+      filters: [{ name: 'Video', extensions: ['mp4', 'mov', 'webm'] }],
+      properties: ['openFile']
+    })
+    if (res.canceled || !res.filePaths[0]) return null
+    getProject(projectId)
+    const src = res.filePaths[0]
+    const rel = `videos/${randomUUID()}${extname(src).toLowerCase()}`
+    const abs = assetAbsPath(projectId, rel)
+    mkdirSync(dirname(abs), { recursive: true })
+    copyFileSync(src, abs)
+    const size = await probeSize(abs).catch(() => null)
+    if (!size) throw new Error('Video tidak bisa dibaca. Pakai file MP4, MOV, atau WebM.')
+    const asset = insertAsset({
+      projectId,
+      clipId,
+      kind: 'video',
+      provider: 'local',
+      prompt: basename(src),
+      localPath: rel,
+      durationMs: await probeDurationMs(abs).catch(() => null),
+      width: size.width,
+      height: size.height
+    })
+    await setActiveAsset(clipId, asset.id)
+    return asset
+  })
+
   handle('settings:get', () => getSettings())
   handle('settings:set', (patch: Partial<AppSettings>) => setSettings(patch))
   handle('settings:keys', () => keyStatuses())

@@ -10,8 +10,10 @@ import {
   replaceCaptionWords,
   resolveCaption
 } from '@shared/captions'
+import { getImageModel, promptLimit } from '@shared/higgsfield'
 import { CAMERA_PRESETS, MOTION_STRENGTHS } from '@shared/motion'
 import { geminiVoiceName } from '@shared/models'
+import { clipPrompt } from '@shared/prompts'
 import { voiceSpan } from '@shared/timeline'
 import type { Asset, Clip, WordTiming } from '@shared/types'
 import { Select } from '../../../components/Select'
@@ -62,11 +64,24 @@ const VIDEO_CAMERA_OPTIONS = [
 ]
 
 function ClipTab({ clip, index }: { clip: Clip; index: number }) {
-  const { project, assets, jobs, updateClip, flush, addAsset } = useProject()
+  const { project, characters, assets, jobs, updateClip, flush, addAsset } = useProject()
   const { toast } = useApp()
   const image = clip.imageAssetId ? assets[clip.imageAssetId] : null
   const video = clip.videoAssetId ? assets[clip.videoAssetId] : null
+  const imageJob = jobFor(jobs, 'image', { clipId: clip.id })
   const videoJob = jobFor(jobs, 'video', { clipId: clip.id })
+  // A manual job waits in 'queued' by design: the picture/video arrives from outside the app.
+  const manualWaiting =
+    (clip.visualProvider === 'manual' || clip.visualProvider === 'extension') &&
+    ((imageJob?.provider === 'manual' && imageJob.status === 'queued' && !clip.imageAssetId) ||
+      (videoJob?.provider === 'manual' && videoJob.status === 'queued' && !clip.videoAssetId))
+  const copyImagePrompt = async (): Promise<void> => {
+    if (!project) return
+    const chars = characters.filter((c) => clip.characterIds.includes(c.id))
+    const prompt = clipPrompt(project, clip, chars, chars.filter((c) => c.sheetAssetId).map((c) => c.name), promptLimit(getImageModel(project.imageModel)))
+    await window.api.app.copyText(prompt)
+    toast('success', `Prompt gambar adegan ${clip.sceneKey} disalin.`)
+  }
   const videoCamera = clip.videoCamera ?? 'static'
   // A camera change plays the clip in the preview at once, without moving the playhead.
   const audition = (): void => useAudition.getState().start({ kind: 'clip', clipId: clip.id })
@@ -111,10 +126,36 @@ function ClipTab({ clip, index }: { clip: Clip; index: number }) {
           </Button>
         </div>
       </Section>
+      <Section title="Jalur manual">
+        {manualWaiting ? (
+          <p className="text-[13px] leading-relaxed text-ink-2">
+            Adegan {clip.sceneKey} menunggu hasil {clip.visualProvider === 'extension' ? 'dari Google Flow di browser' : 'manual'} — salin
+            promptnya, generate di luar, lalu Pindai Folder Kerja di Storyboard.
+          </p>
+        ) : image && (image.provider === 'manual' || image.provider === 'extension') ? (
+          <p className="text-[13px] leading-relaxed text-ink-2">
+            Gambar ini berasal dari jalur {image.provider === 'extension' ? 'ekstensi' : 'manual'} (berkas {image.prompt}).
+          </p>
+        ) : (
+          <p className="text-[13px] leading-relaxed text-ink-2">
+            Jalur visual adegan ini: {clip.visualProvider === 'auto' ? 'otomatis (mengikuti model proyek)' : clip.visualProvider === 'manual' ? 'manual' : clip.visualProvider === 'extension' ? 'ekstensi' : clip.visualProvider === 'flow2api' ? 'Google Flow' : 'Higgsfield'}.
+            Prompt gambarnya bisa disalin untuk generate di luar.
+          </p>
+        )}
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" icon={<Copy className="size-4" />} onClick={() => void copyImagePrompt()}>
+            Salin prompt gambar
+          </Button>
+        </div>
+      </Section>
       {clip.motionType === 'video' ? (
         <Section title="Video AI">
           {video ? (
-            <p className="text-[13px] text-ink-2">Klip ini memakai video dari Higgsfield.</p>
+            <p className="text-[13px] text-ink-2">
+              Klip ini memakai video dari{' '}
+              {video.provider === 'manual' ? 'jalur manual' : video.provider === 'extension' ? 'jalur ekstensi' : video.provider === 'flow2api' ? 'Google Flow' : video.provider === 'local' ? 'berkas lokal' : 'Higgsfield'}
+              .
+            </p>
           ) : (
             <p className="text-[13px] text-ink-2">Video belum dibuat. Sampai video siap, pratinjau memakai gambar diam.</p>
           )}

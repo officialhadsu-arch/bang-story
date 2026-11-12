@@ -5,8 +5,11 @@ import {
   ChevronLeft,
   ChevronRight,
   Clapperboard,
+  Copy,
   Film,
+  FolderSearch,
   Image as ImageIcon,
+  ImagePlus,
   MoreHorizontal,
   Move,
   Pause,
@@ -19,6 +22,7 @@ import {
   Volume2
 } from 'lucide-react'
 import { effectiveResolution, fitDuration, getImageModel, getVideoModel } from '@shared/higgsfield'
+import { VISUAL_PROVIDERS, type ManualScanUnmatched } from '@shared/manual'
 import { CAMERA_PRESETS, MOTION_STRENGTHS, cameraAt, cameraCss } from '@shared/motion'
 import { needsVisual } from '@shared/script'
 import { geminiVoiceName, geminiVoiceTone } from '@shared/models'
@@ -26,6 +30,7 @@ import type { Asset, Clip } from '@shared/types'
 import { AutoTextarea } from '../../components/AutoTextarea'
 import { CharacterAvatar } from '../../components/CharacterAvatar'
 import { ClipVisual } from '../../components/ClipVisual'
+import { Select } from '../../components/Select'
 import { Badge, Button, Chip, IconButton, Menu, Progress, Segmented, confirmDialog, cx, inputCls } from '../../components/ui'
 import { clipNumber, errorText, mmss, secLabel } from '../../lib/format'
 import { useNarration } from '../../lib/useNarration'
@@ -115,6 +120,13 @@ function ClipPanel({ clip, index, total }: { clip: Clip; index: number; total: n
   const imageJob = jobFor(jobs, 'image', { clipId: clip.id })
   const narration = useNarration()
   const videoJob = jobFor(jobs, 'video', { clipId: clip.id })
+  // A manual job waits in 'queued' by design — no spinner that never ends, just a waiting note.
+  const imageBusy = isRunning(imageJob) && imageJob?.provider !== 'manual'
+  const videoBusy = isRunning(videoJob) && videoJob?.provider !== 'manual'
+  const manualWaiting =
+    (clip.visualProvider === 'manual' || clip.visualProvider === 'extension') &&
+    ((imageJob?.provider === 'manual' && imageJob.status === 'queued' && !clip.imageAssetId) ||
+      (videoJob?.provider === 'manual' && videoJob.status === 'queued' && !clip.videoAssetId))
   const versions = Object.values(assets)
     .filter((a) => a.clipId === clip.id && a.kind === 'image')
     .sort((a, b) => a.createdAt - b.createdAt)
@@ -197,6 +209,13 @@ function ClipPanel({ clip, index, total }: { clip: Clip; index: number; total: n
               </Button>
             </div>
           )}
+          {!image && manualWaiting && (
+            <div className="absolute inset-x-0 bottom-6 flex justify-center px-4">
+              <span className="rounded-full bg-ink/80 px-3 py-1.5 text-center text-xs text-paper">
+                Menunggu hasil manual — salin prompt, generate di luar, lalu pindai folder kerja
+              </span>
+            </div>
+          )}
           {versions.length > 1 && (
             <div className="absolute bottom-2.5 left-2.5 flex items-center gap-1.5 rounded-[10px] border border-ink bg-surface/95 p-1.5">
               {versions.slice(-5).map((v, i, arr) => (
@@ -227,7 +246,7 @@ function ClipPanel({ clip, index, total }: { clip: Clip; index: number; total: n
             <Button
               size="sm"
               icon={<RefreshCw className="size-4" />}
-              loading={isRunning(imageJob)}
+              loading={imageBusy}
               onClick={() => void run(() => window.api.generate.clipImage(clip.id))}
             >
               Generate ulang
@@ -255,6 +274,27 @@ function ClipPanel({ clip, index, total }: { clip: Clip; index: number; total: n
             className={cx(inputCls, 'py-2.5 text-[13px] leading-relaxed')}
           />
         )}
+
+        <div className="flex flex-col gap-1.5">
+          <span className="text-sm font-semibold">Jalur visual</span>
+          <Select
+            label="Jalur visual adegan ini"
+            value={clip.visualProvider}
+            onChange={(v) => updateClip(clip.id, { visualProvider: v })}
+            options={VISUAL_PROVIDERS.map((p) => ({ value: p.id, label: p.label, hint: p.hint }))}
+          />
+          <p className="text-xs leading-relaxed text-muted">
+            {clip.visualProvider === 'manual'
+              ? 'Manual: tombol Generate membuat job yang menunggu. Salin Semua Prompt, generate di mana pun, lalu Pindai Folder Kerja.'
+              : clip.visualProvider === 'extension'
+                ? 'Ekstensi: prompt yang sama, tapi generate lewat Google Flow di browser (ekstensi/agen). Hasilnya jatuh ke folder kerja, lalu Pindai.'
+                : clip.visualProvider === 'auto'
+                  ? 'Otomatis: mengikuti model gambar/video yang dipilih proyek.'
+                  : clip.visualProvider === 'flow2api'
+                    ? 'Google Flow: gambar/video dibuat lewat server Flow2API.'
+                    : 'Higgsfield: gambar/video dibuat lewat Higgsfield, apa pun model proyeknya.'}
+          </p>
+        </div>
 
         {characters.length > 0 && (
           <div className="flex flex-col gap-1.5">
@@ -423,14 +463,14 @@ function ClipPanel({ clip, index, total }: { clip: Clip; index: number; total: n
                   size="sm"
                   variant={video ? 'secondary' : 'accent'}
                   icon={<Clapperboard className="size-4" />}
-                  loading={isRunning(videoJob)}
+                  loading={videoBusy}
                   disabled={!image}
                   onClick={() => void run(() => window.api.generate.clipVideo(clip.id))}
                 >
                   {video ? 'Buat ulang video' : 'Buat video'}
                 </Button>
                 {!image && <span className="text-xs text-muted">Buat gambar dulu, lalu jadikan video.</span>}
-                {isRunning(videoJob) && (
+                {videoBusy && (
                   <span className="text-xs text-sun-ink">
                     {videoJob!.message ?? 'Memproses'} {Math.round(videoJob!.progress * 100)}%
                   </span>
@@ -446,13 +486,18 @@ function ClipPanel({ clip, index, total }: { clip: Clip; index: number; total: n
 }
 
 export function StoryboardStep() {
-  const { project, clips, characters, assets, jobs, selectedClipId, select, addClip, updateProject, flush, load } = useProject()
+  const { project, clips, characters, assets, jobs, selectedClipId, select, addClip, updateProject, flush, load, addAsset } = useProject()
   const { toast } = useApp()
   /** A character id, "new" for an unsaved one, or null. */
   const [openChar, setOpenChar] = useState<string | null>(null)
   const [credits, setCredits] = useState<number | null>(null)
   const [videoCredits, setVideoCredits] = useState<number | null>(null)
   const [planning, setPlanning] = useState(false)
+  /** Files the scan could not place on its own, and the scene the user picked for each. */
+  const [unmatched, setUnmatched] = useState<ManualScanUnmatched[]>([])
+  const [workFolder, setWorkFolder] = useState<string | null>(null)
+  const [folderHint, setFolderHint] = useState(false)
+  const [pickScene, setPickScene] = useState<Record<string, string>>({})
   const lastNarration = useRef<string | null>(null)
 
   // A failed narration take is reported once, when it happens.
@@ -464,11 +509,21 @@ export function StoryboardStep() {
   }, [jobs])
 
   useEffect(() => {
-    if (project)
-      void window.api.generate
-        .estimate('image', getImageModel(project.imageModel).id, project.aspectRatio)
-        .then((e) => setCredits(e?.credits ?? null))
-  }, [project?.id, project?.imageModel, project?.aspectRatio])
+    if (!project) return
+    return window.api.on.manual((e) => {
+      if (e.projectId === project.id) setFolderHint(true)
+    })
+  }, [project?.id])
+
+  useEffect(() => {
+    if (!project) return
+    // A manual/extension scene has no per-model price, so no credit estimate is shown for it.
+    const pending = clips.filter((c) => !c.imageAssetId)
+    const allManual = pending.length > 0 && pending.every((c) => c.visualProvider === 'manual' || c.visualProvider === 'extension')
+    void window.api.generate
+      .estimate('image', getImageModel(project.imageModel).id, project.aspectRatio, undefined, undefined, allManual ? 'manual' : undefined)
+      .then((e) => setCredits(e?.credits ?? null))
+  }, [project?.id, project?.imageModel, project?.aspectRatio, clips])
 
   const stats = useMemo(() => {
     const imgs = clips.filter((c) => c.imageAssetId).length
@@ -476,7 +531,11 @@ export function StoryboardStep() {
     const needImg = clips.filter((c) => !c.imageAssetId && !isRunning(jobFor(jobs, 'image', { clipId: c.id }))).length
     const videoRunning = clips.filter((c) => isRunning(jobFor(jobs, 'video', { clipId: c.id }))).length
     const needVideo = clips.filter((c) => !c.videoAssetId && !isRunning(jobFor(jobs, 'video', { clipId: c.id })))
-    return { imgs, voices, needImg, videoRunning, needVideo, total: clips.reduce((n, c) => n + c.durationMs, 0) }
+    const pendingImg = clips.filter((c) => !c.imageAssetId)
+    const pendingVideo = clips.filter((c) => !c.videoAssetId)
+    const manualImgOnly = pendingImg.length > 0 && pendingImg.every((c) => c.visualProvider === 'manual' || c.visualProvider === 'extension')
+    const manualVideoOnly = pendingVideo.length > 0 && pendingVideo.every((c) => c.visualProvider === 'manual' || c.visualProvider === 'extension')
+    return { imgs, voices, needImg, videoRunning, needVideo, total: clips.reduce((n, c) => n + c.durationMs, 0), manualImgOnly, manualVideoOnly }
   }, [clips, jobs])
 
   // Video length follows each clip's voice, so the cost is estimated per video length and summed.
@@ -487,6 +546,7 @@ export function StoryboardStep() {
   }, [stats.needVideo, project?.videoModel])
   useEffect(() => {
     if (!project || !videoLengths) return setVideoCredits(null)
+    if (stats.manualVideoOnly) return setVideoCredits(null)
     const lengths = videoLengths.split(',').map(Number)
     const unique = [...new Set(lengths)]
     const model = getVideoModel(project.videoModel).id
@@ -500,7 +560,7 @@ export function StoryboardStep() {
     return () => {
       live = false
     }
-  }, [videoLengths, project?.aspectRatio, project?.videoResolution])
+  }, [videoLengths, stats.manualVideoOnly, project?.aspectRatio, project?.videoResolution])
 
   if (!project) return null
   const selIndex = Math.max(0, clips.findIndex((c) => c.id === selectedClipId))
@@ -548,6 +608,76 @@ export function StoryboardStep() {
       toast('error', errorText(e))
     } finally {
       setPlanning(false)
+    }
+  }
+
+  // Tier 2 (0.3+): the manual / extension work folder.
+  const copyAllPrompts = async (): Promise<void> => {
+    try {
+      await flush()
+      const r = await window.api.manual.prepareWorkFolder(project.id)
+      await window.api.app.copyText(r.text)
+      setWorkFolder(r.workFolder)
+      setFolderHint(false)
+      toast('success', `${r.fileCount} prompt adegan disalin. Hasil generate nanti masuk ke folder kerja.`)
+    } catch (e) {
+      toast('error', errorText(e))
+    }
+  }
+
+  const scanWorkFolder = async (): Promise<void> => {
+    try {
+      await flush()
+      const r = await window.api.manual.scanWorkFolder(project.id)
+      setUnmatched(r.unmatched)
+      setWorkFolder(r.workFolder)
+      setFolderHint(false)
+      if (r.attached.length) load(await window.api.projects.get(project.id))
+      toast(
+        'success',
+        r.attached.length
+          ? `${r.attached.length} berkas terpasang${r.unmatched.length ? `, ${r.unmatched.length} belum terpasang` : ''}.`
+          : r.unmatched.length
+            ? `${r.unmatched.length} berkas belum terpasang — pilih adegannya di bawah.`
+            : 'Tidak ada berkas baru di folder kerja.'
+      )
+    } catch (e) {
+      toast('error', errorText(e))
+    }
+  }
+
+  const importImage = async (): Promise<void> => {
+    if (!sel) return
+    try {
+      await flush()
+      const a = await window.api.assets.pickClipImage(project.id, sel.id)
+      if (a) addAsset(a)
+    } catch (e) {
+      toast('error', errorText(e))
+    }
+  }
+
+  const importVideo = async (): Promise<void> => {
+    if (!sel) return
+    try {
+      await flush()
+      const a = await window.api.assets.pickClipVideo(project.id, sel.id)
+      if (a) addAsset(a)
+    } catch (e) {
+      toast('error', errorText(e))
+    }
+  }
+
+  const attachUnmatched = async (file: string, kind: 'image' | 'video'): Promise<void> => {
+    const clipId = pickScene[file]
+    if (!clipId) return
+    try {
+      await window.api.manual.importFile(project.id, file, clipId, kind)
+      load(await window.api.projects.get(project.id))
+      setUnmatched((u) => u.filter((x) => x.file !== file))
+      toast('success', `${file} terpasang.`)
+    } catch (e) {
+      toast('error', errorText(e))
     }
   }
 
@@ -651,6 +781,28 @@ export function StoryboardStep() {
               {clips.length} klip · {mmss(stats.total)}
             </span>
             <div className="flex-1" />
+            <Button
+              size="sm"
+              icon={<Copy className="size-4" />}
+              title="Tulis prompts.txt + manual.json ke folder kerja dan salin semua prompt bernomor adegan"
+              onClick={() => void copyAllPrompts()}
+            >
+              Salin Semua Prompt
+            </Button>
+            <Button size="sm" icon={<ImagePlus className="size-4" />} title="Pilih berkas gambar untuk adegan yang dipilih" onClick={() => void importImage()}>
+              Impor Gambar
+            </Button>
+            <Button size="sm" icon={<Clapperboard className="size-4" />} title="Pilih berkas video untuk adegan yang dipilih" onClick={() => void importVideo()}>
+              Impor Video
+            </Button>
+            <Button
+              size="sm"
+              icon={<FolderSearch className="size-4" />}
+              title="Pasangkan berkas hasil di folder kerja ke adegannya"
+              onClick={() => void scanWorkFolder()}
+            >
+              Pindai Folder Kerja
+            </Button>
             <Button variant="ghost" icon={<Plus className="size-[17px]" />} onClick={() => addClip(sel?.id ?? null)}>
               Tambah klip
             </Button>
@@ -666,12 +818,67 @@ export function StoryboardStep() {
               </Button>
             </div>
           )}
+          {(unmatched.length > 0 || folderHint || workFolder) && (
+            <div className="flex flex-col gap-2.5 rounded-2xl border border-line bg-surface px-4 py-3 text-sm">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-semibold">Folder kerja</span>
+                {workFolder && <span className="min-w-0 flex-1 truncate font-mono text-xs text-muted">{workFolder}</span>}
+                <Button size="sm" variant="ghost" onClick={() => void window.api.manual.openWorkFolder(project.id)}>
+                  Buka folder
+                </Button>
+                <Button size="sm" icon={<FolderSearch className="size-4" />} onClick={() => void scanWorkFolder()}>
+                  Pindai
+                </Button>
+              </div>
+              {folderHint && <p className="text-xs text-sun-ink">Ada berkas baru di folder kerja — tekan Pindai untuk memasangkannya.</p>}
+              {unmatched.length > 0 && <p className="text-xs text-muted">Berkas di bawah ini belum terpasang — namanya tidak diawali nomor adegan yang dikenal. Pilih adegannya, lalu Pasangkan.</p>}
+              {unmatched.map((u) => (
+                <div key={u.file} className="flex flex-wrap items-center gap-2 border-t border-dashed border-line pt-2.5">
+                  <span className="font-mono text-[13px]">{u.file}</span>
+                  <span className="text-xs text-muted">
+                    {u.kind === 'image' ? 'gambar' : u.kind === 'video' ? 'video' : 'jenis tidak dikenal'}
+                  </span>
+                  <span className="flex-1" />
+                  {u.kind ? (
+                    <>
+                      <div className="w-[240px]">
+                        <Select
+                          label={`Adegan untuk ${u.file}`}
+                          value={pickScene[u.file] ?? ''}
+                          onChange={(v) => setPickScene((p) => ({ ...p, [u.file]: v }))}
+                          options={[
+                            { value: '', label: 'Pilih adegan…', disabled: true },
+                            ...clips.map((c) => ({ value: c.id, label: `Adegan ${c.sceneKey} — ${c.title || 'Tanpa judul'}` }))
+                          ]}
+                        />
+                      </div>
+                      <Button size="sm" disabled={!pickScene[u.file]} onClick={() => void attachUnmatched(u.file, u.kind!)}>
+                        Pasangkan
+                      </Button>
+                    </>
+                  ) : (
+                    <span className="text-xs text-muted">Nama berkas tidak diawali nomor adegan — ganti namanya jadi 03.png atau sejenisnya.</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
           <div className={cx('grid gap-3.5', project.aspectRatio === '9:16' ? 'grid-cols-4' : 'grid-cols-3')}>
             {clips.map((c, i) => {
               const on = c.id === sel?.id
               const imageJob = jobFor(jobs, 'image', { clipId: c.id })
               const ttsRunning = isRunning(jobFor(jobs, 'tts', { clipId: c.id }))
-              const status = c.imageAssetId ? { label: 'Siap', tone: 'ok' as const } : isRunning(imageJob) ? { label: 'Proses', tone: 'warn' as const } : imageJob?.status === 'failed' ? { label: 'Gagal', tone: 'bad' as const } : { label: 'Draf', tone: 'draft' as const }
+              const manualWaiting =
+                (c.visualProvider === 'manual' || c.visualProvider === 'extension') && imageJob?.provider === 'manual' && imageJob.status === 'queued'
+              const status = c.imageAssetId
+                ? { label: 'Siap', tone: 'ok' as const }
+                : manualWaiting
+                  ? { label: 'Menunggu hasil', tone: 'warn' as const }
+                  : isRunning(imageJob)
+                    ? { label: 'Proses', tone: 'warn' as const }
+                    : imageJob?.status === 'failed'
+                      ? { label: 'Gagal', tone: 'bad' as const }
+                      : { label: 'Draf', tone: 'draft' as const }
               return (
                 <button
                   key={c.id}
@@ -704,6 +911,11 @@ export function StoryboardStep() {
                     <span className="truncate text-sm font-semibold">{c.title || 'Tanpa judul'}</span>
                     <div className="flex items-center gap-2">
                       <Badge tone={status.tone}>{status.label}</Badge>
+                      {c.visualProvider !== 'auto' && (
+                        <span className="rounded-md bg-sand px-1.5 py-0.5 text-[11px] font-semibold text-ink-2">
+                          {VISUAL_PROVIDERS.find((p) => p.id === c.visualProvider)?.label}
+                        </span>
+                      )}
                       <span className={cx('inline-flex items-center gap-1 text-xs', c.audioAssetId ? 'text-ok-ink' : 'text-muted')}>
                         <Volume2 className="size-3.5" />
                         {ttsRunning ? 'Membuat suara…' : c.audioAssetId ? 'Suara siap' : 'Belum ada suara'}

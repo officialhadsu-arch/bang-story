@@ -56,7 +56,8 @@ const api: StudioApi = {
     setWords: call('assets:setWords'),
     pickMusic: call('assets:pickMusic'),
     pickImage: call('assets:pickImage'),
-    pickClipImage: call('assets:pickClipImage')
+    pickClipImage: call('assets:pickClipImage'),
+    pickClipVideo: call('assets:pickClipVideo')
   },
   settings: {
     get: call('settings:get'),

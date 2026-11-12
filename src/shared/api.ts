@@ -84,6 +84,8 @@ export interface StudioApi {
     pickImage(projectId: string): Promise<Asset | null>
     /** A local image file to use as this clip's picture (also links it to the clip). */
     pickClipImage(projectId: string, clipId: string): Promise<Asset | null>
+    /** A local video file to use as this clip's video (also links it to the clip). */
+    pickClipVideo(projectId: string, clipId: string): Promise<Asset | null>
   }
   settings: {
     get(): Promise<AppSettings>
