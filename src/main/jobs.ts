@@ -1,9 +1,12 @@
 import type { Job } from '@shared/types'
 import { emit } from './events'
 import { getJobRaw, updateJob } from './repo'
+import { getSecret } from './secrets'
+import { getSettings } from './settings'
+import { cancelVideo } from './services/nexabot'
 import { cancelRequest } from './services/higgsfield'
 
-export type QueueName = 'higgsfield' | 'flow2api' | 'tts' | 'whisper' | 'export'
+export type QueueName = 'higgsfield' | 'flow2api' | 'nexabot' | 'tts' | 'whisper' | 'export'
 
 export interface TaskCtx {
   jobId: string
@@ -18,9 +21,11 @@ export type Task = (ctx: TaskCtx) => Promise<string | void | { message: string }
 // Whisper uses most CPU cores by itself, so it runs one file at a time.
 // Flow2API also runs one at a time: the server drives one Google account, and a long
 // video render can take minutes, so queueing two would only hide the wait.
-const LIMITS: Record<QueueName, number> = { higgsfield: 3, flow2api: 1, tts: 2, whisper: 1, export: 1 }
-const running: Record<QueueName, number> = { higgsfield: 0, flow2api: 0, tts: 0, whisper: 0, export: 0 }
-const waiting: Record<QueueName, (() => void)[]> = { higgsfield: [], flow2api: [], tts: [], whisper: [], export: [] }
+// NexaBot runs one at a time for the same reason: one paid generate at a time keeps
+// the cost visible and the queue predictable (D3-07).
+const LIMITS: Record<QueueName, number> = { higgsfield: 3, flow2api: 1, nexabot: 1, tts: 2, whisper: 1, export: 1 }
+const running: Record<QueueName, number> = { higgsfield: 0, flow2api: 0, nexabot: 0, tts: 0, whisper: 0, export: 0 }
+const waiting: Record<QueueName, (() => void)[]> = { higgsfield: [], flow2api: [], nexabot: [], tts: [], whisper: [], export: [] }
 const controllers = new Map<string, AbortController>()
 
 function acquire(q: QueueName): Promise<void> {
@@ -96,6 +101,11 @@ export async function cancelJob(id: string): Promise<void> {
   const raw = getJobRaw(id)
   if (!raw) return
   if (raw.remote_id && raw.provider === 'higgsfield') await cancelRequest(raw.remote_id)
+  // A canceled NexaBot video keeps charging unless the server is told to stop it.
+  if (raw.remote_id && raw.provider === 'nexabot') {
+    const key = getSecret('nexabot')
+    if (key) await cancelVideo({ baseUrl: getSettings().nexabotBaseUrl, apiKey: key, id: raw.remote_id })
+  }
   const ctrl = controllers.get(id)
   if (ctrl) ctrl.abort()
   else if (raw.status === 'queued' || raw.status === 'running') emit.job(updateJob(id, { status: 'canceled', message: null }))

@@ -47,7 +47,7 @@ import {
   saveSnapshot,
   updateAssetMeta
 } from './repo'
-import { clearSecret, keyStatuses, recordCheck, revealSecret, setSecret } from './secrets'
+import { clearSecret, getSecret, keyStatuses, recordCheck, revealSecret, setSecret } from './secrets'
 import { dropCache, getSettings, setSettings } from './settings'
 import { probeDurationMs, probeSize } from './services/audio'
 import * as eleven from './services/elevenlabs'
@@ -55,6 +55,7 @@ import * as flow from './services/flow2api'
 import * as gemini from './services/gemini'
 import * as hf from './services/higgsfield'
 import * as llm from './services/llm'
+import * as nexa from './services/nexabot'
 import { importManualFile, prepareWorkFolder, scanWorkFolder } from './services/manual'
 import { generateScript, generateVisuals, generateMusicPrompt } from './story'
 
@@ -75,6 +76,7 @@ function handle(channel: string, fn: Handler): void {
 async function testProvider(provider: ApiProvider, key?: string): Promise<KeyTestResult> {
   if (provider === 'higgsfield') return hf.testCredentials(key)
   if (provider === 'elevenlabs') return eleven.testKey(key)
+  if (provider === 'nexabot') return nexa.testConnection(getSettings().nexabotBaseUrl, key ?? getSecret('nexabot') ?? undefined)
   return llm.testLlm(provider, key)
 }
 
@@ -305,6 +307,7 @@ export function registerIpc(): void {
     return eleven.listVoices()
   })
   handle('flow2api:testConnection', (baseUrl: string) => flow.testConnection(baseUrl))
+  handle('nexabot:testConnection', (baseUrl: string) => nexa.testConnection(baseUrl, getSecret('nexabot') ?? undefined))
 
   handle('export:start', (projectId: string, opts: ExportOptions) => startExport(projectId, opts))
   handle('export:defaultFolder', () => defaultExportFolder())

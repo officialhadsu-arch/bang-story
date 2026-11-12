@@ -36,7 +36,8 @@ export interface NexaSubmitOptions {
   apiKey: string
   prompt: string
   aspectRatio?: string
-  imageDataUri?: string
+  /** Reference images as data URIs. Images use all of them; video uses the first as its first frame. */
+  refs?: string[]
   seconds?: number
   signal?: AbortSignal
 }
@@ -107,7 +108,7 @@ function friendlyError(status: number, detail: string): ApiError {
 }
 
 async function nexa<T>(path: string, options: { baseUrl?: string; apiKey: string; init?: RequestInit; timeoutMs?: number }): Promise<T> {
-  const { signal, cleanup } = combinedSignal(options.init?.signal, options.timeoutMs ?? NEXA_TIMEOUTS.test)
+  const { signal, cleanup } = combinedSignal(options.init?.signal ?? undefined, options.timeoutMs ?? NEXA_TIMEOUTS.test)
   try {
     const res = await fetch(`${nexaBase(options.baseUrl)}${path}`, {
       ...options.init,
@@ -125,14 +126,6 @@ async function nexa<T>(path: string, options: { baseUrl?: string; apiKey: string
   } finally {
     cleanup()
   }
-}
-
-function dataUriToBytes(dataUri: string): { bytes: Buffer; contentType: string } {
-  const m = /^data:([^;,]+)(;base64)?,(.*)$/s.exec(dataUri)
-  if (!m) return { bytes: Buffer.from(dataUri), contentType: 'image/png' }
-  const contentType = m[1] || 'image/png'
-  const bytes = m[2] ? Buffer.from(m[3], 'base64') : Buffer.from(decodeURIComponent(m[3]))
-  return { bytes, contentType }
 }
 
 async function fetchOrDecode(result: { url?: string; b64_json?: string } | undefined, apiKey: string, signal?: AbortSignal): Promise<NexaMedia> {
@@ -159,7 +152,7 @@ function isRecord(x: unknown): x is Record<string, unknown> {
 /** Image: one POST, the result is inline or a URL (assumed OpenAI-images shape). */
 export async function submitImage(opts: NexaSubmitOptions, modelId: string): Promise<NexaMedia> {
   const model = getNexaImageModel(modelId)
-  const refs = opts.imageDataUri ? [opts.imageDataUri] : []
+  const refs = opts.refs ?? []
   const body = await nexa<{ data?: { url?: string; b64_json?: string }[] }>('/v1/images/generations', {
     baseUrl: opts.baseUrl,
     apiKey: opts.apiKey,
@@ -178,14 +171,15 @@ export async function submitImage(opts: NexaSubmitOptions, modelId: string): Pro
 
 export async function submitVideo(opts: NexaSubmitOptions, modelId: string): Promise<string> {
   const model = getNexaVideoModel(modelId)
-  if (!opts.imageDataUri) throw new Error('Model video NexaBot membutuhkan gambar pertama.')
+  const firstFrame = opts.refs?.[0]
+  if (!firstFrame) throw new Error('Model video NexaBot membutuhkan gambar pertama.')
   const body = await nexa<{ id?: string; status?: string }>('/v1/videos/generations', {
     baseUrl: opts.baseUrl,
     apiKey: opts.apiKey,
     timeoutMs: NEXA_TIMEOUTS.video,
     init: {
       method: 'POST',
-      body: JSON.stringify({ model: model.id, prompt: opts.prompt, image: opts.imageDataUri, duration: opts.seconds ?? 15 }),
+      body: JSON.stringify({ model: model.id, prompt: opts.prompt, image: firstFrame, duration: opts.seconds ?? 15 }),
       signal: opts.signal
     }
   })
