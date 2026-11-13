@@ -139,23 +139,29 @@ export interface KeptRun {
   keptSec: number
 }
 
-/** Maximal runs of kept words: a run ends where a cut interval starts (a pause or a dropped word). */
+/** Maximal runs of kept words: a run ends where a cut interval starts (a pause or a dropped word). A pause
+ *  cut lies entirely between two words, so a run must also break when a cut interval overlaps the gap
+ *  between two kept words — otherwise the pause would stay in the scene's media and in keptSec. */
 export function keptRuns(words: WordTiming[], cuts: CutInterval[]): KeptRun[] {
   const inCut = (w: WordTiming): boolean => cuts.some((c) => w.start < c.end && w.end > c.start)
+  const gapCut = (prev: WordTiming, next: WordTiming): boolean => cuts.some((c) => c.end > prev.end && c.start < next.start)
   const runs: KeptRun[] = []
   let cur: KeptRun | null = null
+  let prev: WordTiming | null = null
   words.forEach((w, i) => {
     if (inCut(w)) {
       cur = null
+      prev = null
       return
     }
-    if (!cur) {
+    if (!cur || (prev && gapCut(prev, w))) {
       cur = { startWord: i, endWord: i, startSec: w.start, endSec: w.end, keptSec: 0 }
       runs.push(cur)
     }
     cur.endWord = i
     cur.endSec = w.end
     cur.keptSec = cur.endSec - cur.startSec
+    prev = w
   })
   return runs
 }
