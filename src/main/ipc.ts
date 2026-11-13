@@ -54,6 +54,7 @@ import * as eleven from './services/elevenlabs'
 import * as flow from './services/flow2api'
 import * as gemini from './services/gemini'
 import * as hf from './services/higgsfield'
+import * as kie from './services/kieai'
 import * as llm from './services/llm'
 import * as nexa from './services/nexabot'
 import { importManualFile, prepareWorkFolder, scanWorkFolder } from './services/manual'
@@ -77,6 +78,7 @@ async function testProvider(provider: ApiProvider, key?: string): Promise<KeyTes
   if (provider === 'higgsfield') return hf.testCredentials(key)
   if (provider === 'elevenlabs') return eleven.testKey(key)
   if (provider === 'nexabot') return nexa.testConnection(getSettings().nexabotBaseUrl, key ?? getSecret('nexabot') ?? undefined)
+  if (provider === 'kieai') return kie.testCredentials(getSettings().kieaiBaseUrl, key ?? getSecret('kieai') ?? undefined)
   return llm.testLlm(provider, key)
 }
 

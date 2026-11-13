@@ -231,6 +231,11 @@ export function kieaiCredits(modelId: string, durationMs?: number): number | nul
 
 /** Rupiah price for one generate with this model at the catalog rate, or null when not kie.ai. */
 export function kiePriceIdr(modelId: string, durationMs?: number): number | null {
-  const usd = kieaiUsd(modelId, durationMs)
-  return usd === null ? null : Math.round(usd * KIE_USD_TO_IDR)
+  const price = KIE_PRICES[modelId]
+  if (!price) return null
+  // Multiply rate × kurs × seconds (not rate × seconds × kurs): the latter loses half a Rupiah
+  // to float error on some per-second prices (Grok 5 s: 2047.4999… instead of 2047.5).
+  return price.perSecond
+    ? Math.round(price.usd * KIE_USD_TO_IDR * kieBillSeconds(durationMs))
+    : Math.round(price.usd * KIE_USD_TO_IDR)
 }

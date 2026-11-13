@@ -1,5 +1,6 @@
 import { DEFAULT_IMAGE_MODEL, DEFAULT_VIDEO_MODEL, getImageModel, getVideoModel } from '@shared/higgsfield'
 import { FLOW_DEFAULT_BASE_URL } from '@shared/flow2api'
+import { KIE_DEFAULT_BASE_URL } from '@shared/kieai'
 import { NEXA_DEFAULT_BASE_URL } from '@shared/nexabot'
 import type { AppSettings } from '@shared/types'
 import { getDb } from './db'
@@ -19,6 +20,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   flow2apiBaseUrl: FLOW_DEFAULT_BASE_URL,
   nexabotEnabled: false,
   nexabotBaseUrl: NEXA_DEFAULT_BASE_URL,
+  kieaiEnabled: false,
+  kieaiBaseUrl: KIE_DEFAULT_BASE_URL,
   whisperAuto: true
 }
 
