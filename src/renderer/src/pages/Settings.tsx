@@ -21,6 +21,7 @@ import {
 } from 'lucide-react'
 import { FLOW_DEFAULT_BASE_URL, FLOW_IMAGE_MODELS, FLOW_VIDEO_MODELS } from '@shared/flow2api'
 import { HF_IMAGE_MODELS, HF_VIDEO_MODELS } from '@shared/higgsfield'
+import { KIE_DEFAULT_BASE_URL, KIE_IMAGE_MODELS, KIE_VIDEO_MODELS } from '@shared/kieai'
 import { NEXA_DEFAULT_BASE_URL, NEXA_IMAGE_MODELS, NEXA_VIDEO_MODELS } from '@shared/nexabot'
 import { LANGUAGES, LLM_PROVIDERS } from '@shared/models'
 import type { ApiProvider, AppSettings, KeyStatus, KeyTestResult, LlmProvider, TtsProvider } from '@shared/types'
@@ -30,6 +31,7 @@ import { ProviderLogo, type ProviderLogoId } from '../components/ProviderLogo'
 import { Select } from '../components/Select'
 import { AboutSection } from './AboutSection'
 import { FlowGuideSection } from './FlowGuideSection'
+import { KieAiGuideSection } from './KieAiGuideSection'
 import { ManualGuideSection } from './ManualGuideSection'
 import { NexaBotGuideSection } from './NexaBotGuideSection'
 import { WhisperSection } from './WhisperSection'
@@ -38,7 +40,7 @@ import { errorText, relativeTime } from '../lib/format'
 import { useModels } from '../lib/useModels'
 import { useApp } from '../store/app'
 
-type Tab = 'services' | 'general' | 'about' | 'flow-guide' | 'manual-guide' | 'nexabot-guide'
+type Tab = 'services' | 'general' | 'about' | 'flow-guide' | 'manual-guide' | 'nexabot-guide' | 'kieai-guide'
 
 interface ProviderOption<T extends string> {
   id: T
@@ -809,6 +811,142 @@ function NexaSection({
   )
 }
 
+function KieSection({
+  settings,
+  statusOf,
+  onChanged,
+  onSettings,
+  onOpenGuide
+}: {
+  settings: AppSettings
+  statusOf: (p: ApiProvider) => KeyStatus | undefined
+  onChanged: () => void
+  onSettings: (s: AppSettings) => void
+  onOpenGuide: () => void
+}) {
+  const { toast } = useApp()
+  const [ack, setAck] = useState(false)
+  const [url, setUrl] = useState(settings.kieaiBaseUrl)
+  const [testing, setTesting] = useState(false)
+  const [test, setTest] = useState<KeyTestResult | null>(null)
+
+  const saveUrl = async (): Promise<void> => {
+    const clean = url.trim() || KIE_DEFAULT_BASE_URL
+    setUrl(clean)
+    onSettings(await window.api.settings.set({ kieaiBaseUrl: clean }))
+  }
+
+  const toggle = async (v: boolean): Promise<void> => {
+    if (v && !ack) {
+      toast('info', 'Baca dulu peringatan biaya di atas, lalu centang kotak persetujuan sebelum menyalakan Kie.ai.')
+      return
+    }
+    onSettings(await window.api.settings.set({ kieaiEnabled: v }))
+    if (!v) setAck(false)
+    toast(
+      'success',
+      v
+        ? 'Kie.ai dinyalakan. Model Kie.ai kini bisa dipilih di langkah Ide cerita.'
+        : 'Kie.ai dimatikan. Model Kie.ai tidak bisa dipakai sampai dinyalakan lagi.'
+    )
+  }
+
+  const runTest = async (): Promise<void> => {
+    setTesting(true)
+    setTest(null)
+    try {
+      setTest(await window.api.kieai.testConnection(url.trim() || KIE_DEFAULT_BASE_URL))
+    } catch (e) {
+      setTest({ ok: false, message: errorText(e) })
+    } finally {
+      setTesting(false)
+    }
+  }
+
+  return (
+    <>
+      <SectionTitle
+        icon={<Server className="size-5" />}
+        title="Kie.ai (berbayar per generate, USD)"
+        sub="Gambar dan video AI lewat API kie.ai — model premium seperti Veo 3.1, Seedance, Kling, dan Grok."
+      />
+      <Card>
+        <div className="flex items-center gap-3">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-sand font-display text-lg font-bold">K</span>
+          <div className="flex min-w-0 flex-1 flex-col">
+            <span className="text-base font-bold">Kie.ai</span>
+            <span className="text-[13px] text-ink-2">
+              Veo 3.1 Lite/Fast/Quality, Seedance 2.5, Kling 3.0, Grok Imagine, GPT Image 2.5, dan Nano Banana 2/Pro lewat api.kie.ai
+            </span>
+          </div>
+          <div className={cx(!ack && !settings.kieaiEnabled && 'pointer-events-none opacity-40')}>
+            <Switch on={settings.kieaiEnabled} onChange={(v) => void toggle(v)} label="Nyalakan Kie.ai" />
+          </div>
+        </div>
+        <div className="flex items-start gap-2.5 rounded-xl border border-amber-600/40 bg-amber-50 px-4 py-3.5 text-[13px] leading-relaxed text-amber-900">
+          <TriangleAlert className="mt-0.5 size-4 shrink-0" />
+          <div className="flex flex-col gap-2">
+            <span>
+              <strong>Peringatan biaya — jalur ini MAHAL.</strong> Kie.ai memotong kredit setiap generate dalam USD (1 kredit ≈ $0,005;
+              kurs katalog Rp18.200): gambar Rp546–Rp1.638, video Rp3.185–Rp23.205 per klip 8 detik, model per detik Rp410–Rp1.547/dtk.
+              Batch 30 video Veo Fast menghabiskan sekitar Rp177.450 — sekitar 20× lipat NexaBot (Rp9.000). Kie.ai adalah jalur premium
+              untuk model yang tidak ada di NexaBot; jangan pakai jalur ini untuk model yang ada versi murahnya. Media hasil hanya disimpan
+              14 hari — unduh segera. Kebijakan refund belum terverifikasi resmi — isi saldo secukupnya.
+            </span>
+            <label className="flex cursor-pointer items-start gap-2 font-medium">
+              <input type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)} className="mt-0.5 size-4 accent-ink" />
+              <span>Saya sudah membaca peringatan biaya di atas dan paham setiap generate memotong kredit dalam USD.</span>
+            </label>
+          </div>
+        </div>
+        <KeyForm
+          provider="kieai"
+          name="Kie.ai"
+          status={statusOf('kieai')}
+          help="Kunci API kie.ai dari dashboard kie.ai/api-key. Kunci tersimpan terenkripsi di perangkat ini dan hanya dikirim ke api.kie.ai."
+          link="https://kie.ai/api-key"
+          linkLabel="Buka kie.ai untuk mendapatkan kunci"
+          onChanged={onChanged}
+        />
+        <Field
+          label="Alamat API Kie.ai"
+          hint="Biasanya https://api.kie.ai — kosongkan untuk memakai alamat bawaan. Alamat ini terverifikasi dari docs.kie.ai."
+        >
+          <input
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            onBlur={() => void saveUrl()}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') void saveUrl()
+            }}
+            placeholder={KIE_DEFAULT_BASE_URL}
+            className={inputCls}
+          />
+        </Field>
+        <div className="flex flex-wrap items-center gap-3">
+          <Button onClick={() => void runTest()} disabled={testing}>
+            {testing ? 'Menguji…' : 'Uji Koneksi'}
+          </Button>
+          <Button variant="ghost" onClick={onOpenGuide} icon={<BookOpenText className="size-4" />}>
+            Buka Panduan Kie.ai
+          </Button>
+          {test && (
+            <span className={cx('text-[13px] font-medium', test.ok ? 'text-emerald-700' : 'text-red-700')}>{test.message}</span>
+          )}
+        </div>
+        <p className="flex items-start gap-2.5 border-t border-dashed border-line pt-4 text-[13px] leading-relaxed text-ink-2">
+          <Film className="mt-0.5 size-4 shrink-0" />
+          <span>
+            Semua {KIE_IMAGE_MODELS.length} model gambar dan {KIE_VIDEO_MODELS.length} model video Kie.ai bisa dipakai. Modelnya dipilih
+            per proyek di langkah <strong className="text-ink">Ide cerita</strong>, bagian Model AI — harganya tampil dalam Rupiah +
+            USD. Batch selalu meminta konfirmasi dengan ringkasan biaya total sebelum satu job pun dimulai.
+          </span>
+        </p>
+      </Card>
+    </>
+  )
+}
+
 export function Settings() {
   const { go, route } = useApp()
   const back = route.name === 'settings' && route.back ? route.back : ({ name: 'home' } as const)
@@ -833,6 +971,7 @@ export function Settings() {
     { id: 'flow-guide', label: 'Panduan Flow2API', icon: <BookOpenText className="size-[18px]" /> },
     { id: 'manual-guide', label: 'Panduan Manual & Ekstensi', icon: <BookOpenText className="size-[18px]" /> },
     { id: 'nexabot-guide', label: 'Panduan NexaBot', icon: <BookOpenText className="size-[18px]" /> },
+    { id: 'kieai-guide', label: 'Panduan Kie.ai', icon: <BookOpenText className="size-[18px]" /> },
     { id: 'general', label: 'Umum', icon: <SlidersHorizontal className="size-[18px]" /> },
     { id: 'about', label: 'Tentang aplikasi', icon: <Info className="size-[18px]" /> }
   ]
@@ -892,6 +1031,7 @@ export function Settings() {
                 <HiggsfieldSection status={statusOf('higgsfield')} onChanged={reload} />
                 <FlowSection settings={settings} onSettings={setSettings} onOpenGuide={() => setTab('flow-guide')} />
                 <NexaSection settings={settings} statusOf={statusOf} onChanged={reload} onSettings={setSettings} onOpenGuide={() => setTab('nexabot-guide')} />
+                <KieSection settings={settings} statusOf={statusOf} onChanged={reload} onSettings={setSettings} onOpenGuide={() => setTab('kieai-guide')} />
                 <WhisperSection settings={settings} onSettings={setSettings} />
               </>
             )}
@@ -901,6 +1041,8 @@ export function Settings() {
             {tab === 'manual-guide' && settings && <ManualGuideSection baseUrl={settings.flow2apiBaseUrl} />}
 
             {tab === 'nexabot-guide' && <NexaBotGuideSection />}
+
+            {tab === 'kieai-guide' && <KieAiGuideSection />}
 
             {tab === 'general' && settings && (
               <>
