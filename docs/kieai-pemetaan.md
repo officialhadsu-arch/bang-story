@@ -465,8 +465,8 @@ merge — bukan bagian fase riset ini.
 Dilakukan di laptop Bos, dengan kunci Bos sendiri, 1 gambar + 1 video,
 sesudah persetujuan biaya per pemakaian. Yang harus dikonfirmasi/dikoreksi:
 
-1. Kunci kie.ai dibuat di kie.ai/api-key; 80 kredit gratis masuk; saldo
-   terbaca lewat `GET /api/v1/chat/credit`.
+1. Kunci kie.ai dibuat di kie.ai/api-key; kredit gratis masuk (FAQ beranda: 80; akun Bos yang dicek langsung 13 Nov 2026: 30 —
+   jumlahnya bisa berbeda); saldo terbaca lewat `GET /api/v1/chat/credit`.
 2. String `model` persis + bentuk `input` per model katalog (prompt, rasio,
    durasi, URL gambar referensi) — koreksi modul transport (K4-01) bila
    berbeda.

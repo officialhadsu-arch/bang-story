@@ -46,6 +46,9 @@ export const KIE_CREDIT_IDR = 91
  * Assumed kie.ai `model` strings sent to createTask / veo/generate.
  * Best guesses from the `provider/model` pattern kie.ai documents
  * (e.g. `google/gemini-2-5-pro-tts`); NOT verified — live test §7 item 2.
+ * Supporting evidence: the `google/<model>` pattern itself was confirmed
+ * live 13 Nov 2026 by another lane (TTS `google/gemini-3-1-flash-tts`
+ * generated successfully); the image/video slugs below are still guesses.
  */
 export const KIE_API_MODEL: Record<string, string> = {
   'kieai:gpt-image-2-5': 'openai/gpt-image-2.5',

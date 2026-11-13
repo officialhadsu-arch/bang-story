@@ -21,6 +21,8 @@ import { ApiError, downloadTo, sleep } from './http'
  *   errors ............ HTTP 200 + `code` in the body — ALWAYS check `code`, never the HTTP status
  *                       alone. 401 invalid key · 402/403 insufficient credit · 429 rate limit
  *                       (a rejected request is NOT queued — retry with backoff) · 5xx server.
+ *                       The endpoint + envelope were confirmed live 13 Nov 2026 by another lane
+ *                       (TTS createTask + recordInfo, same family, no paid call from this tier).
  *   rate limit ........ 20 new generate requests per 10 s per account
  *   retention ......... media 14 days — results MUST be downloaded promptly
  * ── LABELLED ASSUMPTIONS (K4-01) ─────────────────────────────────────────
