@@ -19,6 +19,7 @@ import {
   charactersOf,
   clipsOf,
   getAsset,
+  getBundle,
   getCharacter,
   getClip,
   getJob,
@@ -32,7 +33,7 @@ import {
   updateAssetMeta,
   updateJob
 } from './repo'
-import { dropCache, getSettings, readCache, writeCache } from './settings'
+import { dropCache, getSettings, readCache, setSettings, writeCache } from './settings'
 import { getSecret } from './secrets'
 import { probeDurationMs, probeSize } from './services/audio'
 import * as eleven from './services/elevenlabs'
@@ -394,9 +395,9 @@ function updateJobPayload(jobId: string, payload: HfPayload): void {
  * follows the project's model; an explicit provider wins over the model; anything else fails
  * hard (B5) instead of silently falling back to a provider the user did not pick.
  */
-function resolveVisualProvider(clip: Clip, project: Project, kind: 'image' | 'video'): 'higgsfield' | 'flow2api' | 'manual' | 'extension' | 'nexabot' {
+function resolveVisualProvider(clip: Clip, project: Project, kind: 'image' | 'video'): 'higgsfield' | 'flow2api' | 'manual' | 'extension' | 'nexabot' | 'motion' {
   const p = clip.visualProvider ?? 'auto'
-  if (p === 'manual' || p === 'extension' || p === 'higgsfield' || p === 'flow2api' || p === 'nexabot') return p
+  if (p === 'manual' || p === 'extension' || p === 'higgsfield' || p === 'flow2api' || p === 'nexabot' || p === 'motion') return p
   if (p === 'auto') {
     const modelId = kind === 'image' ? project.imageModel : project.videoModel
     if (isFlowModelId(modelId)) return 'flow2api'
@@ -426,6 +427,57 @@ export function startManualJob(clipId: string, kind: 'image' | 'video'): Job {
   return job
 }
 
+// ---------- motion routing (Fase 4, F4-04/F4-09/F4-11) ----------
+
+function requireMotionEnabled(): void {
+  if (!getSettings().motionEnabled)
+    throw new Error('Motion belum dinyalakan. Nyalakan di Pengaturan › Layanan AI dan kunci › Motion, lalu baca Panduan Motion.')
+}
+
+/**
+ * A motion job waits in 'queued' with no running task, like a manual job:
+ * the agent writes the babak into motion-work/out/ and the app renders it at
+ * export time. The job carries the scene's babak/beat link and motion prompt.
+ * Cost to the app is Rp0 (F4-11): the agent runs on the user's own
+ * subscription, outside the app; no agent key is ever stored here.
+ */
+export function startMotionJob(clipId: string, kind: 'video'): Job {
+  requireMotionEnabled()
+  const clip = getClip(clipId)
+  const prompt = [`Adegan ${clip.sceneKey} — ${clip.title}`, `Narasi: ${clip.narration}`, `Cerita: ${clip.story}`, `Prompt visual: ${clip.visualPrompt}`].join('\n')
+  const job = insertJob({
+    projectId: clip.projectId,
+    clipId,
+    kind,
+    provider: 'motion',
+    payload: { sceneKey: clip.sceneKey, babakId: clip.motionBabakId, beatId: clip.motionBeatId, prompt }
+  })
+  emit.job(job)
+  return job
+}
+
+/**
+ * Applies a motion preset to a project. 'penuh' switches every scene to the
+ * motion provider; 'hybrid' changes nothing in bulk — the user picks the key
+ * scenes one by one. The choice is remembered in settings for the next project.
+ */
+export function applyMotionPreset(projectId: string, preset: 'penuh' | 'hybrid'): number {
+  requireMotionEnabled()
+  const bundle = getBundle(projectId)
+  let changed = 0
+  if (preset === 'penuh') {
+    for (const clip of bundle.clips) {
+      if (clip.visualProvider !== 'motion') {
+        patchClip(clip.id, { visualProvider: 'motion' })
+        emit.clip({ clipId: clip.id, patch: { visualProvider: 'motion' } })
+        changed++
+      }
+    }
+  }
+  setSettings({ motionPreset: preset })
+  return changed
+}
+
 // ---------- public entry points ----------
 
 export function generateClipImage(clipId: string): Job {
@@ -434,6 +486,8 @@ export function generateClipImage(clipId: string): Job {
   const clip = getClip(clipId)
   const project = getProject(clip.projectId)
   const provider = resolveVisualProvider(clip, project, 'image')
+  if (provider === 'motion')
+    throw new Error('Adegan motion tidak memakai gambar — visualnya adalah babak motion yang dirender aplikasi (lihat langkah Rancangan).')
   if (provider === 'manual' || provider === 'extension') return startManualJob(clipId, 'image')
   if (provider === 'flow2api') {
     const job = insertJob({ projectId: clip.projectId, clipId, kind: 'image', provider: 'flow2api' })
@@ -543,9 +597,12 @@ export function generateClipVideo(clipId: string): Job {
   const existing = activeJobFor({ clipId }, 'video')
   if (existing) return existing
   const clip = getClip(clipId)
-  if (!clip.imageAssetId) throw new Error('Buat gambar klip ini dulu sebelum membuat video AI.')
   const project = getProject(clip.projectId)
   const provider = resolveVisualProvider(clip, project, 'video')
+  // A motion scene has no picture to animate: its visual is the babak, so the
+  // job waits for the agent instead of asking for an image first.
+  if (provider === 'motion') return startMotionJob(clipId, 'video')
+  if (!clip.imageAssetId) throw new Error('Buat gambar klip ini dulu sebelum membuat video AI.')
   if (provider === 'manual' || provider === 'extension') return startManualJob(clipId, 'video')
   if (provider === 'flow2api') {
     const job = insertJob({ projectId: clip.projectId, clipId, kind: 'video', provider: 'flow2api' })
@@ -687,7 +744,7 @@ export function generateMissingImages(projectId: string): Job[] {
     }
   }
   for (const clip of clipsOf(projectId)) {
-    if (!clip.imageAssetId) jobs.push(generateClipImage(clip.id))
+    if (clip.visualProvider !== 'motion' && !clip.imageAssetId) jobs.push(generateClipImage(clip.id))
   }
   return jobs
 }
@@ -695,7 +752,8 @@ export function generateMissingImages(projectId: string): Job[] {
 /** Turns every clip that has an image but no AI video yet into a video. */
 export function generateMissingVideos(projectId: string): Job[] {
   const clips = clipsOf(projectId)
-  if (clips.some((c) => !c.imageAssetId)) throw new Error('Buat gambar semua klip dulu sebelum menjadikannya video.')
+  // Motion scenes need no picture: their visual is the babak, rendered at export.
+  if (clips.some((c) => c.visualProvider !== 'motion' && !c.imageAssetId)) throw new Error('Buat gambar semua klip dulu sebelum menjadikannya video.')
   return clips.filter((c) => !c.videoAssetId).map((c) => generateClipVideo(c.id))
 }
 
@@ -705,10 +763,10 @@ export function generateMissingTts(projectId: string): Job[] {
     .map((c) => generateClipTts(c.id))
 }
 
-/** After a restart, keep polling Higgsfield requests that were already submitted; fail the rest. Manual jobs are skipped: they keep waiting for the user to bring the file back. A submitted NexaBot video is also resumed by polling its remote id; a NexaBot image has no remote id to resume, so it fails like the rest. */
+/** After a restart, keep polling Higgsfield requests that were already submitted; fail the rest. Manual and motion jobs are skipped: they keep waiting for the user (or the agent) to bring the result back. A submitted NexaBot video is also resumed by polling its remote id; a NexaBot image has no remote id to resume, so it fails like the rest. */
 export function resumeJobs(): void {
   for (const row of unfinishedJobs()) {
-    if (row.provider === 'manual') continue
+    if (row.provider === 'manual' || row.provider === 'motion') continue
     const payload = JSON.parse(row.payload_json || '{}') as Partial<HfPayload>
     if (row.provider === 'higgsfield' && row.remote_id && payload.target) {
       const job = getJob(row.id)!
@@ -760,7 +818,8 @@ const failedEstimates = new Map<string, number>()
  * has no credit-estimate endpoint, and the cost is the user's own Google Flow credit, not a per-model price.
  * NexaBot models return their fixed catalog price (Rp300/video) without a server call — the price is
  * in NexaBot credits, and the pickers convert it to Rupiah. Manual/extension scenes return null for
- * the same reason: no server, no per-model price.
+ * the same reason: no server, no per-model price. Motion scenes also return null: the agent runs on
+ * the user's own subscription, so the app charges Rp0 (F4-11).
  */
 export async function estimateCredits(
   kind: 'image' | 'video',
@@ -770,7 +829,7 @@ export async function estimateCredits(
   resolution?: string | null,
   visualProvider?: VisualProvider
 ): Promise<CreditEstimate | null> {
-  if (visualProvider === 'manual' || visualProvider === 'extension') return null
+  if (visualProvider === 'manual' || visualProvider === 'extension' || visualProvider === 'motion') return null
   if (isFlowModelId(modelId)) return null
   if (isNexaModelId(modelId)) {
     const credits = nexaCredits(modelId)

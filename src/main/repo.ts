@@ -71,6 +71,9 @@ const toClip = (r: Row): Clip => ({
   sort: r.sort,
   sceneKey: r.scene_key ?? sceneKeyOf(r.sort ?? 0),
   visualProvider: isVisualProvider(r.visual_provider) ? r.visual_provider : 'auto',
+  motionBabakId: r.motion_babak_id ?? null,
+  motionBeatId: r.motion_beat_id ?? null,
+  captionOn: r.caption_on == null ? null : r.caption_on !== 0,
   title: r.title,
   story: r.story ?? '',
   visualPrompt: r.visual_prompt,
@@ -249,13 +252,13 @@ export function saveSnapshot(snap: ProjectSnapshot): number {
       ...clipIds
     )
     const upClip = db.prepare(
-      `INSERT INTO clips (id, project_id, sort, scene_key, visual_provider, title, story, visual_prompt, narration, duration_ms, character_ids, motion_type,
+      `INSERT INTO clips (id, project_id, sort, scene_key, visual_provider, motion_babak_id, motion_beat_id, caption_on, title, story, visual_prompt, narration, duration_ms, character_ids, motion_type,
          camera_preset, motion_strength, video_prompt, transition, video_camera, video_strength, transition_ms, voice_gain_db,
          media_in_ms, voice_in_ms, voice_out_ms, voice_start_ms)
-       VALUES (@id, @projectId, @sort, @sceneKey, @visualProvider, @title, @story, @visualPrompt, @narration, @durationMs, @characterIds, @motionType,
+       VALUES (@id, @projectId, @sort, @sceneKey, @visualProvider, @motionBabakId, @motionBeatId, @captionOn, @title, @story, @visualPrompt, @narration, @durationMs, @characterIds, @motionType,
          @cameraPreset, @motionStrength, @videoPrompt, @transition, @videoCamera, @videoStrength, @transitionMs, @voiceGainDb,
          @mediaInMs, @voiceInMs, @voiceOutMs, @voiceStartMs)
-       ON CONFLICT(id) DO UPDATE SET sort = excluded.sort, scene_key = excluded.scene_key, visual_provider = excluded.visual_provider, title = excluded.title, story = excluded.story, visual_prompt = excluded.visual_prompt,
+       ON CONFLICT(id) DO UPDATE SET sort = excluded.sort, scene_key = excluded.scene_key, visual_provider = excluded.visual_provider, motion_babak_id = excluded.motion_babak_id, motion_beat_id = excluded.motion_beat_id, caption_on = excluded.caption_on, title = excluded.title, story = excluded.story, visual_prompt = excluded.visual_prompt,
          narration = excluded.narration, duration_ms = excluded.duration_ms, character_ids = excluded.character_ids,
          motion_type = excluded.motion_type, camera_preset = excluded.camera_preset, motion_strength = excluded.motion_strength,
          video_prompt = excluded.video_prompt, transition = excluded.transition, video_camera = excluded.video_camera,
@@ -274,6 +277,9 @@ export function saveSnapshot(snap: ProjectSnapshot): number {
         projectId: p.id,
         sceneKey: c.sceneKey || formatSceneKey(nextKey++),
         visualProvider: c.visualProvider ?? 'auto',
+        motionBabakId: c.motionBabakId ?? null,
+        motionBeatId: c.motionBeatId ?? null,
+        captionOn: c.captionOn == null ? null : c.captionOn ? 1 : 0,
         characterIds: JSON.stringify(c.characterIds),
         videoCamera: c.videoCamera ?? 'static',
         videoStrength: c.videoStrength ?? 'halus',
@@ -349,16 +355,20 @@ export function duplicateProject(id: string): ProjectSummary {
     }
     for (const c of src.clips) {
       db.prepare(
-        `INSERT INTO clips (id, project_id, sort, scene_key, visual_provider, title, story, visual_prompt, visual_source, narration, duration_ms, character_ids,
+        `INSERT INTO clips (id, project_id, sort, scene_key, visual_provider, motion_babak_id, motion_beat_id, caption_on, title, story, visual_prompt, visual_source, narration, duration_ms, character_ids,
            motion_type, camera_preset, motion_strength, video_prompt, transition, image_asset_id, video_asset_id, audio_asset_id,
            video_camera, video_strength, transition_ms, voice_gain_db, media_in_ms, voice_in_ms, voice_out_ms, voice_start_ms)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(
         mapId(c.id),
         newId,
         c.sort,
         c.sceneKey,
         c.visualProvider,
+        c.motionBabakId,
+        c.motionBeatId,
+        c.captionOn == null ? null : c.captionOn ? 1 : 0,
+        c.title,
         c.story,
         c.visualPrompt,
         c.visualSource,
@@ -398,6 +408,9 @@ export type StoryClip = Omit<
   | 'sort'
   | 'sceneKey'
   | 'visualProvider'
+  | 'motionBabakId'
+  | 'motionBeatId'
+  | 'captionOn'
   | 'imageAssetId'
   | 'videoAssetId'
   | 'audioAssetId'
@@ -570,6 +583,9 @@ export function clipsOf(projectId: string): Clip[] {
 const CLIP_COLS: Partial<Record<keyof Clip, string>> = {
   sceneKey: 'scene_key',
   visualProvider: 'visual_provider',
+  motionBabakId: 'motion_babak_id',
+  motionBeatId: 'motion_beat_id',
+  captionOn: 'caption_on',
   imageAssetId: 'image_asset_id',
   videoAssetId: 'video_asset_id',
   audioAssetId: 'audio_asset_id',
@@ -606,10 +622,10 @@ export function insertClipAfter(afterId: string, c: Clip): void {
         (db.prepare('SELECT COALESCE(MAX(CAST(scene_key AS INTEGER)), 0) AS m FROM clips WHERE project_id = ?').get(after.projectId) as Row).m + 1
       )
     db.prepare(
-      `INSERT INTO clips (id, project_id, sort, scene_key, visual_provider, title, story, visual_prompt, visual_source, narration, duration_ms, character_ids,
+      `INSERT INTO clips (id, project_id, sort, scene_key, visual_provider, motion_babak_id, motion_beat_id, caption_on, title, story, visual_prompt, visual_source, narration, duration_ms, character_ids,
          motion_type, camera_preset, motion_strength, video_prompt, transition, image_asset_id, video_asset_id, audio_asset_id,
          video_camera, video_strength, transition_ms, voice_gain_db, media_in_ms, voice_in_ms, voice_out_ms, voice_start_ms)
-       VALUES (@id, @projectId, @sort, @sceneKey, @visualProvider, @title, @story, @visualPrompt, @visualSource, @narration, @durationMs, @characterIds,
+       VALUES (@id, @projectId, @sort, @sceneKey, @visualProvider, @motionBabakId, @motionBeatId, @captionOn, @title, @story, @visualPrompt, @visualSource, @narration, @durationMs, @characterIds,
          @motionType, @cameraPreset, @motionStrength, @videoPrompt, @transition, @imageAssetId, @videoAssetId, @audioAssetId,
          @videoCamera, @videoStrength, @transitionMs, @voiceGainDb, @mediaInMs, @voiceInMs, @voiceOutMs, @voiceStartMs)`
     ).run({ ...c, projectId: after.projectId, sort: after.sort + 1, sceneKey, visualProvider: c.visualProvider ?? 'auto', characterIds: JSON.stringify(c.characterIds) })

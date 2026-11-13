@@ -134,6 +134,15 @@ export interface Clip {
   sceneKey: string
   /** Which provider makes this scene's picture/video; 'auto' follows the project's model. */
   visualProvider: VisualProvider
+  /** Motion (Fase 4): the babak folder this scene belongs to (motion-work/out/<babakId>/), null for other providers. */
+  motionBabakId: string | null
+  /** Motion (Fase 4): the beat id of this scene inside its babak's beats.json, null for other providers. */
+  motionBeatId: string | null
+  /**
+   * Caption per scene (B6): true = burn captions on this scene, false = off, null = default
+   * (off on motion scenes, on elsewhere). Preview and export read the same rule.
+   */
+  captionOn: boolean | null
   title: string
   /** What happens in the scene, in the script's language (the Naskah step). */
   story: string
@@ -306,6 +315,13 @@ export interface AppSettings {
   nexabotEnabled: boolean
   /** Base URL of the NexaBot REST API (an assumption until the live PC test confirms it). */
   nexabotBaseUrl: string
+  /**
+   * Motion (Fase 4, tier 3): off by default. Only when on can a scene use the
+   * 'motion' provider; 'auto' never picks motion on its own (F4-04).
+   */
+  motionEnabled: boolean
+  /** Which motion preset the last apply used: 'penuh' (motion on every scene) or 'hybrid' (only key scenes). */
+  motionPreset: 'penuh' | 'hybrid'
   /** Time captions against the real voice with Whisper after narration is made (when the model is present). */
   whisperAuto: boolean
 }

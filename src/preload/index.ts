@@ -47,6 +47,19 @@ const api: StudioApi = {
     importFile: call('manual:importFile'),
     openWorkFolder: call('manual:openWorkFolder')
   },
+  motion: {
+    prepareWorkFolder: call('motion:prepareWorkFolder'),
+    listBabak: call('motion:listBabak'),
+    getBabak: call('motion:getBabak'),
+    approveBeat: call('motion:approveBeat'),
+    overrideEasing: call('motion:overrideEasing'),
+    renderBabak: call('motion:renderBabak'),
+    getTemplates: call('motion:getTemplates'),
+    applyPreset: call('motion:applyPreset'),
+    getStyleOverride: call('motion:getStyleOverride'),
+    saveStyleOverride: call('motion:saveStyleOverride'),
+    openWorkFolder: call('motion:openWorkFolder')
+  },
   clips: {
     split: call('clips:split'),
     detachVoice: call('clips:detachVoice')

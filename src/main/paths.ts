@@ -27,6 +27,11 @@ export function manualWorkFolder(projectId: string): string {
   return join(projectDir(projectId), 'manual')
 }
 
+/** Folder a project's motion work files live in: `<project folder>/motion-work/`. */
+export function motionWorkFolder(projectId: string): string {
+  return join(projectDir(projectId), 'motion-work')
+}
+
 /** Absolute path of an asset stored relative to its project folder. */
 export function assetAbsPath(projectId: string, localPath: string): string {
   return join(projectsRoot(), projectId, localPath)

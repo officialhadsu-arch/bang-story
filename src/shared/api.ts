@@ -1,4 +1,6 @@
 import type { ManualScanResult, ManualWatchEvent, ManualWorkFolder, VisualProvider, WorkFileKind } from './manual'
+import type { BeatsJson, MotionBabakStatus, MotionWorkFolderResult, RenderBabakResult } from './motion-contract'
+import type { MotionTemplate } from './motion-templates'
 import type {
   ApiProvider,
   AspectRatio,
@@ -67,6 +69,30 @@ export interface StudioApi {
     /** Attaches one work-folder file to the scene the user picked. */
     importFile(projectId: string, fileName: string, clipId: string, kind: WorkFileKind): Promise<Asset>
     /** Opens the project's work folder in the file manager. */
+    openWorkFolder(projectId: string): Promise<void>
+  }
+  motion: {
+    /** Creates/refreshes motion-work/ (agent instructions + per-scene input) and links scenes to babak/beat ids. */
+    prepareWorkFolder(projectId: string, styleId?: string): Promise<MotionWorkFolderResult>
+    /** Babak folders already present under motion-work/out/. */
+    listBabak(projectId: string): Promise<string[]>
+    /** Reads + validates one babak's beats.json (and its HTML when present). */
+    getBabak(projectId: string, babakId: string): Promise<MotionBabakStatus>
+    /** Sets one beat's approval status (the Tahap 1 gate). */
+    approveBeat(projectId: string, babakId: string, beatId: string, status: 'approved' | 'redo' | 'pending'): Promise<BeatsJson>
+    /** The user's per-beat easing override, applied before Tahap 2. */
+    overrideEasing(projectId: string, babakId: string, beatId: string, easing: string | null): Promise<BeatsJson>
+    /** Renders a whole finished babak (stage 2) to motion-work/out/<babakId>/render/babak.mp4. */
+    renderBabak(projectId: string, babakId: string): Promise<RenderBabakResult>
+    /** The application-level style template library (heavy styles locked until measured). */
+    getTemplates(): Promise<MotionTemplate[]>
+    /** 'penuh' switches every scene to motion; 'hybrid' changes nothing in bulk. */
+    applyPreset(projectId: string, preset: 'penuh' | 'hybrid'): Promise<number>
+    /** The project's style override (motion-work/style/style.js), if the user wrote one. */
+    getStyleOverride(projectId: string): Promise<string | null>
+    /** Saves the override; approved beats in every babak become "redo". */
+    saveStyleOverride(projectId: string, styleJs: string): Promise<string[]>
+    /** Opens the project's motion-work/ folder in the file manager. */
     openWorkFolder(projectId: string): Promise<void>
   }
   clips: {
