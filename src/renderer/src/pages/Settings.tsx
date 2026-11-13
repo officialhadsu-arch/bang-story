@@ -846,6 +846,9 @@ function TalkingHeadSection({
       v
         ? 'Talking Head dinyalakan. Mode Talking Head kini bisa dipilih saat membuat proyek baru.'
         : 'Talking Head dimatikan. Proyek Talking Head yang sudah ada tetap bisa dibuka, tapi proyek baru tidak bisa memilih mode ini.'
+    )
+  }
+
   return (
     <>
       <SectionTitle
@@ -922,6 +925,12 @@ function TalkingHeadSection({
             Semua proses berjalan lokal di komputer ini (Whisper + FFmpeg) dan <strong className="text-ink">gratis</strong>. Susun adegan
             dengan AI memakai kunci LLM yang sudah diatur; tanpa kunci itu, adegan disusun otomatis dari jeda panjang. Mode ini{' '}
             <strong className="text-ink">tanpa pelacakan wajah</strong> — close-up hanya memperbesar bagian frame yang dipilih.
+          </span>
+        </p>
+      </Card>
+    </>
+  )
+}
 
 export function Settings() {
   const { go, route } = useApp()
