@@ -826,29 +826,6 @@ function MotionSection({ settings, onSettings, onOpenGuide }: { settings: AppSet
     )
   }
 
-/** Talking Head (Fase 5): a local-only mode — no key, no account, no cost. The switch only decides
- *  whether new projects may pick the Talking Head birth mode. */
-function TalkingHeadSection({
-  settings,
-  onSettings,
-  onOpenGuide
-}: {
-  settings: AppSettings
-  onSettings: (s: AppSettings) => void
-  onOpenGuide: () => void
-}) {
-  const { toast } = useApp()
-
-  const toggle = async (v: boolean): Promise<void> => {
-    onSettings(await window.api.settings.set({ talkingHeadEnabled: v }))
-    toast(
-      'success',
-      v
-        ? 'Talking Head dinyalakan. Mode Talking Head kini bisa dipilih saat membuat proyek baru.'
-        : 'Talking Head dimatikan. Proyek Talking Head yang sudah ada tetap bisa dibuka, tapi proyek baru tidak bisa memilih mode ini.'
-    )
-  }
-
   return (
     <>
       <SectionTitle
@@ -902,6 +879,34 @@ function TalkingHeadSection({
     </>
   )
 }
+
+/** Talking Head (Fase 5): a local-only mode — no key, no account, no cost. The switch only decides
+ *  whether new projects may pick the Talking Head birth mode. */
+function TalkingHeadSection({
+  settings,
+  onSettings,
+  onOpenGuide
+}: {
+  settings: AppSettings
+  onSettings: (s: AppSettings) => void
+  onOpenGuide: () => void
+}) {
+  const { toast } = useApp()
+
+  const toggle = async (v: boolean): Promise<void> => {
+    onSettings(await window.api.settings.set({ talkingHeadEnabled: v }))
+    toast(
+      'success',
+      v
+        ? 'Talking Head dinyalakan. Mode Talking Head kini bisa dipilih saat membuat proyek baru.'
+        : 'Talking Head dimatikan. Proyek Talking Head yang sudah ada tetap bisa dibuka, tapi proyek baru tidak bisa memilih mode ini.'
+    )
+  }
+
+  return (
+    <>
+      <SectionTitle
+        icon={<Clapperboard className="size-5" />}
         title="Talking Head"
         sub="Ubah rekaman orang berbicara jadi video adegan-per-adegan — transkrip Whisper lokal, tanpa kunci."
       />

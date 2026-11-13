@@ -45,9 +45,6 @@ export function ProjectHeader({ doneSteps, right }: { doneSteps: Step[]; right?:
   const { go } = useApp()
   const [editing, setEditing] = useState(false)
   if (!project) return null
-  // Step 3 is "Rancangan" when the project has motion scenes (Fase 4), "Storyboard" otherwise.
-  const steps = STEPS.map((s) => (s.n === 3 && clips.some((c) => c.visualProvider === 'motion') ? { ...s, label: 'Rancangan' } : s))
-
   // Talking Head renames steps 2–3 (F5-02): Naskah → Transkrip, Storyboard → Adegan. The numbers stay 1–4.
   const STEPS: { n: Step; label: string }[] =
     project.mode === 'talking-head'
@@ -63,6 +60,12 @@ export function ProjectHeader({ doneSteps, right }: { doneSteps: Step[]; right?:
           { n: 3, label: 'Storyboard' },
           { n: 4, label: 'Editor' }
         ]
+
+  // Step 3 is "Rancangan" when the project has motion scenes (Fase 4), "Storyboard" otherwise.
+  // The label guard keeps Talking Head's "Adegan" step 3 untouched (motion clips never exist there).
+  const steps = STEPS.map((s) =>
+    s.n === 3 && s.label === 'Storyboard' && clips.some((c) => c.visualProvider === 'motion') ? { ...s, label: 'Rancangan' } : s
+  )
 
   const setStep = (n: Step): void => {
     const s = project.status
