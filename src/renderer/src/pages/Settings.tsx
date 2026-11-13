@@ -4,6 +4,7 @@ import {
   BookOpenText,
   Check,
   ChevronDown,
+  Clapperboard,
   Cpu,
   ExternalLink,
   Eye,
@@ -21,6 +22,7 @@ import {
 } from 'lucide-react'
 import { FLOW_DEFAULT_BASE_URL, FLOW_IMAGE_MODELS, FLOW_VIDEO_MODELS } from '@shared/flow2api'
 import { HF_IMAGE_MODELS, HF_VIDEO_MODELS } from '@shared/higgsfield'
+import { MOTION_TEMPLATES } from '@shared/motion-templates'
 import { NEXA_DEFAULT_BASE_URL, NEXA_IMAGE_MODELS, NEXA_VIDEO_MODELS } from '@shared/nexabot'
 import { LANGUAGES, LLM_PROVIDERS } from '@shared/models'
 import type { ApiProvider, AppSettings, KeyStatus, KeyTestResult, LlmProvider, TtsProvider } from '@shared/types'
@@ -31,6 +33,7 @@ import { Select } from '../components/Select'
 import { AboutSection } from './AboutSection'
 import { FlowGuideSection } from './FlowGuideSection'
 import { ManualGuideSection } from './ManualGuideSection'
+import { MotionGuideSection } from './MotionGuideSection'
 import { NexaBotGuideSection } from './NexaBotGuideSection'
 import { WhisperSection } from './WhisperSection'
 import { Badge, Button, Field, IconButton, Switch, confirmDialog, cx, inputCls } from '../components/ui'
@@ -38,7 +41,7 @@ import { errorText, relativeTime } from '../lib/format'
 import { useModels } from '../lib/useModels'
 import { useApp } from '../store/app'
 
-type Tab = 'services' | 'general' | 'about' | 'flow-guide' | 'manual-guide' | 'nexabot-guide'
+type Tab = 'services' | 'general' | 'about' | 'flow-guide' | 'manual-guide' | 'nexabot-guide' | 'motion-guide'
 
 interface ProviderOption<T extends string> {
   id: T
@@ -809,6 +812,73 @@ function NexaSection({
   )
 }
 
+function MotionSection({ settings, onSettings, onOpenGuide }: { settings: AppSettings; onSettings: (s: AppSettings) => void; onOpenGuide: () => void }) {
+  const { toast } = useApp()
+
+  const toggle = async (v: boolean): Promise<void> => {
+    onSettings(await window.api.settings.set({ motionEnabled: v }))
+    toast(
+      'success',
+      v
+        ? 'Motion dinyalakan. Adegan bisa memilih jalur Motion di langkah Storyboard/Rancangan.'
+        : 'Motion dimatikan. Adegan motion yang sudah ada tidak bisa di-generate sampai dinyalakan lagi.'
+    )
+  }
+
+  return (
+    <>
+      <SectionTitle
+        icon={<Clapperboard className="size-5" />}
+        title="Motion (HTML+GSAP, render aplikasi)"
+        sub="Motion graphic dari kode — agent menulis babak, aplikasi merender MP4. Rp0 dari aplikasi."
+      />
+      <Card>
+        <div className="flex items-center gap-3">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-sand font-display text-lg font-bold">M</span>
+          <div className="flex min-w-0 flex-1 flex-col">
+            <span className="text-base font-bold">Motion</span>
+            <span className="text-[13px] text-ink-2">Babak HTML+GSAP dari agent coding (Claude/Kiro/Antigravity), MP4 dirender aplikasi</span>
+          </div>
+          <Switch on={settings.motionEnabled} onChange={(v) => void toggle(v)} label="Nyalakan Motion" />
+        </div>
+        <div className="flex items-start gap-2.5 rounded-xl border border-line bg-sand px-4 py-3.5 text-[13px] leading-relaxed text-ink-2">
+          <Info className="mt-0.5 size-4 shrink-0" />
+          <span>
+            <strong className="text-ink">Rp0 tunai dari aplikasi.</strong> Agent memakai langgananmu sendiri di luar aplikasi; KenStory tidak
+            menyimpan kunci agent apa pun dan tidak mengirim apa pun ke agent. Agent bekerja di folder <code>motion-work/</code> di
+            komputermu, dan kamu menyetujui tiap beat di langkah Rancangan sebelum aplikasi merender. “Otomatis” tidak pernah memilih
+            Motion sendiri — hanya kamu (atau preset) yang mengaktifkannya per adegan.
+          </span>
+        </div>
+        <Field label="Preset motion" hint="Dipakai tombol preset di langkah Rancangan. “Penuh” mengubah semua adegan jadi Motion; “Hybrid” membiarkanmu memilih adegan kunci satu per satu.">
+          <Select
+            label="Preset motion"
+            value={settings.motionPreset}
+            onChange={async (v) => onSettings(await window.api.settings.set({ motionPreset: v }))}
+            options={[
+              { value: 'penuh', label: 'Motion Grafik penuh', hint: 'Semua adegan jadi Motion' },
+              { value: 'hybrid', label: 'Hybrid', hint: 'Hanya adegan kunci yang dipilih' }
+            ]}
+            className="max-w-[320px]"
+          />
+        </Field>
+        <div className="flex flex-wrap items-center gap-3">
+          <Button variant="ghost" onClick={onOpenGuide} icon={<BookOpenText className="size-4" />}>
+            Buka Panduan Motion
+          </Button>
+        </div>
+        <p className="flex items-start gap-2.5 border-t border-dashed border-line pt-4 text-[13px] leading-relaxed text-ink-2">
+          <Film className="mt-0.5 size-4 shrink-0" />
+          <span>
+            {MOTION_TEMPLATES.filter((t) => !t.heavy).length} gaya siap dipakai ({MOTION_TEMPLATES.filter((t) => !t.heavy).map((t) => t.name).join(', ')}).
+            Gaya Berat (WebGL/Partikel) terkunci sampai diukur di Fase 4. Daftar lengkap beserta brief gaya ada di langkah Rancangan.
+          </span>
+        </p>
+      </Card>
+    </>
+  )
+}
+
 export function Settings() {
   const { go, route } = useApp()
   const back = route.name === 'settings' && route.back ? route.back : ({ name: 'home' } as const)
@@ -833,6 +903,7 @@ export function Settings() {
     { id: 'flow-guide', label: 'Panduan Flow2API', icon: <BookOpenText className="size-[18px]" /> },
     { id: 'manual-guide', label: 'Panduan Manual & Ekstensi', icon: <BookOpenText className="size-[18px]" /> },
     { id: 'nexabot-guide', label: 'Panduan NexaBot', icon: <BookOpenText className="size-[18px]" /> },
+    { id: 'motion-guide', label: 'Panduan Motion', icon: <BookOpenText className="size-[18px]" /> },
     { id: 'general', label: 'Umum', icon: <SlidersHorizontal className="size-[18px]" /> },
     { id: 'about', label: 'Tentang aplikasi', icon: <Info className="size-[18px]" /> }
   ]
@@ -892,6 +963,7 @@ export function Settings() {
                 <HiggsfieldSection status={statusOf('higgsfield')} onChanged={reload} />
                 <FlowSection settings={settings} onSettings={setSettings} onOpenGuide={() => setTab('flow-guide')} />
                 <NexaSection settings={settings} statusOf={statusOf} onChanged={reload} onSettings={setSettings} onOpenGuide={() => setTab('nexabot-guide')} />
+                <MotionSection settings={settings} onSettings={setSettings} onOpenGuide={() => setTab('motion-guide')} />
                 <WhisperSection settings={settings} onSettings={setSettings} />
               </>
             )}
@@ -901,6 +973,8 @@ export function Settings() {
             {tab === 'manual-guide' && settings && <ManualGuideSection baseUrl={settings.flow2apiBaseUrl} />}
 
             {tab === 'nexabot-guide' && <NexaBotGuideSection />}
+
+            {tab === 'motion-guide' && <MotionGuideSection />}
 
             {tab === 'general' && settings && (
               <>

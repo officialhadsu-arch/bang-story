@@ -138,7 +138,7 @@ function ClipTab({ clip, index }: { clip: Clip; index: number }) {
           </p>
         ) : (
           <p className="text-[13px] leading-relaxed text-ink-2">
-            Jalur visual adegan ini: {clip.visualProvider === 'auto' ? 'otomatis (mengikuti model proyek)' : clip.visualProvider === 'manual' ? 'manual' : clip.visualProvider === 'extension' ? 'ekstensi' : clip.visualProvider === 'flow2api' ? 'Google Flow' : 'Higgsfield'}.
+            Jalur visual adegan ini: {clip.visualProvider === 'auto' ? 'otomatis (mengikuti model proyek)' : clip.visualProvider === 'manual' ? 'manual' : clip.visualProvider === 'extension' ? 'ekstensi' : clip.visualProvider === 'flow2api' ? 'Google Flow' : clip.visualProvider === 'nexabot' ? 'NexaBot' : clip.visualProvider === 'motion' ? 'motion (babak HTML+GSAP, dirender aplikasi)' : 'Higgsfield'}.
             Prompt gambarnya bisa disalin untuk generate di luar.
           </p>
         )}
