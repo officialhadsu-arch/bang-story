@@ -18,6 +18,7 @@ import {
   type ResolvedCaption
 } from '@shared/captions'
 import { cameraPerspective, TRANSITIONS, transitionSecOf } from '@shared/motion'
+import { compositionCropFilters } from '@shared/talkinghead'
 import { clipCaptionWords, musicSpan, voiceSpan } from '@shared/timeline'
 import { anchorOffset, contrastColor, overlayEnd, textEffects } from '@shared/overlays'
 import type { Asset, Clip, ExportOptions, ImageOverlay, Job, ProjectBundle, TextOverlay } from '@shared/types'
@@ -345,14 +346,24 @@ async function renderSegment(
   if (video) {
     const cam = cameraPerspective(clip.videoCamera, clip.videoStrength, Math.max(2, Math.round(seg.own * opts.fps)), opts.fps)
     const work = cam ? workSize(video.width, video.height, size) : size
-    const vf = cameraChain(cam, work, size, [`fps=${opts.fps}`, `tpad=stop_mode=clone:stop_duration=${len.toFixed(3)}`])
+    // A talking-head composition crops the frame before the camera move, exactly as the preview does.
+    const vf = cameraChain(cam, work, size, [
+      ...compositionCropFilters(clip.composition ?? 'penuh', work.w, work.h),
+      `fps=${opts.fps}`,
+      `tpad=stop_mode=clone:stop_duration=${len.toFixed(3)}`
+    ])
     // A video trimmed on the timeline starts that far into its file.
     const from = clip.mediaInMs > 0 ? ['-ss', (clip.mediaInMs / 1000).toFixed(3)] : []
     await runFfmpeg([...from, '-i', assetAbsPath(bundle.project.id, video.localPath), '-vf', vf, '-t', len.toFixed(3), ...enc, out], tmp, signal)
     return out
   }
   const image = assetOf(bundle, clip.imageAssetId)
-  if (!image) throw new Error(`Klip ${String(index + 1).padStart(2, '0')} (“${clip.title}”) belum punya gambar.`)
+  // A video clip needs its video, not a picture: video-only clips (talking head, F5-10) export
+  // without an image, so the message names what is actually missing.
+  if (!image) {
+    if (clip.motionType === 'video') throw new Error(`Klip ${String(index + 1).padStart(2, '0')} (“${clip.title}”) belum punya video.`)
+    throw new Error(`Klip ${String(index + 1).padStart(2, '0')} (“${clip.title}”) belum punya gambar.`)
+  }
   const ownFrames = Math.max(2, Math.round(seg.own * opts.fps))
   const cam = cameraPerspective(clip.cameraPreset, clip.motionStrength, ownFrames, opts.fps)
   const vf = cameraChain(cam, cam ? workSize(image.width, image.height, size) : size, size)

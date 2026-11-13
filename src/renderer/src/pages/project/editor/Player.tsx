@@ -13,6 +13,7 @@ import {
   type CaptionChunk
 } from '@shared/captions'
 import { cameraAt, cameraCss, transitionSecOf } from '@shared/motion'
+import { compositionFrame } from '@shared/talkinghead'
 import { anchorOffset, contrastColor, overlayVisible, textEffects } from '@shared/overlays'
 import type { AspectRatio, Asset, EditorSettings, Overlay } from '@shared/types'
 import { IconButton, cx } from '../../../components/ui'
@@ -50,21 +51,32 @@ function Frame({ item, local, playing, style }: { item: TimelineItem; local: num
   const p = Math.min(1, local / own)
   const cam = cameraAt(item.clip.cameraPreset, item.clip.motionStrength, p, local)
   const videoCam = cameraAt(item.clip.videoCamera ?? 'static', item.clip.videoStrength ?? 'halus', p, local)
+  // A talking-head composition crops the frame before the camera move, exactly as the export does.
+  const comp = compositionFrame(item.clip.composition ?? 'penuh')
+  const videoEl = (
+    <video
+      ref={video}
+      src={item.video!.url}
+      // The clip image is the video's first frame, so it only stands in when the clip starts there.
+      poster={(item.clip.mediaInMs ?? 0) > 0 ? undefined : item.image?.url}
+      muted
+      playsInline
+      className="absolute inset-0 size-full object-cover will-change-transform"
+      // A moving video is kept just short of opaque so it is never promoted to a hardware overlay,
+      // which would snap the camera move to whole pixels and make it tremble.
+      style={{ transform: cameraCss(videoCam), opacity: (item.clip.videoCamera ?? 'static') === 'static' ? 1 : 0.999 }}
+    />
+  )
   return (
     <div data-clip={item.clip.id} className="absolute inset-0 overflow-hidden bg-sand" style={style}>
       {useVideo ? (
-        <video
-          ref={video}
-          src={item.video!.url}
-          // The clip image is the video's first frame, so it only stands in when the clip starts there.
-          poster={(item.clip.mediaInMs ?? 0) > 0 ? undefined : item.image?.url}
-          muted
-          playsInline
-          className="absolute inset-0 size-full object-cover will-change-transform"
-          // A moving video is kept just short of opaque so it is never promoted to a hardware overlay,
-          // which would snap the camera move to whole pixels and make it tremble.
-          style={{ transform: cameraCss(videoCam), opacity: (item.clip.videoCamera ?? 'static') === 'static' ? 1 : 0.999 }}
-        />
+        comp.zoom === 1 ? (
+          videoEl
+        ) : (
+          <div className="absolute inset-0 will-change-transform" style={{ transform: cameraCss(comp) }}>
+            {videoEl}
+          </div>
+        )
       ) : item.image ? (
         <img
           src={item.image.url}
