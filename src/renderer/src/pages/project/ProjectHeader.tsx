@@ -6,13 +6,6 @@ import { relativeTime } from '../../lib/format'
 import { useApp } from '../../store/app'
 import { useProject } from '../../store/project'
 
-const STEPS: { n: Step; label: string }[] = [
-  { n: 1, label: 'Ide cerita' },
-  { n: 2, label: 'Naskah' },
-  { n: 3, label: 'Storyboard' },
-  { n: 4, label: 'Editor' }
-]
-
 function SaveStatus() {
   const { saveState, saveError, savedAt, save } = useProject()
   if (saveState === 'saving')
@@ -52,6 +45,22 @@ export function ProjectHeader({ doneSteps, right }: { doneSteps: Step[]; right?:
   const { go } = useApp()
   const [editing, setEditing] = useState(false)
   if (!project) return null
+
+  // Talking Head renames steps 2–3 (F5-02): Naskah → Transkrip, Storyboard → Adegan. The numbers stay 1–4.
+  const STEPS: { n: Step; label: string }[] =
+    project.mode === 'talking-head'
+      ? [
+          { n: 1, label: 'Ide cerita' },
+          { n: 2, label: 'Transkrip' },
+          { n: 3, label: 'Adegan' },
+          { n: 4, label: 'Editor' }
+        ]
+      : [
+          { n: 1, label: 'Ide cerita' },
+          { n: 2, label: 'Naskah' },
+          { n: 3, label: 'Storyboard' },
+          { n: 4, label: 'Editor' }
+        ]
 
   const setStep = (n: Step): void => {
     const s = project.status

@@ -19,6 +19,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   flow2apiBaseUrl: FLOW_DEFAULT_BASE_URL,
   nexabotEnabled: false,
   nexabotBaseUrl: NEXA_DEFAULT_BASE_URL,
+  talkingHeadEnabled: false,
   whisperAuto: true
 }
 

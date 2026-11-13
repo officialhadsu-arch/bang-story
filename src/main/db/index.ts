@@ -141,6 +141,11 @@ const MIGRATIONS: string[] = [
   ALTER TABLE clips ADD COLUMN visual_provider TEXT NOT NULL DEFAULT 'auto';
   UPDATE clips SET scene_key = printf('%02d', sort + 1) WHERE scene_key IS NULL OR scene_key = '';
   CREATE UNIQUE INDEX clips_project_scene_key ON clips(project_id, scene_key);
+  `,
+  // Fase 5 (0.5): birth mode per project (F5-01) and per-scene framing for talking-head clips (F5-09).
+  `
+  ALTER TABLE projects ADD COLUMN mode TEXT NOT NULL DEFAULT 'gambar-video';
+  ALTER TABLE clips ADD COLUMN composition TEXT NOT NULL DEFAULT 'penuh';
   `
 ]
 

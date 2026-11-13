@@ -108,9 +108,13 @@ export function IdeaStep() {
   const [busy, setBusy] = useState(false)
   const [writer, setWriter] = useState<{ provider: LlmProvider; model: string } | null>(null)
   const [keys, setKeys] = useState<KeyStatus[]>([])
+  const [thEnabled, setThEnabled] = useState(false)
 
   useEffect(() => {
-    void window.api.settings.get().then((s) => setWriter({ provider: s.llmProvider, model: s.llmModels[s.llmProvider] }))
+    void window.api.settings.get().then((s) => {
+      setWriter({ provider: s.llmProvider, model: s.llmModels[s.llmProvider] })
+      setThEnabled(s.talkingHeadEnabled)
+    })
     void window.api.settings.keys().then(setKeys)
   }, [])
 
@@ -190,6 +194,28 @@ export function IdeaStep() {
                 <span>Tips: tulis juga suasana yang kamu mau, misalnya tegang, lucu, atau haru.</span>
                 <span className="font-mono">{project.synopsis.length.toLocaleString('id-ID')} / 4.000</span>
               </div>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <span className="text-sm font-semibold">Mode proyek</span>
+              <div className="flex flex-wrap gap-2">
+                <Chip on={project.mode !== 'talking-head'} disabled={clips.length > 0} onClick={() => updateProject({ mode: 'gambar-video' })} className="h-10 px-4">
+                  Gambar &amp; Video
+                </Chip>
+                {thEnabled && (
+                  <Chip on={project.mode === 'talking-head'} disabled={clips.length > 0} onClick={() => updateProject({ mode: 'talking-head' })} className="h-10 px-4">
+                    Talking Head
+                  </Chip>
+                )}
+              </div>
+              <span className="text-[13px] text-muted">
+                {clips.length > 0
+                  ? 'Mode dipilih saat proyek dibuat dan tidak bisa diganti. Untuk mode lain, buat proyek baru.'
+                  : project.mode === 'talking-head'
+                    ? 'Talking Head: impor rekaman orang berbicara, lalu aplikasi memahami narasinya dan memotongnya jadi adegan.'
+                    : 'Gambar & Video: AI menyusun naskah dari idemu, lalu membuat gambar, video, dan suara narator.'}
+                {!thEnabled && ' Mode Talking Head bisa dinyalakan di Pengaturan.'}
+              </span>
             </div>
 
             <div className="flex flex-col gap-2">

@@ -38,6 +38,7 @@ type Row = Record<string, any>
 const toProject = (r: Row): Project => ({
   id: r.id,
   title: r.title,
+  mode: r.mode === 'talking-head' ? 'talking-head' : 'gambar-video',
   synopsis: r.synopsis,
   durationSec: r.duration_sec,
   language: r.language,
@@ -85,6 +86,7 @@ const toClip = (r: Row): Clip => ({
   transition: r.transition,
   videoCamera: r.video_camera ?? 'static',
   videoStrength: r.video_strength ?? 'halus',
+  composition: r.composition === 'tengah' || r.composition === 'kiri' || r.composition === 'kanan' ? r.composition : 'penuh',
   transitionMs: r.transition_ms ?? null,
   voiceGainDb: r.voice_gain_db ?? 0,
   mediaInMs: r.media_in_ms ?? 0,
@@ -164,13 +166,14 @@ export function createProject(input: NewProjectInput): Project {
   const tts = input.ttsProvider ?? s.defaultTtsProvider
   getDb()
     .prepare(
-      `INSERT INTO projects (id, title, synopsis, duration_sec, language, aspect_ratio, style_id, tts_provider, tts_voice,
+      `INSERT INTO projects (id, title, mode, synopsis, duration_sec, language, aspect_ratio, style_id, tts_provider, tts_voice,
         image_model, video_model, status, step, editor_json, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', 1, ?, ?, ?)`
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', 1, ?, ?, ?)`
     )
     .run(
       id,
       'Proyek tanpa judul',
+      input.mode ?? 'gambar-video',
       input.synopsis ?? '',
       input.durationSec ?? 60,
       input.language ?? s.defaultLanguage,
@@ -227,7 +230,7 @@ export function saveSnapshot(snap: ProjectSnapshot): number {
   const p = snap.project
   db.transaction(() => {
     db.prepare(
-      `UPDATE projects SET title = @title, synopsis = @synopsis, duration_sec = @durationSec, language = @language,
+      `UPDATE projects SET title = @title, mode = @mode, synopsis = @synopsis, duration_sec = @durationSec, language = @language,
         aspect_ratio = @aspectRatio, style_id = @styleId, tts_provider = @ttsProvider, tts_voice = @ttsVoice,
         image_model = @imageModel, video_model = @videoModel, video_resolution = @videoResolution, status = @status, step = @step, editor_json = @editor, updated_at = @now
        WHERE id = @id`
@@ -250,16 +253,16 @@ export function saveSnapshot(snap: ProjectSnapshot): number {
     )
     const upClip = db.prepare(
       `INSERT INTO clips (id, project_id, sort, scene_key, visual_provider, title, story, visual_prompt, narration, duration_ms, character_ids, motion_type,
-         camera_preset, motion_strength, video_prompt, transition, video_camera, video_strength, transition_ms, voice_gain_db,
+         camera_preset, motion_strength, video_prompt, transition, video_camera, video_strength, composition, transition_ms, voice_gain_db,
          media_in_ms, voice_in_ms, voice_out_ms, voice_start_ms)
        VALUES (@id, @projectId, @sort, @sceneKey, @visualProvider, @title, @story, @visualPrompt, @narration, @durationMs, @characterIds, @motionType,
-         @cameraPreset, @motionStrength, @videoPrompt, @transition, @videoCamera, @videoStrength, @transitionMs, @voiceGainDb,
+         @cameraPreset, @motionStrength, @videoPrompt, @transition, @videoCamera, @videoStrength, @composition, @transitionMs, @voiceGainDb,
          @mediaInMs, @voiceInMs, @voiceOutMs, @voiceStartMs)
        ON CONFLICT(id) DO UPDATE SET sort = excluded.sort, scene_key = excluded.scene_key, visual_provider = excluded.visual_provider, title = excluded.title, story = excluded.story, visual_prompt = excluded.visual_prompt,
          narration = excluded.narration, duration_ms = excluded.duration_ms, character_ids = excluded.character_ids,
          motion_type = excluded.motion_type, camera_preset = excluded.camera_preset, motion_strength = excluded.motion_strength,
          video_prompt = excluded.video_prompt, transition = excluded.transition, video_camera = excluded.video_camera,
-         video_strength = excluded.video_strength, transition_ms = excluded.transition_ms, voice_gain_db = excluded.voice_gain_db,
+         video_strength = excluded.video_strength, composition = excluded.composition, transition_ms = excluded.transition_ms, voice_gain_db = excluded.voice_gain_db,
          media_in_ms = excluded.media_in_ms, voice_in_ms = excluded.voice_in_ms, voice_out_ms = excluded.voice_out_ms,
          voice_start_ms = excluded.voice_start_ms`
     )
@@ -277,6 +280,7 @@ export function saveSnapshot(snap: ProjectSnapshot): number {
         characterIds: JSON.stringify(c.characterIds),
         videoCamera: c.videoCamera ?? 'static',
         videoStrength: c.videoStrength ?? 'halus',
+        composition: c.composition ?? 'penuh',
         transitionMs: c.transitionMs ?? null,
         voiceGainDb: c.voiceGainDb ?? 0,
         mediaInMs: Math.round(c.mediaInMs ?? 0),
@@ -308,9 +312,9 @@ export function duplicateProject(id: string): ProjectSummary {
   db.transaction(() => {
     const p = db.prepare('SELECT * FROM projects WHERE id = ?').get(id) as Row
     db.prepare(
-      `INSERT INTO projects (id, title, synopsis, duration_sec, language, aspect_ratio, style_id, tts_provider, tts_voice,
+      `INSERT INTO projects (id, title, mode, synopsis, duration_sec, language, aspect_ratio, style_id, tts_provider, tts_voice,
          image_model, video_model, video_resolution, status, step, cover_asset_id, editor_json, created_at, updated_at)
-       SELECT @newId, @title, synopsis, duration_sec, language, aspect_ratio, style_id, tts_provider, tts_voice,
+       SELECT @newId, @title, mode, synopsis, duration_sec, language, aspect_ratio, style_id, tts_provider, tts_voice,
          image_model, video_model, video_resolution, status, step, @cover, editor_json, @now, @now FROM projects WHERE id = @id`
     ).run({ newId, id, title: `${p.title} (salinan)`, cover: mapId(p.cover_asset_id), now })
     for (const a of src.assets) {
@@ -351,8 +355,8 @@ export function duplicateProject(id: string): ProjectSummary {
       db.prepare(
         `INSERT INTO clips (id, project_id, sort, scene_key, visual_provider, title, story, visual_prompt, visual_source, narration, duration_ms, character_ids,
            motion_type, camera_preset, motion_strength, video_prompt, transition, image_asset_id, video_asset_id, audio_asset_id,
-           video_camera, video_strength, transition_ms, voice_gain_db, media_in_ms, voice_in_ms, voice_out_ms, voice_start_ms)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+           video_camera, video_strength, composition, transition_ms, voice_gain_db, media_in_ms, voice_in_ms, voice_out_ms, voice_start_ms)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(
         mapId(c.id),
         newId,
@@ -375,6 +379,7 @@ export function duplicateProject(id: string): ProjectSummary {
         mapId(c.audioAssetId),
         c.videoCamera,
         c.videoStrength,
+        c.composition,
         c.transitionMs,
         c.voiceGainDb,
         c.mediaInMs,
@@ -405,6 +410,7 @@ export type StoryClip = Omit<
   | 'visualSource'
   | 'videoCamera'
   | 'videoStrength'
+  | 'composition'
   | 'transitionMs'
   | 'voiceGainDb'
   | 'mediaInMs'
@@ -477,6 +483,52 @@ export interface ScriptScene {
   story: string
   narration: string
   durationMs: number
+}
+
+/** One talking-head scene as built from the recording (F5-06): a video clip whose picture and voice both come from the recording. */
+export interface TalkingHeadClipRow {
+  title: string
+  narration: string
+  durationMs: number
+  videoAssetId: string
+  audioAssetId: string
+  videoCamera: Clip['videoCamera']
+  videoStrength: Clip['videoStrength']
+  composition: Clip['composition']
+}
+
+/**
+ * Replaces all scenes with talking-head scenes cut from the recording. Old scene media stays in the
+ * asset history, unattached — the same rule as a script rewrite. The project moves to step 3 (Adegan).
+ */
+export function replaceTalkingHeadClips(projectId: string, title: string, scenes: TalkingHeadClipRow[]): void {
+  const db = getDb()
+  db.transaction(() => {
+    db.prepare('DELETE FROM clips WHERE project_id = ?').run(projectId)
+    const insert = db.prepare(
+      `INSERT INTO clips (id, project_id, sort, scene_key, visual_provider, title, story, visual_prompt, narration, duration_ms,
+         character_ids, motion_type, camera_preset, motion_strength, video_prompt, transition, image_asset_id, video_asset_id, audio_asset_id,
+         video_camera, video_strength, composition, transition_ms, voice_gain_db, media_in_ms, voice_in_ms, voice_out_ms, voice_start_ms)
+       VALUES (?, ?, ?, ?, 'footage', ?, '', '', ?, ?, '[]', 'video', 'zoomin', 'halus', '', 'fade', NULL, ?, ?, ?, ?, ?, NULL, 0, 0, 0, NULL, 0)`
+    )
+    scenes.forEach((c, i) =>
+      insert.run(
+        randomUUID(),
+        projectId,
+        i,
+        formatSceneKey(i + 1),
+        c.title,
+        c.narration,
+        c.durationMs,
+        c.videoAssetId,
+        c.audioAssetId,
+        c.videoCamera,
+        c.videoStrength,
+        c.composition
+      )
+    )
+    db.prepare("UPDATE projects SET title = ?, status = 'storyboard', step = 3, updated_at = ? WHERE id = ?").run(title, Date.now(), projectId)
+  })()
 }
 
 /**
@@ -577,6 +629,7 @@ const CLIP_COLS: Partial<Record<keyof Clip, string>> = {
   motionType: 'motion_type',
   videoCamera: 'video_camera',
   videoStrength: 'video_strength',
+  composition: 'composition',
   mediaInMs: 'media_in_ms',
   voiceInMs: 'voice_in_ms',
   voiceOutMs: 'voice_out_ms',
@@ -608,10 +661,10 @@ export function insertClipAfter(afterId: string, c: Clip): void {
     db.prepare(
       `INSERT INTO clips (id, project_id, sort, scene_key, visual_provider, title, story, visual_prompt, visual_source, narration, duration_ms, character_ids,
          motion_type, camera_preset, motion_strength, video_prompt, transition, image_asset_id, video_asset_id, audio_asset_id,
-         video_camera, video_strength, transition_ms, voice_gain_db, media_in_ms, voice_in_ms, voice_out_ms, voice_start_ms)
+         video_camera, video_strength, composition, transition_ms, voice_gain_db, media_in_ms, voice_in_ms, voice_out_ms, voice_start_ms)
        VALUES (@id, @projectId, @sort, @sceneKey, @visualProvider, @title, @story, @visualPrompt, @visualSource, @narration, @durationMs, @characterIds,
          @motionType, @cameraPreset, @motionStrength, @videoPrompt, @transition, @imageAssetId, @videoAssetId, @audioAssetId,
-         @videoCamera, @videoStrength, @transitionMs, @voiceGainDb, @mediaInMs, @voiceInMs, @voiceOutMs, @voiceStartMs)`
+         @videoCamera, @videoStrength, @composition, @transitionMs, @voiceGainDb, @mediaInMs, @voiceInMs, @voiceOutMs, @voiceStartMs)`
     ).run({ ...c, projectId: after.projectId, sort: after.sort + 1, sceneKey, visualProvider: c.visualProvider ?? 'auto', characterIds: JSON.stringify(c.characterIds) })
   })()
 }
