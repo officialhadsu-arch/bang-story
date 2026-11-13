@@ -115,8 +115,9 @@ export function NexaBotGuideSection() {
           <>Buka dashboard, lalu isi saldo lewat QRIS (top-up minimum Rp5.000). Kredit tidak kedaluwarsa.</>,
           <>Salin kunci API dari dashboard, lalu tempel di Pengaturan → Layanan AI dan kunci → NexaBot.</>,
           <>
-            Tekan <strong>Uji Koneksi</strong> di seksi yang sama. Kalau hasilnya “Terhubung ke NexaBot”, kuncinya benar dan saldonya cukup
-            untuk satu panggilan uji.
+            Tekan <strong>Uji Koneksi</strong> di seksi yang sama. Kalau hasilnya “Terhubung ke NexaBot”, kuncinya benar dan server bisa
+            dijangkau — tapi itu baru pemeriksaan kunci, bukan pemeriksaan saldo: probe-nya (GET /v1/models) mestinya tidak memotong
+            kredit. Periksa saldo di dashboard NexaBot sebelum generate.
           </>
         ]}
       />
