@@ -154,11 +154,58 @@ v2.1 sudah tidak berlaku.
 - Suara/musik TIDAK dibangun untuk NexaBot (D3-09). Tutorial lengkap berbahasa Indonesia ada di dalam aplikasi
   (Pengaturan › Panduan NexaBot, `NexaBotGuideSection.tsx`) dan pemetaannya di `docs/nexabot-pemetaan.md`.
 
+## kie.ai (`services/kieai.ts`, `shared/kieai.ts`)
+
+Tier 4 (0.3+): gambar dan video berbayar **premium** lewat REST API kie.ai (`api.kie.ai`) dengan kunci pengguna
+sendiri (BYOK, terenkripsi seperti kunci lain). kie.ai BUKAN pengganti NexaBot: untuk model yang tumpang tindih
+NexaBot 5–11× lebih murah; nilai kie.ai adalah luas katalog (Veo 3.1, Seedance, Kling, Grok) + dokumentasi API publik
+yang nyata. Tarif terverifikasi dari kie.ai/pricing (13 Nov 2026, kurs Rp18.200/USD): 1 kredit ≈ $0,005; gambar
+Rp546–Rp1.638; video Veo 3.1 Rp3.185–Rp23.205 per klip 8 detik; model per detik Rp410–Rp1.547/dtk. Omni Flash 1.2
+sengaja tidak masuk katalog (NexaBot Rp300 vs kie.ai Rp2.912). Tugas gagal tidak ditagih; kredit tidak kedaluwarsa;
+media hasil hanya disimpan 14 hari.
+
+- Katalog model di `shared/kieai.ts`: 3 model gambar, 6 model video, semuanya berawalan `kieai:`. `getImageModel`/
+  `getVideoModel` jatuh ke katalog ini bila id berawalan `kieai:`. Harga katalog dipakai estimasi biaya tanpa
+  panggilan server (`kiePriceIdr`, `kieaiCredits`, `kieaiUsd`); model per detik mengalikan tarif/dtk dengan durasi
+  klip (dibulatkan ke atas per detik).
+- **Bentuk API terverifikasi dari docs.kie.ai, kecuali string model + bentuk input (asumsi berlabel, K4-01).**
+  Alamat dasar `https://api.kie.ai`, auth `Authorization: Bearer <kunci>`; tugas asinkron
+  `POST /api/v1/jobs/createTask` `{model, input}` → `{code: 200, data: {taskId}}` lalu
+  `GET /api/v1/jobs/recordInfo?taskId=…` → status `waiting → queuing → generating → success | fail`, hasil di
+  `resultJson` (string berisi `resultUrls`); Veo memakai endpoint sendiri `POST /api/v1/veo/generate` +
+  `GET /api/v1/veo/record-info` (`successFlag`: 1 berhasil, 2 gagal — asumsi); probe
+  `GET /api/v1/chat/credit`. Galat datang sebagai **HTTP 200 + `code` di body** — transport selalu memeriksa `code`,
+  bukan status HTTP. String `model` persis + bentuk `input` per model adalah asumsi berlabel di `KIE_API_MODEL` +
+  transport; pola `google/<model>` terkonfirmasi live 13 Nov 2026 lewat TTS (`google/gemini-3-1-flash-tts`), slug
+  gambar/video tetap menunggu uji live PC. Batas rate 20 generate baru/10 detik; request yang ditolak tidak masuk
+  antrean. Tidak ada endpoint batal yang terdokumentasi — membatalkan hanya menghentikan polling lokal.
+- Alur: gambar dan video submit → simpan taskId → polling backoff 2 dtk → 10 dtk, timeout 20 menit, lalu unduh.
+  Timeout: gambar 300 dtk, video 600 dtk, unduh 180 dtk, probe 8 dtk. Frame pertama dikirim sebagai data URI
+  (`image_urls`/`imageUrls` — asumsi). Gambar referensi (lembar karakter) TIDAK dikirim di tier 4 — dukungan
+  referensi masih menunggu uji live. Pesan galat ramah Bahasa Indonesia (401 kunci tidak valid; 402/403 kredit tidak
+  cukup; 429 batas rate, tidak masuk antrean; 5xx server); kunci tidak pernah bocor ke pesan galat.
+- Penyambungan (`generation.ts`): model `kieai:` bercabang ke antrean `kieai` (limit 1) dengan penyedia `kieai`.
+  `requireKie` gagal keras bila sakelar mati atau kunci belum diisi — tanpa fallback diam-diam ke provider lain
+  (K4-03). `estimateCredits` mengembalikan harga katalog (kredit kie.ai + USD asli, bukan null seperti NexaBot).
+  `resumeJobs` melanjutkan polling tugas yang sudah disubmit sesudah restart — gambar, lembar, dan video, karena
+  ketiganya menyimpan taskId.
+- Pengaturan: `kieaiEnabled` (mati bawaan) dan `kieaiBaseUrl` (`AppSettings`). Sakelarnya terkunci di balik
+  peringatan biaya dan kotak persetujuan di Pengaturan (`Settings.tsx`, `KieSection`); kunci BYOK lewat `KeyForm`
+  yang sama dengan provider lain. IPC `kieai:testConnection` memeriksa `GET /api/v1/chat/credit` dengan kunci
+  tersimpan, dan `settings:testKey` punya cabang kie.ai.
+- Gerbang biaya batch (K4-05b, lebih tegas dari D3-05b): Storyboard menampilkan ringkasan biaya total Rupiah + USD
+  dan meminta konfirmasi sebelum satu job kie.ai pun dimulai; judul dialog menyebut Kie.ai; membatalkan di tengah
+  jalan tidak mengembalikan kredit generate yang sudah jadi, dan tugas yang sudah terkirim di server bisa terus
+  berjalan. Harga per generate tampil di pemilih model (kredit + USD) dan di kartu Model AI (Rupiah + USD +
+  tarif/dtk untuk model per detik).
+- Suara/musik/LLM TIDAK dibangun untuk kie.ai (K4-09). Tutorial lengkap berbahasa Indonesia ada di dalam aplikasi
+  (Pengaturan › Panduan Kie.ai, `KieAiGuideSection.tsx`) dan pemetaannya di `docs/kieai-pemetaan.md`.
+
 ## Jalur manual & ekstensi (`services/manual.ts`, `shared/manual.ts`, `manualWatch.ts`)
 
 Tier 2 (0.3+): gambar dan video adegan dibuat di luar KenStory — oleh pengguna, agen, atau ekstensi browser — lalu
 dibawa kembali lewat folder kerja. Manual adalah provider (`visualProvider` per adegan: `auto` | `higgsfield` |
-`flow2api` | `nexabot` | `manual` | `extension`), bukan mode; tiap adegan punya nomor stabil 2 digit (`sceneKey`, `01`, `02`, …,
+`flow2api` | `nexabot` | `kieai` | `manual` | `extension`), bukan mode; tiap adegan punya nomor stabil 2 digit (`sceneKey`, `01`, `02`, …,
 UNIQUE per proyek, backfill dari `sort`) yang dipakai untuk mencocokkan berkas hasil.
 
 - Skema: migrasi akhir di `db/index.ts` (`scene_key` + `visual_provider`, bawaan `auto`); `Clip` di `shared/types.ts`

@@ -27,6 +27,14 @@ by bangtutorial, licensed under the MIT License (see LICENSE).
   was written from the assumed wire shape labelled in
   `src/main/services/nexabot.ts`, to be confirmed by the first live test.
   https://nexabot.id
+- **kie.ai** — pay-as-you-go image/video API at kie.ai (tier 4, 0.3+).
+  KenStory calls its REST API with the user's own key; no kie.ai code is
+  vendored into this repository. The API is publicly documented
+  (docs.kie.ai): the client follows the documented endpoints, auth, and
+  error envelope; only the exact per-model `model` strings and `input`
+  shapes are labelled assumptions in `src/main/services/kieai.ts` and
+  `src/shared/kieai.ts`, to be confirmed by the first live test.
+  https://kie.ai
 - **GSAP** — GreenSock Animation Platform, used by the motion renderer.
   Standard "No Charge" License, effective 30 April 2025.
   Note on the Prohibited Uses clause: "Tidak tampak masuk: larangan punya
