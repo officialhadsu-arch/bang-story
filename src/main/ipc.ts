@@ -16,6 +16,7 @@ import type {
   WordTiming
 } from '@shared/types'
 import type { VisualProvider, WorkFileKind } from '@shared/manual'
+import type { SceneDef } from '@shared/talkinghead'
 import { startExport } from './exporter'
 import {
   applyMotionPreset,
@@ -71,6 +72,7 @@ import {
 } from './services/motion'
 import { renderBabakFull } from './services/renderer'
 import { generateScript, generateVisuals, generateMusicPrompt } from './story'
+import { arrangeScenes, buildScenes, getFootage, importFootage, setDroppedWords, setFillers, transcribeFootage } from './talkinghead'
 
 
 type Handler = (...args: any[]) => unknown
@@ -167,6 +169,23 @@ export function registerIpc(): void {
     const err = await shell.openPath(motionWorkFolder(projectId))
     if (err) throw new Error(`Folder kerja motion tidak bisa dibuka: ${err}`)
   })
+  // Fase 5 (0.5): Talking Head — narration-first mode (import recording, transcribe, arrange, build).
+  handle('talkinghead:importFootage', async (projectId: string) => {
+    const win = BrowserWindow.getFocusedWindow()
+    const res = await dialog.showOpenDialog(win!, {
+      title: 'Pilih rekaman video',
+      filters: [{ name: 'Video', extensions: ['mp4', 'mov', 'webm'] }],
+      properties: ['openFile']
+    })
+    if (res.canceled || !res.filePaths[0]) return null
+    return importFootage(projectId, res.filePaths[0])
+  })
+  handle('talkinghead:getFootage', (projectId: string) => getFootage(projectId))
+  handle('talkinghead:transcribe', (projectId: string) => transcribeFootage(projectId))
+  handle('talkinghead:setDroppedWords', (assetId: string, dropped: number[]) => setDroppedWords(assetId, dropped))
+  handle('talkinghead:setFillers', (assetId: string, fillers: string[]) => setFillers(assetId, fillers))
+  handle('talkinghead:arrange', (projectId: string) => arrangeScenes(projectId))
+  handle('talkinghead:buildScenes', (projectId: string, scenes: SceneDef[]) => buildScenes(projectId, scenes))
 
   handle('assets:setActive', (clipId: string, assetId: string) => setActiveAsset(clipId, assetId))
   handle('clips:split', (clipId: string, atMs: number) => splitClip(clipId, Number(atMs)))

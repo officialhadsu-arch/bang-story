@@ -4,18 +4,20 @@ import { appendFileSync, copyFileSync, existsSync, mkdirSync, readFileSync, stat
 import { basename, dirname, extname, join } from 'node:path'
 import { app, type BrowserWindow } from 'electron'
 import ffmpegStatic from 'ffmpeg-static'
-import { estimateWordTimings } from '@shared/captions'
+import { estimateWordTimings, WHISPER_TIMING } from '@shared/captions'
 import { anchorPoint } from '@shared/overlays'
+import { autoDroppedIndexes, DEFAULT_FILLERS } from '@shared/talkinghead'
 import { startExport } from './exporter'
 import { setActiveAsset } from './generation'
-import { assetAbsPath, binPath, manualWorkFolder, motionWorkFolder } from './paths'
+import { assetAbsPath, binPath, dataDir, manualWorkFolder, motionWorkFolder } from './paths'
 import { probeDurationMs, probeSize } from './services/audio'
 import { approveMotionBeat, motionBabakDir, prepareMotionWorkFolder, readMotionBabak, syncMotionBeatIds } from './services/motion'
 import { renderBabakRange, type RenderRangeResult } from './services/renderer'
 import { setSettings } from './settings'
-import { createProject, getBundle, insertAsset, listProjects, patchClip, replaceStory, saveSnapshot, touchProject } from './repo'
+import { createProject, getBundle, insertAsset, listProjects, patchClip, replaceStory, saveSnapshot, touchProject, updateAssetMeta } from './repo'
 import { recordCheck, setTestKey } from './secrets'
-import type { ApiProvider } from '@shared/types'
+import { importFootage } from './talkinghead'
+import type { ApiProvider, WordTiming } from '@shared/types'
 
 /**
  * Real speech for the demo clips (Windows' built-in English voice) with estimated caption timings, so
@@ -104,7 +106,47 @@ function addDemoVideos(projectId: string): void {
   }
 }
 
-/** Builds a small project from synthetic media so storyboard, editor and export can be tested without API keys. */
+/** Talking Head fixture (Fase 5): two talking-head projects from one synthetic recording (testsrc + sine
+ *  tone, 46 s). Project A is for the transcribe negative test (no Whisper model in the VM: the job must
+ *  fail closed with a clear message). Project B carries an injected word-level transcript — 110 words
+ *  with four fillers and one long pause — for arrange/build/export. The native file dialog cannot be
+ *  clicked by the harness, so the fixture calls importFootage directly; the dialog itself is covered by
+ *  screenshot and code inspection instead. */
+async function talkingHeadFixture(): Promise<{ transcribeId: string; scenesId: string }> {
+  const ff = binPath(ffmpegStatic!)
+  const src = join(dataDir(), 'tmp', 'th-fixture.mp4')
+  mkdirSync(dirname(src), { recursive: true })
+  execFileSync(
+    ff,
+    ['-y', '-f', 'lavfi', '-i', 'testsrc2=s=1280x720:r=30:d=46', '-f', 'lavfi', '-i', 'sine=frequency=440:d=46', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-shortest', src],
+    { windowsHide: true }
+  )
+  const rename = (id: string, title: string): void => {
+    const b = getBundle(id)
+    saveSnapshot({ project: { ...b.project, title }, characters: b.characters, clips: b.clips })
+  }
+  const transcribeId = createProject({ mode: 'talking-head', language: 'id', synopsis: 'Uji transkrip (harus gagal tanpa model Whisper).' }).id
+  rename(transcribeId, 'Talking Head Uji Transkrip')
+  await importFootage(transcribeId, src)
+  const scenesId = createProject({ mode: 'talking-head', language: 'id', synopsis: 'Uji susun adegan, buat adegan, dan ekspor.' }).id
+  rename(scenesId, 'Talking Head Uji Adegan')
+  const { audio } = await importFootage(scenesId, src)
+  const fillerIdx = new Set([10, 30, 70, 95])
+  const words: WordTiming[] = []
+  for (let i = 0; i < 110; i++) {
+    const start = i * 0.4 + (i >= 55 ? 1.2 : 0)
+    words.push({ text: fillerIdx.has(i) ? 'eh' : `kata${i + 1}`, start, end: start + 0.35 })
+  }
+  updateAssetMeta(audio.id, {
+    ...audio.meta,
+    words,
+    droppedWordIndexes: autoDroppedIndexes(words, DEFAULT_FILLERS),
+    estimatedTimings: false,
+    timedBy: WHISPER_TIMING
+  })
+  console.log(`[harness] talkingHeadFixture transcribe=${transcribeId} scenes=${scenesId}`)
+  return { transcribeId, scenesId }
+}
 function seedDemo(): string {
   const ff = binPath(ffmpegStatic!)
   const p = createProject({ synopsis: 'Demo: Gajah Mada dan Sumpah Palapa', durationSec: 30, styleId: 'stickman', language: 'id' })
@@ -402,7 +444,7 @@ export function attachDevHarness(win: BrowserWindow): void {
   const planPath = process.env.STUDIO_CAPTURE_PLAN
   if (!planPath) return
   let plan: {
-    main?: 'seed' | 'export' | 'key' | 'overlays' | 'speech' | 'videos' | 'importClipImages' | 'manualFixture' | 'motionFixture' | 'motionApprove' | 'motionSpike' | 'motionSpikeVert'
+    main?: 'seed' | 'export' | 'key' | 'overlays' | 'speech' | 'videos' | 'importClipImages' | 'manualFixture' | 'motionFixture' | 'motionApprove' | 'motionSpike' | 'motionSpikeVert' | 'talkingHeadFixture'
     exportTo?: string
     /** For main "export": an existing project instead of the seeded demo. */
     projectId?: string
@@ -492,6 +534,7 @@ export function attachDevHarness(win: BrowserWindow): void {
         if (step.main === 'motionApprove' && demoId) approveMotionBabak(demoId, log)
         if (step.main === 'motionSpike' && demoId) await runMotionSpike(demoId, log)
         if (step.main === 'motionSpikeVert' && demoId) await runMotionSpikeVert(demoId, log)
+        if (step.main === 'talkingHeadFixture') await talkingHeadFixture()
         if (step.main === 'key' && step.provider) {
           // Test-only key, kept in memory by setTestKey: it never touches
           // disk, so this step works where setSecret() must refuse (D-07).

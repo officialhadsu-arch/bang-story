@@ -1,6 +1,7 @@
 import type { ManualScanResult, ManualWatchEvent, ManualWorkFolder, VisualProvider, WorkFileKind } from './manual'
 import type { BeatsJson, MotionBabakStatus, MotionWorkFolderResult, RenderBabakResult } from './motion-contract'
 import type { MotionTemplate } from './motion-templates'
+import type { ArrangeResult, SceneDef } from './talkinghead'
 import type {
   ApiProvider,
   AspectRatio,
@@ -94,6 +95,22 @@ export interface StudioApi {
     saveStyleOverride(projectId: string, styleJs: string): Promise<string[]>
     /** Opens the project's motion-work/ folder in the file manager. */
     openWorkFolder(projectId: string): Promise<void>
+  },
+  talkinghead: {
+    /** Imports the raw recording (file dialog) and extracts its audio for transcription. */
+    importFootage(projectId: string): Promise<{ video: Asset; audio: Asset } | null>
+    /** The project's recording and extracted audio, if any. */
+    getFootage(projectId: string): Promise<{ video: Asset | null; audio: Asset | null }>
+    /** Recognises the recording once with local Whisper (a job; progress in the jobs list). */
+    transcribe(projectId: string): Promise<Job>
+    /** Marks transcript words to cut (or restores them). */
+    setDroppedWords(assetId: string, dropped: number[]): Promise<Asset>
+    /** Replaces the filler-word list and re-marks the auto-cut words. */
+    setFillers(assetId: string, fillers: string[]): Promise<Asset>
+    /** Groups the transcript into scenes with the LLM, or deterministically when the LLM is unavailable. */
+    arrange(projectId: string): Promise<ArrangeResult>
+    /** Cuts the scenes out of the recording (video + audio) and replaces the project's clips. */
+    buildScenes(projectId: string, scenes: SceneDef[]): Promise<ProjectBundle>
   }
   clips: {
     /** Splits a clip at `atMs` into two clips (picture, voice and narration divided at the nearest pause). */

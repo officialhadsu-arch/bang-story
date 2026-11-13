@@ -242,6 +242,8 @@ export function generateNarration(projectId: string, mode: 'missing' | 'all'): J
   const running = activeProjectJob(projectId, 'narration')
   if (running) return running
   const project = getProject(projectId)
+  // Talking Head has no TTS: the scenes' voices are the recording itself (F5-07).
+  if (project.mode === 'talking-head') throw new Error('Mode Talking Head memakai suara dari rekaman, bukan suara narator.')
   const targets = clipsOf(projectId).filter((c) => c.narration.trim() && (mode === 'all' || !c.audioAssetId))
   if (!targets.length) throw new Error('Tidak ada naskah narasi yang perlu disuarakan.')
   const job = insertJob({ projectId, kind: 'narration', provider: project.ttsProvider, payload: { mode, clipIds: targets.map((c) => c.id) } })

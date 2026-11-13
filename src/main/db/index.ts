@@ -148,6 +148,11 @@ const MIGRATIONS: string[] = [
   ALTER TABLE clips ADD COLUMN motion_babak_id TEXT;
   ALTER TABLE clips ADD COLUMN motion_beat_id TEXT;
   ALTER TABLE clips ADD COLUMN caption_on INTEGER;
+  `,
+  // Fase 5 (0.5): birth mode per project (F5-01) and per-scene framing for talking-head clips (F5-09).
+  `
+  ALTER TABLE projects ADD COLUMN mode TEXT NOT NULL DEFAULT 'gambar-video';
+  ALTER TABLE clips ADD COLUMN composition TEXT NOT NULL DEFAULT 'penuh';
   `
 ]
 

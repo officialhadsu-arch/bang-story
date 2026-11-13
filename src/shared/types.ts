@@ -17,6 +17,12 @@ export type CaptionSize = 'kecil' | 'sedang' | 'besar'
 /** 1 idea, 2 script, 3 storyboard, 4 editor */
 export type Step = 1 | 2 | 3 | 4
 
+/** How a project is born (F5-01): an AI-written story with generated visuals, or a raw recording understood first. Locked after creation; changing it means a new project. */
+export type ProjectMode = 'gambar-video' | 'talking-head'
+
+/** Framing of one talking-head scene (F5-09): the whole frame, or a close-up (60% crop) in the middle, left or right. No face tracking in v1. */
+export type CompositionId = 'penuh' | 'tengah' | 'kiri' | 'kanan'
+
 export interface EditorSettings {
   captionStyle: CaptionStyleId
   captionPosition: CaptionPosition
@@ -97,6 +103,8 @@ export type Overlay = ImageOverlay | TextOverlay
 export interface Project {
   id: string
   title: string
+  /** Birth mode (F5-01): 'gambar-video' (AI story + generated visuals) or 'talking-head' (raw recording first). */
+  mode: ProjectMode
   synopsis: string
   durationSec: number
   language: string
@@ -160,6 +168,8 @@ export interface Clip {
   /** Camera move drawn over the AI video ('static' keeps the video as it is). */
   videoCamera: CameraPresetId
   videoStrength: MotionStrength
+  /** Framing of a talking-head scene (F5-09); 'penuh' for every other clip. */
+  composition: CompositionId
   /** Length of the transition into the next clip; null uses the default (0.4 s). */
   transitionMs: number | null
   /** Volume change for this clip's narration, in dB. */
@@ -187,6 +197,16 @@ export interface AssetMeta {
   words?: WordTiming[]
   estimatedTimings?: boolean
   voice?: string
+  /** Whisper DTW timings ('whisper-dtw') or an estimate; set on narration and footage audio. */
+  timedBy?: string
+  /** What this asset is for the talking-head flow: 'footage' (raw recording) or 'footage-audio' (its extracted audio). */
+  role?: string
+  /** The footage video this audio was extracted from (footage-audio only). */
+  footageAssetId?: string
+  /** Word indexes the user (or the auto-drop) marked to cut out of the talking-head transcript. */
+  droppedWordIndexes?: number[]
+  /** The filler-word list that auto-marks words to cut (editable on the Transcript step). */
+  fillerWords?: string[]
   [key: string]: unknown
 }
 
@@ -210,8 +230,8 @@ export interface Asset {
   createdAt: number
 }
 
-/** "narration" voices several scenes in one take and cuts it per scene. */
-export type JobKind = 'story' | 'image' | 'sheet' | 'video' | 'tts' | 'narration' | 'align' | 'export'
+/** "narration" voices several scenes in one take and cuts it per scene. "transcribe" recognises the talking-head recording once. */
+export type JobKind = 'story' | 'image' | 'sheet' | 'video' | 'tts' | 'narration' | 'align' | 'export' | 'transcribe'
 export type JobStatus = 'queued' | 'running' | 'done' | 'failed' | 'canceled'
 
 export interface Job {
@@ -259,6 +279,7 @@ export interface ProjectSnapshot {
 
 export interface NewProjectInput {
   synopsis?: string
+  mode?: ProjectMode
   durationSec?: number
   language?: string
   aspectRatio?: AspectRatio
@@ -322,6 +343,8 @@ export interface AppSettings {
   motionEnabled: boolean
   /** Which motion preset the last apply used: 'penuh' (motion on every scene) or 'hybrid' (only key scenes). */
   motionPreset: 'penuh' | 'hybrid'
+  /** Talking Head (narration-first mode) is off until the user turns it on in Settings. */
+  talkingHeadEnabled: boolean
   /** Time captions against the real voice with Whisper after narration is made (when the model is present). */
   whisperAuto: boolean
 }

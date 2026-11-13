@@ -110,3 +110,36 @@ Electron yang terbukti display-independent. Delta installer Puppeteer: ±684 MB 
 7,3 dtk vs 9,0 dtk tapi video +11% pada fixture warna datar dan berisiko artefak di tepi teks — PNG lossless
 lebih aman untuk konten vektor datar). Angka RAM di atas adalah lantai (fixture satu div) — babak GSAP asli
 harus diukur ulang di gerbang PC. E(3) — lari S3 v2 di laptop Bos — tetap gerbang PC.
+### Talking Head: audio rekaman diekstrak sekali, trek audio file video tidak dipakai (F5-07)
+Sama seperti aturan "audio dari file video tidak pernah dipakai di ekspor" di atas, tapi di mode Talking Head
+ini disengaja dan struktural: saat impor, audio rekaman diekstrak sekali jadi WAV 16 kHz mono, dan semua suara
+adegan dipotong dari ekstraksi itu. Eksporter tidak pernah membaca trek audio file video mana pun. Alasannya:
+transkrip Whisper, potongan, dan caption semuanya hidup di atas ekstraksi yang sama, jadi satu sumber waktu
+untuk kata, potongan, dan suara.
+
+### Talking Head: adegan adalah file video + audio sendiri, bukan rentang (F5-08)
+Satu adegan bisa merentang beberapa interval potong (contoh: 55 potongan dalam 14 adegan), dan satu rentang
+`mediaInMs` tidak bisa menyatakan potongan di dalam adegan. Jadi `buildScenes` merender satu file video + satu
+file audio per adegan yang hanya berisi materi terpakai, dipotong dari daftar potong yang sama di kedua trek —
+video dan audio tetap sinkron. File rekaman mentah tetap disimpan untuk transkrip ulang / susun ulang.
+`exporter` tidak diubah untuk ini: adegan adalah klip video biasa (`motionType: 'video'`, tanpa
+`imageAssetId`), dan syarat "tiap klip harus punya gambar" sudah dipenuhi lewat konstruksi itu.
+
+### Talking Head: komposisi close-up 60%, rumus sama di pratinjau dan ekspor (F5-09)
+Close-up adalah crop 60% frame (tengah/kiri/kanan), diperbesar kembali ke ukuran frame. Pratinjau memakai
+`cameraCss` (translate + scale) dan ekspor memakai filter FFmpeg `crop` + `scale` dengan angka yang sama
+(`compositionFrame` / `compositionCropFilters` di `src/shared/talkinghead.ts`), supaya yang tampil itulah yang
+keluar. Zoom otomatis v1 hanya zoom-in halus di tengah frame — tanpa pelacakan wajah.
+
+### Talking Head: susun adegan LLM + fallback deterministik, tanpa jalan buntu (F5-05)
+`arrangeScenes` meminta LLM mengelompokkan transkrip (JSON ketat, batas berupa indeks kata), lalu batasnya
+divalidasi `normalizeSceneDefs` (dipotong ke transkrip, tumpang tindih dirapikan, tiap kata terpakai masuk
+tepat satu adegan). Kalau LLM tidak tersedia atau hasilnya tidak valid, fallback deterministik (kelompokkan
+run kata terpakai jadi adegan 30–60 detik) selalu menghasilkan adegan — susun adegan tidak pernah gagal
+diam-diam.
+
+### Run kata terpakai putus di jeda yang dipotong
+`keptRuns` dulu hanya memutus run bila sebuah kata tumpang tindih dengan interval potong. Interval jeda
+terletak seluruhnya di antara dua kata, jadi jeda ikut terhitung "terpakai" dan ikut masuk media adegan.
+Sekarang run juga putus bila interval potong tumpang tindih dengan celah antara dua kata terpakai.
+Ditemukan service-test `talkinghead` (Fase 5, 62 butir).

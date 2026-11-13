@@ -138,6 +138,7 @@ export const useProject = create<ProjectState>((set, get) => {
         transition: 'fade',
         videoCamera: 'static',
         videoStrength: 'halus',
+        composition: 'penuh',
         transitionMs: null,
         voiceGainDb: 0,
         mediaInMs: 0,

@@ -12,13 +12,14 @@ import {
 } from '@shared/captions'
 import { getImageModel, promptLimit } from '@shared/higgsfield'
 import { CAMERA_PRESETS, MOTION_STRENGTHS } from '@shared/motion'
+import { COMPOSITIONS } from '@shared/talkinghead'
 import { geminiVoiceName } from '@shared/models'
 import { clipPrompt } from '@shared/prompts'
 import { voiceSpan } from '@shared/timeline'
 import type { Asset, Clip, WordTiming } from '@shared/types'
 import { Select } from '../../../components/Select'
 import { AutoTextarea } from '../../../components/AutoTextarea'
-import { Button, Segmented, Switch, cx, inputCls } from '../../../components/ui'
+import { Button, Chip, Segmented, Switch, cx, inputCls } from '../../../components/ui'
 import { clipNumber, errorText, secLabel, timecode } from '../../../lib/format'
 import { useApp } from '../../../store/app'
 import { useNarration } from '../../../lib/useNarration'
@@ -83,6 +84,8 @@ function ClipTab({ clip, index }: { clip: Clip; index: number }) {
     toast('success', `Prompt gambar adegan ${clip.sceneKey} disalin.`)
   }
   const videoCamera = clip.videoCamera ?? 'static'
+  // A talking-head scene comes from the imported recording: no AI picture, no AI video, no TTS.
+  const isFootage = clip.visualProvider === 'footage'
   // A camera change plays the clip in the preview at once, without moving the playhead.
   const audition = (): void => useAudition.getState().start({ kind: 'clip', clipId: clip.id })
   const setCamera = (patch: Partial<Clip>): void => {
@@ -103,31 +106,40 @@ function ClipTab({ clip, index }: { clip: Clip; index: number }) {
       <ClipHeader clip={clip} index={index} />
       {/* W6(b): a clip without a picture cannot be exported, so the clip tab
           offers a local image file for it (no paid generation involved). */}
-      <Section title="Gambar klip">
-        {image ? (
-          <p className="text-[13px] text-ink-2">Gambar klip sudah terpasang.</p>
-        ) : (
-          <p className="text-[13px] text-ink-2">Klip ini belum punya gambar. Pilih berkas gambar dari komputermu.</p>
-        )}
-        <div className="flex flex-wrap gap-2">
-          <Button
-            size="sm"
-            variant={image ? 'secondary' : 'accent'}
-            icon={<Image className="size-4" />}
-            onClick={() =>
-              void run(async () => {
-                if (!project) return
-                const a = await window.api.assets.pickClipImage(project.id, clip.id)
-                if (a) addAsset(a)
-              })
-            }
-          >
-            {image ? 'Ganti gambar' : 'Pilih gambar'}
-          </Button>
-        </div>
-      </Section>
-      <Section title="Jalur manual">
-        {manualWaiting ? (
+      {/* A talking-head scene has no picture: its video is the recording itself. */}
+      {isFootage ? (
+        <Section title="Gambar klip">
+          <p className="text-[13px] text-ink-2">Adegan ini memakai video dari rekaman yang diimpor, jadi tidak butuh gambar.</p>
+        </Section>
+      ) : (
+        <Section title="Gambar klip">
+          {image ? (
+            <p className="text-[13px] text-ink-2">Gambar klip sudah terpasang.</p>
+          ) : (
+            <p className="text-[13px] text-ink-2">Klip ini belum punya gambar. Pilih berkas gambar dari komputermu.</p>
+          )}
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              variant={image ? 'secondary' : 'accent'}
+              icon={<Image className="size-4" />}
+              onClick={() =>
+                void run(async () => {
+                  if (!project) return
+                  const a = await window.api.assets.pickClipImage(project.id, clip.id)
+                  if (a) addAsset(a)
+                })
+              }
+            >
+              {image ? 'Ganti gambar' : 'Pilih gambar'}
+            </Button>
+          </div>
+        </Section>
+      )}
+      {/* No manual path for a recording scene: its picture comes from the recording, not a prompt. */}
+      {!isFootage && (
+        <Section title="Jalur manual">
+          {manualWaiting ? (
           <p className="text-[13px] leading-relaxed text-ink-2">
             Adegan {clip.sceneKey} menunggu hasil {clip.visualProvider === 'extension' ? 'dari Google Flow di browser' : 'manual'} — salin
             promptnya, generate di luar, lalu Pindai Folder Kerja di Storyboard.
@@ -138,42 +150,72 @@ function ClipTab({ clip, index }: { clip: Clip; index: number }) {
           </p>
         ) : (
           <p className="text-[13px] leading-relaxed text-ink-2">
-            Jalur visual adegan ini: {clip.visualProvider === 'auto' ? 'otomatis (mengikuti model proyek)' : clip.visualProvider === 'manual' ? 'manual' : clip.visualProvider === 'extension' ? 'ekstensi' : clip.visualProvider === 'flow2api' ? 'Google Flow' : clip.visualProvider === 'nexabot' ? 'NexaBot' : clip.visualProvider === 'motion' ? 'motion (babak HTML+GSAP, dirender aplikasi)' : 'Higgsfield'}.
-            Prompt gambarnya bisa disalin untuk generate di luar.
+            Jalur visual adegan ini:{' '}
+            {clip.visualProvider === 'auto'
+              ? 'otomatis (mengikuti model proyek)'
+              : clip.visualProvider === 'manual'
+                ? 'manual'
+                : clip.visualProvider === 'extension'
+                  ? 'ekstensi'
+                  : clip.visualProvider === 'flow2api'
+                    ? 'Google Flow'
+                    : clip.visualProvider === 'nexabot'
+                      ? 'NexaBot'
+                      : clip.visualProvider === 'motion'
+                        ? 'motion (babak HTML+GSAP, dirender aplikasi)'
+                        : clip.visualProvider === 'footage'
+                          ? 'rekaman yang diimpor'
+                          : 'Higgsfield'}
+            . Prompt gambarnya bisa disalin untuk generate di luar.
           </p>
         )}
-        <div className="flex flex-wrap gap-2">
-          <Button size="sm" icon={<Copy className="size-4" />} onClick={() => void copyImagePrompt()}>
-            Salin prompt gambar
-          </Button>
-        </div>
-      </Section>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" icon={<Copy className="size-4" />} onClick={() => void copyImagePrompt()}>
+              Salin prompt gambar
+            </Button>
+          </div>
+        </Section>
+      )}
       {clip.motionType === 'video' ? (
-        <Section title="Video AI">
+        <Section title={isFootage ? 'Video rekaman' : 'Video AI'}>
           {video ? (
             <p className="text-[13px] text-ink-2">
               Klip ini memakai video dari{' '}
-              {video.provider === 'manual' ? 'jalur manual' : video.provider === 'extension' ? 'jalur ekstensi' : video.provider === 'flow2api' ? 'Google Flow' : video.provider === 'local' ? 'berkas lokal' : 'Higgsfield'}
+              {isFootage
+                ? 'rekaman yang diimpor'
+                : video.provider === 'manual'
+                  ? 'jalur manual'
+                  : video.provider === 'extension'
+                    ? 'jalur ekstensi'
+                    : video.provider === 'flow2api'
+                      ? 'Google Flow'
+                      : video.provider === 'local'
+                        ? 'berkas lokal'
+                        : 'Higgsfield'}
               .
             </p>
           ) : (
             <p className="text-[13px] text-ink-2">Video belum dibuat. Sampai video siap, pratinjau memakai gambar diam.</p>
           )}
-          <div className="flex flex-wrap gap-2">
-            <Button
-              size="sm"
-              variant={video ? 'secondary' : 'accent'}
-              icon={<Clapperboard className="size-4" />}
-              loading={isRunning(videoJob)}
-              disabled={!image}
-              onClick={() => void run(() => window.api.generate.clipVideo(clip.id))}
-            >
-              {video ? 'Buat ulang video' : 'Buat video'}
-            </Button>
-            <Button size="sm" icon={<Move className="size-4" />} onClick={() => updateClip(clip.id, { motionType: 'camera' })}>
-              Kembali ke gerak kamera
-            </Button>
-          </div>
+          {isFootage ? (
+            <p className="text-[13px] text-ink-2">Video adegan ini dipotong dari rekaman di langkah Transkrip. Untuk mengubah isinya, susun ulang adegan di sana.</p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                variant={video ? 'secondary' : 'accent'}
+                icon={<Clapperboard className="size-4" />}
+                loading={isRunning(videoJob)}
+                disabled={!image}
+                onClick={() => void run(() => window.api.generate.clipVideo(clip.id))}
+              >
+                {video ? 'Buat ulang video' : 'Buat video'}
+              </Button>
+              <Button size="sm" icon={<Move className="size-4" />} onClick={() => updateClip(clip.id, { motionType: 'camera' })}>
+                Kembali ke gerak kamera
+              </Button>
+            </div>
+          )}
           {isRunning(videoJob) && (
             <span className="text-xs text-sun-ink">
               {videoJob!.message ?? 'Memproses'} {Math.round(videoJob!.progress * 100)}%
@@ -199,8 +241,10 @@ function ClipTab({ clip, index }: { clip: Clip; index: number }) {
               />
             </div>
             <p className="text-xs leading-relaxed text-muted">
-              Video AI sudah bergerak sendiri. Tambahkan zoom atau geser kalau ingin efek kamera di atasnya.
-            </p>
+            {isFootage
+              ? 'Zoom otomatis v1: zoom-in halus di tengah frame. Bukan pelacakan wajah — kameranya tidak mengikuti wajah.'
+              : 'Video AI sudah bergerak sendiri. Tambahkan zoom atau geser kalau ingin efek kamera di atasnya.'}
+          </p>
             <Button size="sm" variant="ghost" className="self-start" icon={<Play className="size-4" />} onClick={audition}>
               Putar pratinjau gerak
             </Button>
@@ -241,6 +285,21 @@ function ClipTab({ clip, index }: { clip: Clip; index: number }) {
             </Button>
           </div>
           <p className="text-xs leading-relaxed text-muted">Ganti gerakan atau kekuatannya untuk langsung melihatnya di pratinjau.</p>
+        </Section>
+      )}
+      {/* F5-09: framing per scene for talking-head clips (close-up = 60% crop); preview = export. */}
+      {isFootage && (
+        <Section title="Komposisi">
+          <div className="flex flex-wrap gap-2">
+            {COMPOSITIONS.map((c) => (
+              <Chip key={c.id} on={(clip.composition ?? 'penuh') === c.id} onClick={() => setCamera({ composition: c.id })} title={c.hint}>
+                {c.label}
+              </Chip>
+            ))}
+          </div>
+          <p className="text-xs leading-relaxed text-muted">
+            Close-up memperbesar 60% bagian frame (tengah, kiri, atau kanan). Yang tampil di pratinjau sama dengan yang keluar di ekspor.
+          </p>
         </Section>
       )}
     </>
@@ -319,8 +378,10 @@ function VoiceTab({ clip, index }: { clip: Clip; index: number }) {
       <ClipHeader clip={clip} index={index} />
       <Section title="Suara narasi">
         <p className="text-[13px] leading-relaxed text-ink-2">{clip.narration || 'Naskah masih kosong.'}</p>
-        {/* Voices come from one take of the whole script, so a change is fixed by re-recording that take. */}
-        {narration.running ? (
+        {/* Talking Head has no TTS: the voice is the recording itself (F5-07), so there is nothing to re-record. */}
+        {project.mode === 'talking-head' ? (
+          <span className="text-xs text-muted">Suara adegan ini berasal dari rekaman, bukan suara narator — tidak bisa direkam ulang di sini.</span>
+        ) : narration.running ? (
           <span className="text-xs text-sun-ink">Suara narasi sedang dibuat…</span>
         ) : !voice || stale ? (
           <div className="flex flex-col items-start gap-2">

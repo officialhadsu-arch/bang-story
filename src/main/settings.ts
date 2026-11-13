@@ -21,6 +21,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   nexabotBaseUrl: NEXA_DEFAULT_BASE_URL,
   motionEnabled: false,
   motionPreset: 'hybrid',
+  talkingHeadEnabled: false,
   whisperAuto: true
 }
 
