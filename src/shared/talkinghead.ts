@@ -307,6 +307,13 @@ export function sceneKeptRanges(scene: SceneDef, words: WordTiming[], cuts: CutI
   }))
 }
 
+/** What arranging the transcript returns: the scenes, and whether the LLM or the fallback made them. */
+export interface ArrangeResult {
+  scenes: SceneDef[]
+  source: 'llm' | 'fallback'
+  summary: TranscriptSummary
+}
+
 /** A scene's words rebased onto its own concatenated timeline (cut intervals removed). */
 export function sceneWordsRebased(scene: SceneDef, words: WordTiming[], cuts: CutInterval[]): WordTiming[] {
   const ranges = sceneKeptRanges(scene, words, cuts)

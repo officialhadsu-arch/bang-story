@@ -47,6 +47,15 @@ const api: StudioApi = {
     importFile: call('manual:importFile'),
     openWorkFolder: call('manual:openWorkFolder')
   },
+  talkinghead: {
+    importFootage: call('talkinghead:importFootage'),
+    getFootage: call('talkinghead:getFootage'),
+    transcribe: call('talkinghead:transcribe'),
+    setDroppedWords: call('talkinghead:setDroppedWords'),
+    setFillers: call('talkinghead:setFillers'),
+    arrange: call('talkinghead:arrange'),
+    buildScenes: call('talkinghead:buildScenes')
+  },
   clips: {
     split: call('clips:split'),
     detachVoice: call('clips:detachVoice')
