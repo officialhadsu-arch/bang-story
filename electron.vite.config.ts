@@ -7,7 +7,12 @@ const shared = { '@shared': resolve('src/shared') }
 
 export default defineConfig({
   main: {
-    resolve: { alias: shared }
+    resolve: { alias: shared },
+    // Puppeteer is an OPTIONAL runtime dependency of the motion renderer
+    // (Fase 4): it is never installed with the app, only loaded lazily via
+    // dynamic import when the user installed it. It must stay external so
+    // the main bundle builds without it.
+    build: { rollupOptions: { external: ['puppeteer'] } }
   },
   preload: {
     resolve: { alias: shared }

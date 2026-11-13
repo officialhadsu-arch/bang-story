@@ -1,12 +1,11 @@
-import { spawn } from 'node:child_process'
-import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import ffmpegStatic from 'ffmpeg-static'
 import {
   CAPTION_BOX_PAD,
   CAPTION_BOX_RADIUS,
   CAPTION_MAX_WIDTH,
   captionFontFile,
+  captionOnForClip,
   captionScaleOf,
   layoutCaptionLines,
   roundedRectPath,
@@ -24,45 +23,15 @@ import type { Asset, Clip, ExportOptions, ImageOverlay, Job, ProjectBundle, Text
 import { emit } from './events'
 import { runJob, type TaskCtx } from './jobs'
 import { fontMeasure } from './fontMetrics'
-import { assetAbsPath, binPath, dataDir, fontsDir } from './paths'
+import { assetAbsPath, dataDir, fontsDir } from './paths'
 import { getBundle, insertJob, touchProject } from './repo'
-
-function ffmpegPath(): string {
-  if (!ffmpegStatic) throw new Error('FFmpeg tidak ditemukan di aplikasi')
-  return binPath(ffmpegStatic)
-}
+import { runFfmpeg } from './services/ffmpeg'
+import { renderMotionSegment } from './services/renderer'
 
 function outputSize(aspect: '16:9' | '9:16', res: ExportOptions['resolution']): { w: number; h: number } {
   const long = res === 720 ? 1280 : res === 1080 ? 1920 : 3840
   const short = res
   return aspect === '16:9' ? { w: long, h: short } : { w: short, h: long }
-}
-
-/** Runs ffmpeg in `cwd`, reporting progress from its `time=` output against `totalSec`. */
-function runFfmpeg(args: string[], cwd: string, signal: AbortSignal, totalSec?: number, onProgress?: (f: number) => void): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const p = spawn(ffmpegPath(), ['-hide_banner', '-y', ...args], { cwd, windowsHide: true })
-    let tail = ''
-    const onAbort = (): void => {
-      p.kill('SIGKILL')
-    }
-    signal.addEventListener('abort', onAbort)
-    p.stderr.on('data', (d: Buffer) => {
-      const s = d.toString()
-      tail = (tail + s).slice(-4000)
-      if (totalSec && onProgress) {
-        const m = /time=(\d+):(\d+):(\d+(?:\.\d+)?)/.exec(s)
-        if (m) onProgress(Math.min(1, (+m[1] * 3600 + +m[2] * 60 + +m[3]) / totalSec))
-      }
-    })
-    p.on('error', reject)
-    p.on('close', (code) => {
-      signal.removeEventListener('abort', onAbort)
-      if (signal.aborted) return reject(new Error('Dibatalkan'))
-      if (code === 0) resolve()
-      else reject(new Error(`FFmpeg gagal (kode ${code}): ${tail.split('\n').slice(-6).join(' ').trim()}`))
-    })
-  })
 }
 
 // ---------- captions ----------
@@ -277,7 +246,13 @@ function planSegments(clips: Clip[], fps: number): Segment[] {
   return clips.map((clip, i) => {
     const { startF, endF } = frames[i]
     const last = i === clips.length - 1
-    const tr = TRANSITIONS.find((x) => x.id === clip.transition)
+    // Motion scenes from different babak join with a hard cut (F4-05): an
+    // xfade across two different babak renders would smear two unrelated timelines.
+    const crossBabak =
+      clip.visualProvider === 'motion' &&
+      clips[i + 1]?.visualProvider === 'motion' &&
+      clip.motionBabakId !== clips[i + 1].motionBabakId
+    const tr = TRANSITIONS.find((x) => x.id === (crossBabak ? 'cut' : clip.transition))
     let overlapF = 0
     if (!last) {
       // The clip's own transition length, never longer than either clip it joins.
@@ -340,6 +315,19 @@ async function renderSegment(
   const out = `seg_${String(index).padStart(3, '0')}.mp4`
   const len = seg.own + seg.overlap + seg.pad
   const frames = Math.max(1, Math.round(len * opts.fps))
+  // A motion scene is rendered from its babak page, not from a still image:
+  // the Tahap 1 gate (beat approved) is enforced inside renderMotionSegment.
+  if (clip.visualProvider === 'motion') {
+    const dir = join(tmp, `motion_${index}`)
+    const r = await renderMotionSegment(bundle.project.id, clip.id, len, dir, {
+      fps: opts.fps,
+      width: size.w,
+      height: size.h,
+      signal
+    })
+    renameSync(r.videoPath, join(tmp, out))
+    return out
+  }
   const video = clip.motionType === 'video' ? assetOf(bundle, clip.videoAssetId) : undefined
   const enc = ['-an', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '17', '-pix_fmt', 'yuv420p', '-r', String(opts.fps)]
   if (video) {
@@ -406,10 +394,12 @@ async function renderProject(ctx: TaskCtx, projectId: string, opts: ExportOption
     // 2. captions
     const style = resolveCaption(bundle.project.editor)
     // Captions follow each clip's voice as trimmed and placed on the timeline.
+    // A scene whose caption is off (B6: motion scenes default off) contributes
+    // no words, so the burned captions and the SRT agree with the preview.
     const chunks = timelineChunks(
       segs.map((s) => {
         const audio = assetOf(bundle, s.clip.audioAssetId)
-        if (!audio) return { start: s.start, words: [] }
+        if (!audio || !captionOnForClip(s.clip)) return { start: s.start, words: [] }
         const shown = clipCaptionWords(s.clip, audio.meta.words ?? [], audio.durationMs ?? UNKNOWN_AUDIO_MS)
         return { start: s.start, words: shown.words, key: audio.id, offset: shown.offset }
       })
