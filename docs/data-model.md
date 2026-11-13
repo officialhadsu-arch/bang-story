@@ -34,6 +34,7 @@ dalam transaksi, lalu `user_version` dinaikkan.
 | 6 | `clips.video_camera`, `video_strength`, `transition_ms`, `voice_gain_db` |
 | 7 | `clips.media_in_ms`, `voice_in_ms`, `voice_out_ms`, `voice_start_ms` |
 | 8 | `clips.scene_key`, `clips.visual_provider` (tier 2, 0.3+); backfill `scene_key` dari `sort`, UNIQUE `(project_id, scene_key)` |
+| 9 | `clips.motion_babak_id`, `clips.motion_beat_id`, `clips.caption_on` (Fase 4, 0.4+); tautan adegan motion ke babak/beat + setelan caption per adegan (null = bawaan) |
 
 **Aturan:** tambahkan migrasi baru di akhir. Jangan mengubah migrasi yang sudah ada, karena pengguna lama sudah
 menjalankannya.
@@ -59,7 +60,9 @@ Satu klip = satu adegan: gambar atau video, suara narasinya, dan geraknya.
 |---|---|
 | `sort` | urutan di timeline (klip selalu bersambung tanpa celah) |
 | `sceneKey` | nomor adegan 2 digit yang stabil (`01`, `02`, …); folder kerja manual mencocokkan berkas hasil ke nomor ini |
-| `visualProvider` | jalur visual adegan: `auto` (mengikuti model proyek), `higgsfield`, `flow2api`, `manual`, `extension` |
+| `visualProvider` | jalur visual adegan: `auto` (mengikuti model proyek), `higgsfield`, `flow2api`, `nexabot`, `manual`, `extension`, `motion` |
+| `motionBabakId`, `motionBeatId` | tautan adegan motion ke babak/beat (`motion-work/out/<babakId>/beats.json`); null untuk adegan non-motion |
+| `captionOn` | caption per adegan: `true`/`false` eksplisit, null = bawaan (motion mati, lainnya menyala — `captionOnForClip`) |
 | `title`, `story`, `narration` | judul adegan, alur cerita (langkah Naskah), teks narasi (VO, boleh berisi tag `<short pause>` dll.) |
 | `visualPrompt` | prompt gambar berlabel: `Setting:`, `Action:`, `Wardrobe:`, `Framing:`, `Avoid:` |
 | `visualSource` | teks naskah saat rencana visual dibuat; kalau berbeda dari naskah sekarang, adegan perlu visual baru (`needsVisual`) |
@@ -134,7 +137,8 @@ Properti opsional baru di `EditorSettings` tidak butuh migrasi; berikan nilai ba
 
 `defaultTtsProvider`, `defaultLanguage`, `exportFolder`, `llmProvider`, `llmModels` (model per penyedia LLM),
 `customBaseUrl`, `geminiTtsModel`, `elevenModel`, `imageModel`, `videoModel` (bawaan untuk proyek baru),
-`whisperAuto` (sinkron caption otomatis setelah narasi Gemini).
+`whisperAuto` (sinkron caption otomatis setelah narasi Gemini), `motionEnabled` (sakelar induk motion, mati
+bawaan), `motionPreset` (`penuh` | `hybrid`, bawaan `hybrid`).
 
 Kunci baru harus ada di `DEFAULT_SETTINGS` (`src/main/settings.ts`); kunci yang tidak dikenal diabaikan saat
 disimpan.

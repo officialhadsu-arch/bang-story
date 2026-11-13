@@ -85,3 +85,28 @@ startup (`warmUpEncryption`) mencegah kunci API tidak terbaca setelah aplikasi d
 ### YouTube embed diberi Referer berisi ID aplikasi
 Halaman dari `file://` tidak mengirim Referer, dan YouTube menolak embed tanpa identitas (Error 153). Header
 ditambahkan hanya untuk `https://www.youtube.com/embed/*`.
+
+### D-21: kontrak babak motion (Fase 4)
+Babak motion adalah `index.html` + `style.js` + `act-*.js` + `beats.json`, dengan waktu dari kata narasi (bukan
+tebakan agent). `window.OPENER` wajib punya `ready`, `DURATION`, `clipsReady`, dan `seek(t)`; `seek` harus
+deterministik (murni fungsi dari `t`) supaya render penuh dan render rentang menghasilkan frame yang sama (S1d).
+Caption milik aplikasi (default mati di adegan motion); halaman motion tidak menggambar caption sendiri.
+
+### D-22: jalur render motion (Fase 4, diputus spike 4.0)
+Jalur utama (bersyarat): jendela tersembunyi + `useContentSize`, ukuran dipaksa dari konfigurasi (D-11), verifikasi
+frame pertama, settle 50 ms + double-verify (W7). Cadangan: Puppeteer (dependensi opsional, tidak terpasang).
+Offscreen ditolak sebagai jalur produksi (flaky) dan hanya dipakai sebagai pembanding spike. Yang memutus final
+adalah spike 4.0: S1d 20/20 DAN ukuran sesuai konfigurasi; bila lebih dari satu jalur lolos, pilih RAM terendah
+dengan metode pohon proses (bukan RSS proses tunggal).
+
+**Putusan final spike 4.0 (VM, 13 Nov 2026, fixture minimal tanpa GSAP):** landscape 1280×720 — hidden
+MENANG (S1d 20/20 tiga kali — log lari r1/r2/r3: `run-fase4-spike-r1/r2/r3.log`, 0 mismatch, frame pertama tepat, RAM renderer ±88–89 MB; waktu 60 frame berisik antar lari — hidden 15,1–37,6 dtk vs offscreen 15,9–38,7 dtk — jadi kecepatan bukan penentu); offscreen juga lolos S1d dengan perbaikan W7 tapi tidak lebih hemat RAM dan punya riwayat flaky, jadi tetap ditolak sebagai jalur produksi. **Potret 9:16 — kedua jalur Electron GAGAL di layar
+landscape** (frame pertama 1080×1080, bukan 1080×1920: jendela hidden terjepit ke tinggi layar 1080 — display-bound, Xvfb 1920×1080; di layar
+portrait 1080×1920 offscreen memberi 1079×1919 — kurang 1 px di kedua sumbu, off-by-one, bukan jepitan layar — dan D-11 menghentikan
+render dengan benar di kedua kasus, bukan menghasilkan video berukuran salah). **Puppeteer LULUS 9:16** (1080×1920 tepat,
+deterministik, ganti adegan bekerja; headless, tanpa layar) — jadi Puppeteer WAJIB untuk potret sampai ada jalur
+Electron yang terbukti display-independent. Delta installer Puppeteer: ±684 MB (Chrome penuh) atau ±282 MB
+(headless-shell saja) + 8,2 MB puppeteer-core. Intermediate tetap PNG bawaan (JPEG q90 lebih cepat tangkap
+7,3 dtk vs 9,0 dtk tapi video +11% pada fixture warna datar dan berisiko artefak di tepi teks — PNG lossless
+lebih aman untuk konten vektor datar). Angka RAM di atas adalah lantai (fixture satu div) — babak GSAP asli
+harus diukur ulang di gerbang PC. E(3) — lari S3 v2 di laptop Bos — tetap gerbang PC.

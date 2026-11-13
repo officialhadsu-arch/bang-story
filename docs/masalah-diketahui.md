@@ -14,6 +14,10 @@
 | Riwayat versi aset setelah split | Bagian kedua memakai gambar/video milik klip asal; riwayat versinya ada di klip asal. | Salin baris aset untuk klip baru kalau riwayat per bagian diperlukan. |
 | Caption sulit digeser utuh | Potongan caption berdempetan, jadi menyeret badannya sering tidak punya ruang. | Tarik tepinya; atau izinkan geser yang ikut mendorong potongan tetangga. |
 | Tidak semua model sudah diuji langsung | Katalog Higgsfield berisi 48 model; sebagian besar baru diuji lewat body permintaan, belum lewat generate sungguhan. Penyedia LLM selain Gemini juga belum semuanya diuji. | Uji model yang sering dipakai, lalu catat model yang bermasalah. |
+| Puppeteer belum terpasang (motion, Fase 4) | Jalur cadangan Puppeteer gagal dengan pesan jelas sampai pengguna memasangnya sendiri (`npm i puppeteer` di luar aplikasi — bukan dependensi aplikasi). Jalur utama (jendela tersembunyi) tidak butuh Puppeteer. | Pasang Puppeteer hanya bila jalur utama gagal di spike/gerbang PC; laporkan hasilnya sebelum menjadikannya jalur utama. |
+| Gaya motion Berat terkunci (Fase 4) | Template WebGL/Partikel tidak bisa dipilih sampai diukur di Fase 4 (D-17, kelas Berat mati bawaan). | Ukur RAM-nya di spike 4.0 / gerbang PC, baru buka kuncinya. |
+| Pratinjau motion bukan HTML live (Fase 4) | Pratinjau menampilkan keyframe + hasil render MP4 on-demand; halaman babak tidak diputar live di iframe (scripting iframe `file://` diblokir CORS). | Render babak dari Rancangan untuk melihat geraknya; keyframe menunjukkan komposisi tiap beat. |
+| Lari S3 v2 di laptop Bos belum dilakukan (E(3), Fase 4) | Bagian VM spike 4.0 sudah jalan; lari S3 v2 di laptop Bos adalah gerbang PC dan masih tertunda. | Jalankan paket S3 v2 di laptop Bos, lalu catat hasilnya di laporan Fase 4. |
 
 ## Ide pengembangan
 
