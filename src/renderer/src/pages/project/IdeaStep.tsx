@@ -129,6 +129,7 @@ export function IdeaStep() {
   if (!project) return null
   const ready = ttsReadiness(keys)
   const blocked = keys.length ? (['gemini', 'elevenlabs'] as const).filter((p) => !ready[p].ok) : []
+  const isTH = project.mode === 'talking-head'
   const openSettings = async (): Promise<void> => {
     await flush()
     go({ name: 'settings', back: { name: 'project', id: project.id } })
@@ -218,19 +219,22 @@ export function IdeaStep() {
               </span>
             </div>
 
-            <div className="flex flex-col gap-2">
-              <span className="text-sm font-semibold">Durasi video</span>
-              <div className="flex flex-wrap gap-2">
-                {DURATIONS.map((d) => (
-                  <Chip key={d.sec} on={project.durationSec === d.sec} onClick={() => updateProject({ durationSec: d.sec })} className="h-10 px-4">
-                    {d.label}
-                  </Chip>
-                ))}
+            {/* Talking Head has no AI script, duration target, format choice, TTS voice or visual models: its material is the recording. Language still matters (Whisper). */}
+            {!isTH && (
+              <div className="flex flex-col gap-2">
+                <span className="text-sm font-semibold">Durasi video</span>
+                <div className="flex flex-wrap gap-2">
+                  {DURATIONS.map((d) => (
+                    <Chip key={d.sec} on={project.durationSec === d.sec} onClick={() => updateProject({ durationSec: d.sec })} className="h-10 px-4">
+                      {d.label}
+                    </Chip>
+                  ))}
+                </div>
+                <span className="text-[13px] text-muted">
+                  Sekitar {clipCount} klip, masing-masing kurang lebih {perClip} detik. Durasi akhir mengikuti panjang suara narasi.
+                </span>
               </div>
-              <span className="text-[13px] text-muted">
-                Sekitar {clipCount} klip, masing-masing kurang lebih {perClip} detik. Durasi akhir mengikuti panjang suara narasi.
-              </span>
-            </div>
+            )}
 
             <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] gap-5">
               <Field label="Bahasa naskah dan suara">
@@ -242,8 +246,9 @@ export function IdeaStep() {
                   options={LANGUAGES.map((l) => ({ value: l.code, label: l.label }))}
                 />
               </Field>
-              <div className="flex flex-col gap-1.5">
-                <span className="text-sm font-semibold">Format</span>
+              {!isTH && (
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-sm font-semibold">Format</span>
                 <div className="grid grid-cols-2 gap-2">
                   {(
                     [
@@ -274,11 +279,14 @@ export function IdeaStep() {
                     )
                   })}
                 </div>
-              </div>
+                </div>
+              )}
             </div>
 
-            <div className="flex flex-col gap-2">
-              <span className="text-sm font-semibold">Suara narator</span>
+            {!isTH && (
+              <>
+              <div className="flex flex-col gap-2">
+                <span className="text-sm font-semibold">Suara narator</span>
               <div className="flex items-center gap-2">
                 <Segmented
                   value={project.ttsProvider}
@@ -314,6 +322,8 @@ export function IdeaStep() {
                 if (!('videoResolution' in patch)) void window.api.settings.set(patch)
               }}
             />
+              </>
+            )}
           </div>
 
           <aside className="flex flex-col gap-3.5 self-start rounded-[18px] border border-line bg-surface p-5">
@@ -327,30 +337,48 @@ export function IdeaStep() {
         </div>
       </div>
 
-      <footer className="absolute inset-x-0 bottom-0 flex h-[84px] items-center gap-4 border-t border-line bg-surface px-14">
-        <div className="flex flex-col gap-0.5">
-          <span className="text-[15px] font-semibold">
-            ± {clipCount} adegan · gambar {model.name}
-          </span>
-          <span className="flex items-center gap-1.5 text-[13px] text-muted">
-            <Bot className="size-3.5" />
-            Disusun oleh {writer ? `${llmName(writer.provider)} · ` : ''}
-            <span className={cx('font-mono', writer && !writer.model && 'text-accent-dark')}>{writer ? writer.model || 'model belum dipilih' : '…'}</span>
-            <button type="button" onClick={() => void openSettings()} className="font-semibold text-accent-dark hover:underline">
-              Ganti
-            </button>
-          </span>
-        </div>
-        <div className="flex-1" />
-        {clips.length > 0 && !busy && (
-          <Button size="lg" onClick={() => updateProject({ step: 2 })}>
-            Lihat naskah
+      {isTH ? (
+        <footer className="absolute inset-x-0 bottom-0 flex h-[84px] items-center gap-4 border-t border-line bg-surface px-14">
+          <div className="flex flex-col gap-0.5">
+            <span className="text-[15px] font-semibold">Talking Head · {clips.length ? `${clips.length} adegan` : 'belum ada adegan'}</span>
+            <span className="text-[13px] text-muted">Suara adegan berasal dari rekaman, bukan suara narator.</span>
+          </div>
+          <div className="flex-1" />
+          {clips.length > 0 && (
+            <Button size="lg" onClick={() => updateProject({ step: 3 })}>
+              Lihat adegan
+            </Button>
+          )}
+          <Button variant="primary" size="lg" className="h-[50px]" onClick={() => updateProject({ step: 2 })}>
+            Lanjut ke Transkrip
           </Button>
-        )}
-        <Button variant="primary" size="lg" className="h-[50px]" loading={busy} icon={!busy && <Sparkles className="size-[18px]" />} onClick={() => void compose()}>
-          {clips.length ? 'Susun ulang naskah' : 'Susun naskah'}
-        </Button>
-      </footer>
+        </footer>
+      ) : (
+        <footer className="absolute inset-x-0 bottom-0 flex h-[84px] items-center gap-4 border-t border-line bg-surface px-14">
+          <div className="flex flex-col gap-0.5">
+            <span className="text-[15px] font-semibold">
+              ± {clipCount} adegan · gambar {model.name}
+            </span>
+            <span className="flex items-center gap-1.5 text-[13px] text-muted">
+              <Bot className="size-3.5" />
+              Disusun oleh {writer ? `${llmName(writer.provider)} · ` : ''}
+              <span className={cx('font-mono', writer && !writer.model && 'text-accent-dark')}>{writer ? writer.model || 'model belum dipilih' : '…'}</span>
+              <button type="button" onClick={() => void openSettings()} className="font-semibold text-accent-dark hover:underline">
+                Ganti
+              </button>
+            </span>
+          </div>
+          <div className="flex-1" />
+          {clips.length > 0 && !busy && (
+            <Button size="lg" onClick={() => updateProject({ step: 2 })}>
+              Lihat naskah
+            </Button>
+          )}
+          <Button variant="primary" size="lg" className="h-[50px]" loading={busy} icon={!busy && <Sparkles className="size-[18px]" />} onClick={() => void compose()}>
+            {clips.length ? 'Susun ulang naskah' : 'Susun naskah'}
+          </Button>
+        </footer>
+      )}
     </div>
   )
 }
