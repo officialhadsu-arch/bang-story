@@ -112,6 +112,10 @@ export interface StudioApi {
     /** Probes the NexaBot API at `baseUrl` with the stored key (GET /v1/models). */
     testConnection(baseUrl: string): Promise<KeyTestResult>
   }
+  kieai: {
+    /** Probes the kie.ai API at `baseUrl` with the stored key (GET /api/v1/chat/credit). */
+    testConnection(baseUrl: string): Promise<KeyTestResult>
+  }
   exporter: {
     start(projectId: string, options: ExportOptions): Promise<Job>
     defaultFolder(): Promise<string>

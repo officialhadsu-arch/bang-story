@@ -6,7 +6,7 @@ import { getSettings } from './settings'
 import { cancelVideo } from './services/nexabot'
 import { cancelRequest } from './services/higgsfield'
 
-export type QueueName = 'higgsfield' | 'flow2api' | 'nexabot' | 'tts' | 'whisper' | 'export'
+export type QueueName = 'higgsfield' | 'flow2api' | 'nexabot' | 'kieai' | 'tts' | 'whisper' | 'export'
 
 export interface TaskCtx {
   jobId: string
@@ -22,10 +22,11 @@ export type Task = (ctx: TaskCtx) => Promise<string | void | { message: string }
 // Flow2API also runs one at a time: the server drives one Google account, and a long
 // video render can take minutes, so queueing two would only hide the wait.
 // NexaBot runs one at a time for the same reason: one paid generate at a time keeps
-// the cost visible and the queue predictable (D3-07).
-const LIMITS: Record<QueueName, number> = { higgsfield: 3, flow2api: 1, nexabot: 1, tts: 2, whisper: 1, export: 1 }
-const running: Record<QueueName, number> = { higgsfield: 0, flow2api: 0, nexabot: 0, tts: 0, whisper: 0, export: 0 }
-const waiting: Record<QueueName, (() => void)[]> = { higgsfield: [], flow2api: [], nexabot: [], tts: [], whisper: [], export: [] }
+// the cost visible and the queue predictable (D3-07). kie.ai runs one at a time too (K4-07):
+// a paid generate must never multiply silently through parallelism.
+const LIMITS: Record<QueueName, number> = { higgsfield: 3, flow2api: 1, nexabot: 1, kieai: 1, tts: 2, whisper: 1, export: 1 }
+const running: Record<QueueName, number> = { higgsfield: 0, flow2api: 0, nexabot: 0, kieai: 0, tts: 0, whisper: 0, export: 0 }
+const waiting: Record<QueueName, (() => void)[]> = { higgsfield: [], flow2api: [], nexabot: [], kieai: [], tts: [], whisper: [], export: [] }
 const controllers = new Map<string, AbortController>()
 
 function acquire(q: QueueName): Promise<void> {
@@ -106,6 +107,8 @@ export async function cancelJob(id: string): Promise<void> {
     const key = getSecret('nexabot')
     if (key) await cancelVideo({ baseUrl: getSettings().nexabotBaseUrl, apiKey: key, id: raw.remote_id })
   }
+  // kie.ai documents no cancel endpoint: cancelling only stops the local poll below,
+  // the server task may keep running (and charging) — the cost gate says so (K4-01).
   const ctrl = controllers.get(id)
   if (ctrl) ctrl.abort()
   else if (raw.status === 'queued' || raw.status === 'running') emit.job(updateJob(id, { status: 'canceled', message: null }))

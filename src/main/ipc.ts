@@ -310,6 +310,7 @@ export function registerIpc(): void {
   })
   handle('flow2api:testConnection', (baseUrl: string) => flow.testConnection(baseUrl))
   handle('nexabot:testConnection', (baseUrl: string) => nexa.testConnection(baseUrl, getSecret('nexabot') ?? undefined))
+  handle('kieai:testConnection', (baseUrl: string) => kie.testConnection(baseUrl, getSecret('kieai') ?? undefined))
 
   handle('export:start', (projectId: string, opts: ExportOptions) => startExport(projectId, opts))
   handle('export:defaultFolder', () => defaultExportFolder())

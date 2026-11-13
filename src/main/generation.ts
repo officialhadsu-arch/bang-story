@@ -3,6 +3,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, extname } from 'node:path'
 import { estimateWordTimings } from '@shared/captions'
 import { isFlowModelId } from '@shared/flow2api'
+import { isKieModelId, kieaiCredits, kieaiUsd } from '@shared/kieai'
 import { type VisualProvider } from '@shared/manual'
 import { isNexaModelId, nexaCredits } from '@shared/nexabot'
 import { clipPrompt, videoPromptForClip } from '@shared/prompts'
@@ -41,6 +42,8 @@ import type { FlowImageRef, FlowMedia } from './services/flow2api'
 import * as gemini from './services/gemini'
 import * as hf from './services/higgsfield'
 import { downloadTo, sleep } from './services/http'
+import * as kie from './services/kieai'
+import type { KieMedia } from './services/kieai'
 import { completeManualJobs } from './services/manual'
 import * as nexa from './services/nexabot'
 import type { NexaMedia } from './services/nexabot'
@@ -312,6 +315,95 @@ function startNexa(
   })
 }
 
+// ---------- kie.ai (pay-as-you-go REST API in USD, premium models, tier 4) ----------
+
+/**
+ * kie.ai stays off until the user reads the cost warning and turns it on in Settings.
+ * A kie.ai model without a key fails hard here (K4-03) — it never falls back to another
+ * provider, so a paid generate can never start by accident. The key is BYOK, encrypted
+ * like every other key (D-07). kie.ai bills in USD and charges per generate (or per
+ * second for per-second models); the batch cost gate in the Storyboard shows the total
+ * before anything starts (K4-05).
+ */
+function requireKie(): { baseUrl: string; apiKey: string } {
+  const settings = getSettings()
+  if (!settings.kieaiEnabled)
+    throw new Error('kie.ai belum dinyalakan. Nyalakan di Pengaturan › Layanan AI dan kunci › Kie.ai, lalu baca Panduan Kie.ai.')
+  const apiKey = getSecret('kieai')
+  if (!apiKey) throw new Error('Isi kunci kie.ai di Pengaturan › Kie.ai sebelum generate. Kunci hanya tersimpan di perangkat ini.')
+  return { baseUrl: settings.kieaiBaseUrl, apiKey }
+}
+
+/** Saves a kie.ai result and attaches it to the clip or character, mirroring finishNexa's tail. */
+async function finishKie(
+  ctx: TaskCtx,
+  job: Job,
+  target: 'clip-image' | 'sheet' | 'clip-video',
+  model: HfModel,
+  prompt: string,
+  out: KieMedia,
+  remoteId: string | null
+): Promise<string> {
+  const isVideo = target === 'clip-video'
+  ctx.progress(0.93, 'Menyimpan hasil')
+  const rel = saveFile(job.projectId, isVideo ? 'videos' : 'images', extFromType(out.contentType, out.remoteUrl ?? '', isVideo ? '.mp4' : '.png'), out.bytes)
+  const abs = assetAbsPath(job.projectId, rel)
+  const size = await probeSize(abs)
+  const durationMs = isVideo ? await probeDurationMs(abs).catch(() => null) : null
+  const asset = insertAsset({
+    projectId: job.projectId,
+    clipId: job.clipId,
+    characterId: job.characterId,
+    kind: isVideo ? 'video' : 'image',
+    provider: 'kieai',
+    model: model.id,
+    prompt,
+    remoteId,
+    remoteUrl: out.remoteUrl,
+    localPath: rel,
+    durationMs,
+    width: size?.width ?? null,
+    height: size?.height ?? null
+  })
+  emit.asset(asset)
+  if (target === 'sheet' && job.characterId) {
+    setCharacterSheet(job.characterId, asset.id)
+    emit.character({ characterId: job.characterId, patch: { sheetAssetId: asset.id } })
+  } else if (target === 'clip-image' && job.clipId) {
+    patchClip(job.clipId, { imageAssetId: asset.id })
+    emit.clip({ clipId: job.clipId, patch: { imageAssetId: asset.id } })
+    const project = getProject(job.projectId)
+    const first = clipsOf(job.projectId)[0]
+    if (!project.coverAssetId || first?.id === job.clipId) touchProject(job.projectId, { coverAssetId: asset.id })
+  } else if (target === 'clip-video' && job.clipId) {
+    const patch = { videoAssetId: asset.id, motionType: 'video' as const, mediaInMs: 0 }
+    patchClip(job.clipId, patch)
+    emit.clip({ clipId: job.clipId, patch })
+  }
+  touchProject(job.projectId)
+  return asset.id
+}
+
+function startKie(
+  job: Job,
+  build: (ctx: TaskCtx) => Promise<{
+    target: 'clip-image' | 'sheet' | 'clip-video'
+    model: HfModel
+    prompt: string
+    run: (ctx: TaskCtx) => Promise<{ media: KieMedia; remoteId: string | null }>
+  }>
+): Job {
+  emit.job(job)
+  return runJob(job, 'kieai', async (ctx) => {
+    ctx.progress(0.04, 'Menyiapkan prompt')
+    const { target, model, prompt, run } = await build(ctx)
+    ctx.progress(0.08, 'Mengirim ke kie.ai')
+    updateJobPayload(job.id, { target, model: model.id, prompt })
+    const { media, remoteId } = await run(ctx)
+    return finishKie(ctx, job, target, model, prompt, media, remoteId)
+  })
+}
+
 // ---------- finishing a Higgsfield request (also used to resume after a restart) ----------
 
 interface HfPayload {
@@ -394,13 +486,14 @@ function updateJobPayload(jobId: string, payload: HfPayload): void {
  * follows the project's model; an explicit provider wins over the model; anything else fails
  * hard (B5) instead of silently falling back to a provider the user did not pick.
  */
-function resolveVisualProvider(clip: Clip, project: Project, kind: 'image' | 'video'): 'higgsfield' | 'flow2api' | 'manual' | 'extension' | 'nexabot' {
+function resolveVisualProvider(clip: Clip, project: Project, kind: 'image' | 'video'): 'higgsfield' | 'flow2api' | 'manual' | 'extension' | 'nexabot' | 'kieai' {
   const p = clip.visualProvider ?? 'auto'
-  if (p === 'manual' || p === 'extension' || p === 'higgsfield' || p === 'flow2api' || p === 'nexabot') return p
+  if (p === 'manual' || p === 'extension' || p === 'higgsfield' || p === 'flow2api' || p === 'nexabot' || p === 'kieai') return p
   if (p === 'auto') {
     const modelId = kind === 'image' ? project.imageModel : project.videoModel
     if (isFlowModelId(modelId)) return 'flow2api'
     if (isNexaModelId(modelId)) return 'nexabot'
+    if (isKieModelId(modelId)) return 'kieai'
     return 'higgsfield'
   }
   // Unreachable for clips read through toClip (it sanitises to 'auto'), but a stored value the
@@ -474,6 +567,30 @@ export function generateClipImage(clipId: string): Job {
       }
     })
   }
+  if (provider === 'kieai') {
+    const job = insertJob({ projectId: clip.projectId, clipId, kind: 'image', provider: 'kieai' })
+    return startKie(job, async (ctx) => {
+      const { baseUrl, apiKey } = requireKie()
+      const fresh = getClip(clipId)
+      const project = getProject(fresh.projectId)
+      const model = getImageModel(project.imageModel)
+      const chars = charactersOf(project.id).filter((c) => fresh.characterIds.includes(c.id))
+      const refs = await referenceImages(model, chars, ctx.signal)
+      const prompt = clipPrompt(project, fresh, chars, refs.names, promptLimit(model))
+      return {
+        target: 'clip-image' as const,
+        model,
+        prompt,
+        run: (c: TaskCtx) =>
+          kie
+            .submitImage(
+              { baseUrl, apiKey, prompt, aspectRatio: project.aspectRatio, refs: refs.images.map((r) => toDataUri(r.bytes, r.mime)), signal: c.signal },
+              model.id
+            )
+            .then(({ media, taskId }) => ({ media, remoteId: taskId }))
+      }
+    })
+  }
   const job = insertJob({ projectId: clip.projectId, clipId, kind: 'image', provider: 'higgsfield' })
   return startHiggsfield(job, async (ctx) => {
     const fresh = getClip(clipId)
@@ -522,6 +639,24 @@ export function generateCharacterSheet(characterId: string): Job {
         prompt,
         run: (ctx: TaskCtx) =>
           nexa.submitImage({ baseUrl, apiKey, prompt, refs: [], signal: ctx.signal }, model.id).then((media) => ({ media, remoteId: null }))
+      }
+    })
+  }
+  if (isKieModelId(getProject(c.projectId).imageModel)) {
+    const job = insertJob({ projectId: c.projectId, characterId, kind: 'sheet', provider: 'kieai' })
+    return startKie(job, async () => {
+      const { baseUrl, apiKey } = requireKie()
+      const project = getProject(c.projectId)
+      const model = getImageModel(project.imageModel)
+      const prompt = sheetPrompt(project, getCharacter(characterId))
+      return {
+        target: 'sheet' as const,
+        model,
+        prompt,
+        run: (ctx: TaskCtx) =>
+          kie
+            .submitImage({ baseUrl, apiKey, prompt, aspectRatio: '16:9', refs: [], signal: ctx.signal }, model.id)
+            .then(({ media, taskId }) => ({ media, remoteId: taskId }))
       }
     })
   }
@@ -597,6 +732,45 @@ export function generateClipVideo(clipId: string): Job {
               c.progress(
                 s === 'completed' ? 0.9 : 0.5,
                 s === 'queued' ? 'Mengantre di NexaBot' : s === 'processing' ? 'NexaBot sedang membuat video' : 'Mengunduh hasil'
+              )
+          )
+          return { media, remoteId }
+        }
+      }
+    })
+  }
+  if (provider === 'kieai') {
+    const job = insertJob({ projectId: clip.projectId, clipId, kind: 'video', provider: 'kieai' })
+    return startKie(job, async (ctx) => {
+      const { baseUrl, apiKey } = requireKie()
+      const fresh = getClip(clipId)
+      const image = getAsset(fresh.imageAssetId)
+      if (!image) throw new Error('Gambar klip tidak ditemukan')
+      const project = getProject(fresh.projectId)
+      const model = getVideoModel(project.videoModel)
+      ctx.progress(0.05, 'Menyiapkan gambar awal')
+      const abs = assetAbsPath(image.projectId, image.localPath)
+      const firstFrame: FlowImageRef = { bytes: readFileSync(abs), mime: mimeFromExt(abs) }
+      const prompt = videoPromptForClip(fresh, model.input.mode === 'reference')
+      return {
+        target: 'clip-video' as const,
+        model,
+        prompt,
+        run: async (c: TaskCtx) => {
+          // Whole seconds, rounded up: Veo is fixed 8 s, per-second models bill per started second.
+          const seconds = Math.ceil(fitDuration(model, fresh.durationMs / 1000) ?? fresh.durationMs / 1000)
+          const remoteId = await kie.submitVideo(
+            { baseUrl, apiKey, prompt, aspectRatio: project.aspectRatio, refs: [toDataUri(firstFrame.bytes, firstFrame.mime)], seconds, signal: c.signal },
+            model.id
+          )
+          c.setRemote(remoteId)
+          const media = await kie.waitForVideo(
+            { baseUrl, apiKey, id: remoteId, signal: c.signal },
+            model.id,
+            (s) =>
+              c.progress(
+                s === 'success' ? 0.9 : 0.5,
+                s === 'waiting' || s === 'queuing' ? 'Mengantre di kie.ai' : s === 'generating' ? 'kie.ai sedang membuat video' : 'Mengunduh hasil'
               )
           )
           return { media, remoteId }
@@ -704,7 +878,7 @@ export function generateMissingTts(projectId: string): Job[] {
     .map((c) => generateClipTts(c.id))
 }
 
-/** After a restart, keep polling Higgsfield requests that were already submitted; fail the rest. Manual jobs are skipped: they keep waiting for the user to bring the file back. A submitted NexaBot video is also resumed by polling its remote id; a NexaBot image has no remote id to resume, so it fails like the rest. */
+/** After a restart, keep polling Higgsfield requests that were already submitted; fail the rest. Manual jobs are skipped: they keep waiting for the user to bring the file back. A submitted NexaBot video is also resumed by polling its remote id; a NexaBot image has no remote id to resume, so it fails like the rest. A submitted kie.ai task (image, sheet, or video) carries its taskId, so all three resume by polling it. */
 export function resumeJobs(): void {
   for (const row of unfinishedJobs()) {
     if (row.provider === 'manual') continue
@@ -726,6 +900,24 @@ export function resumeJobs(): void {
       runJob(job, 'nexabot', async (ctx) => {
         const media = await nexa.waitForVideo({ baseUrl: creds.baseUrl, apiKey: creds.apiKey, id: remoteId, signal: ctx.signal })
         return finishNexa(ctx, job, 'clip-video', getVideoModel(payload.model ?? ''), payload.prompt ?? '', media, remoteId)
+      })
+    } else if (row.provider === 'kieai' && row.remote_id && payload.target) {
+      const job = getJob(row.id)!
+      let creds: { baseUrl: string; apiKey: string }
+      try {
+        creds = requireKie()
+      } catch (e) {
+        // The key may have been removed since the submit; fail the job instead of crashing startup.
+        emit.job(updateJob(row.id, { status: 'failed', error: (e as Error).message, message: null }))
+        continue
+      }
+      const remoteId = row.remote_id
+      const target = payload.target as 'clip-image' | 'sheet' | 'clip-video'
+      const modelId = payload.model ?? ''
+      runJob(job, 'kieai', async (ctx) => {
+        const media = await kie.waitForTask({ baseUrl: creds.baseUrl, apiKey: creds.apiKey, id: remoteId, signal: ctx.signal }, modelId)
+        const model = target === 'clip-video' ? getVideoModel(modelId) : getImageModel(modelId)
+        return finishKie(ctx, job, target, model, payload.prompt ?? '', media, remoteId)
       })
     } else {
       emit.job(updateJob(row.id, { status: 'failed', error: 'Terhenti karena aplikasi ditutup. Coba lagi.', message: null }))
@@ -758,7 +950,9 @@ const failedEstimates = new Map<string, number>()
  * so answers are kept for a day and failures for ten minutes. Flow2API models return null: the server
  * has no credit-estimate endpoint, and the cost is the user's own Google Flow credit, not a per-model price.
  * NexaBot models return their fixed catalog price (Rp300/video) without a server call — the price is
- * in NexaBot credits, and the pickers convert it to Rupiah. Manual/extension scenes return null for
+ * in NexaBot credits, and the pickers convert it to Rupiah. kie.ai models return their fixed catalog
+ * price too, but in USD: `credits` is kie.ai credits and `usd` is the real USD price (not null, unlike
+ * NexaBot) — per-second models multiply their rate by the clip length. Manual/extension scenes return null for
  * the same reason: no server, no per-model price.
  */
 export async function estimateCredits(
@@ -774,6 +968,11 @@ export async function estimateCredits(
   if (isNexaModelId(modelId)) {
     const credits = nexaCredits(modelId)
     return credits === null ? null : { credits, usd: null }
+  }
+  if (isKieModelId(modelId)) {
+    const durationMs = kind === 'video' ? seconds * 1000 : undefined
+    const credits = kieaiCredits(modelId, durationMs)
+    return credits === null ? null : { credits, usd: kieaiUsd(modelId, durationMs) }
   }
   const model = kind === 'image' ? getImageModel(modelId) : getVideoModel(modelId)
   const body =
