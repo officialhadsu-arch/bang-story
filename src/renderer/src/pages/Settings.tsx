@@ -4,6 +4,7 @@ import {
   BookOpenText,
   Check,
   ChevronDown,
+  Clapperboard,
   Cpu,
   ExternalLink,
   Eye,
@@ -32,13 +33,14 @@ import { AboutSection } from './AboutSection'
 import { FlowGuideSection } from './FlowGuideSection'
 import { ManualGuideSection } from './ManualGuideSection'
 import { NexaBotGuideSection } from './NexaBotGuideSection'
+import { TalkingHeadGuideSection } from './TalkingHeadGuideSection'
 import { WhisperSection } from './WhisperSection'
 import { Badge, Button, Field, IconButton, Switch, confirmDialog, cx, inputCls } from '../components/ui'
 import { errorText, relativeTime } from '../lib/format'
 import { useModels } from '../lib/useModels'
 import { useApp } from '../store/app'
 
-type Tab = 'services' | 'general' | 'about' | 'flow-guide' | 'manual-guide' | 'nexabot-guide'
+type Tab = 'services' | 'general' | 'about' | 'flow-guide' | 'manual-guide' | 'nexabot-guide' | 'talkinghead-guide'
 
 interface ProviderOption<T extends string> {
   id: T
@@ -809,6 +811,63 @@ function NexaSection({
   )
 }
 
+/** Talking Head (Fase 5): a local-only mode — no key, no account, no cost. The switch only decides
+ *  whether new projects may pick the Talking Head birth mode. */
+function TalkingHeadSection({
+  settings,
+  onSettings,
+  onOpenGuide
+}: {
+  settings: AppSettings
+  onSettings: (s: AppSettings) => void
+  onOpenGuide: () => void
+}) {
+  const { toast } = useApp()
+
+  const toggle = async (v: boolean): Promise<void> => {
+    onSettings(await window.api.settings.set({ talkingHeadEnabled: v }))
+    toast(
+      'success',
+      v
+        ? 'Talking Head dinyalakan. Mode Talking Head kini bisa dipilih saat membuat proyek baru.'
+        : 'Talking Head dimatikan. Proyek Talking Head yang sudah ada tetap bisa dibuka, tapi proyek baru tidak bisa memilih mode ini.'
+    )
+  }
+
+  return (
+    <>
+      <SectionTitle
+        icon={<Clapperboard className="size-5" />}
+        title="Talking Head"
+        sub="Ubah rekaman orang berbicara jadi video adegan-per-adegan — transkrip Whisper lokal, tanpa kunci."
+      />
+      <Card>
+        <div className="flex items-center gap-3">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-sand font-display text-lg font-bold">T</span>
+          <div className="flex min-w-0 flex-1 flex-col">
+            <span className="text-base font-bold">Talking Head</span>
+            <span className="text-[13px] text-ink-2">Impor rekaman, transkrip sekali, potong jeda dan kata pengisi, susun adegan</span>
+          </div>
+          <Switch on={settings.talkingHeadEnabled} onChange={(v) => void toggle(v)} label="Nyalakan Talking Head" />
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <Button variant="ghost" onClick={onOpenGuide} icon={<BookOpenText className="size-4" />}>
+            Buka Panduan Talking Head
+          </Button>
+        </div>
+        <p className="flex items-start gap-2.5 border-t border-dashed border-line pt-4 text-[13px] leading-relaxed text-ink-2">
+          <Clapperboard className="mt-0.5 size-4 shrink-0" />
+          <span>
+            Semua proses berjalan lokal di komputer ini (Whisper + FFmpeg) dan <strong className="text-ink">gratis</strong>. Susun adegan
+            dengan AI memakai kunci LLM yang sudah diatur; tanpa kunci itu, adegan disusun otomatis dari jeda panjang. Mode ini{' '}
+            <strong className="text-ink">tanpa pelacakan wajah</strong> — close-up hanya memperbesar bagian frame yang dipilih.
+          </span>
+        </p>
+      </Card>
+    </>
+  )
+}
+
 export function Settings() {
   const { go, route } = useApp()
   const back = route.name === 'settings' && route.back ? route.back : ({ name: 'home' } as const)
@@ -833,6 +892,7 @@ export function Settings() {
     { id: 'flow-guide', label: 'Panduan Flow2API', icon: <BookOpenText className="size-[18px]" /> },
     { id: 'manual-guide', label: 'Panduan Manual & Ekstensi', icon: <BookOpenText className="size-[18px]" /> },
     { id: 'nexabot-guide', label: 'Panduan NexaBot', icon: <BookOpenText className="size-[18px]" /> },
+    { id: 'talkinghead-guide', label: 'Panduan Talking Head', icon: <BookOpenText className="size-[18px]" /> },
     { id: 'general', label: 'Umum', icon: <SlidersHorizontal className="size-[18px]" /> },
     { id: 'about', label: 'Tentang aplikasi', icon: <Info className="size-[18px]" /> }
   ]
@@ -892,6 +952,7 @@ export function Settings() {
                 <HiggsfieldSection status={statusOf('higgsfield')} onChanged={reload} />
                 <FlowSection settings={settings} onSettings={setSettings} onOpenGuide={() => setTab('flow-guide')} />
                 <NexaSection settings={settings} statusOf={statusOf} onChanged={reload} onSettings={setSettings} onOpenGuide={() => setTab('nexabot-guide')} />
+                <TalkingHeadSection settings={settings} onSettings={setSettings} onOpenGuide={() => setTab('talkinghead-guide')} />
                 <WhisperSection settings={settings} onSettings={setSettings} />
               </>
             )}
@@ -901,6 +962,8 @@ export function Settings() {
             {tab === 'manual-guide' && settings && <ManualGuideSection baseUrl={settings.flow2apiBaseUrl} />}
 
             {tab === 'nexabot-guide' && <NexaBotGuideSection />}
+
+            {tab === 'talkinghead-guide' && <TalkingHeadGuideSection />}
 
             {tab === 'general' && settings && (
               <>
