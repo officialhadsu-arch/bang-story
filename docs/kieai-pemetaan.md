@@ -471,13 +471,19 @@ sesudah persetujuan biaya per pemakaian. Yang harus dikonfirmasi/dikoreksi:
    durasi, URL gambar referensi) — koreksi modul transport (K4-01) bila
    berbeda.
 3. Jalur Veo: `POST /api/v1/veo/generate` + `record-info` berfungsi; durasi
-   klip Veo per generate (8 detik atau lain); kosakata status Veo.
+   klip Veo per generate (8 detik atau lain); kosakata status Veo
+   (kode kini memperlakukan flag 3 sebagai gagal — dua sumber pengutip
+   docs.kie.ai menyebut 0 = berjalan, 1 = sukses, 2 = tugas gagal dibuat,
+   3 = generate gagal; dikoreksi 13 Nov 2026 sesudah verifikasi independen;
+   tetap konfirmasi live).
 4. Durasi model per detik: apakah durasi yang ditagih = durasi yang diminta
    (Seedance/Kling/Grok/Wan).
 5. Dukungan referensi gambar (jumlah maks, URL publik vs base64 vs unggah
    ke host kie.ai; berkas unggah dihapus 24 jam — sekunder).
 6. Pesan galat nyata untuk 401/402/429; apakah galat benar datang sebagai
-   HTTP 200 + `code`.
+   HTTP 200 + `code`. Catatan: mock mengembalikan 404 untuk `taskId` tak
+   dikenal, satu sumber menyebut live memakai 422 — konfirmasi live; bila
+   422, pesan galat untuk tugas hilang menjadi generik (bukan blocker).
 7. Biaya nyata yang terpotong untuk 1 gambar + 1 video vs tabel §1; kurs
    saat top-up vs kurs katalog (perbarui `KIE_USD_TO_IDR`).
 8. Top-up minimum $5 + cara bayar (kartu/Stripe) + kebijakan refund —
@@ -503,3 +509,11 @@ sesudah persetujuan biaya per pemakaian. Yang harus dikonfirmasi/dikoreksi:
 - Berikutnya: implementasi §6 langkah 1–6 → 50/100; tutorial +
   verifikasi independen → 80/100; penutup (branch siap merge + backup +
   laporan) → 100/100. **Tanpa merge/push tanpa perintah Bos.**
+- **100/100 — implementasi selesai (13 Nov 2026, cabang `0.3-tier4-kieai-impl`,
+  HEAD `e7c9124`).** 7 commit implementasi + merge main `bfc019f`
+  (perbaikan aspectRatio NexaBot, tanpa konflik). Service-test mock 57/57
+  (termasuk kasus flag Veo 3 = gagal, ditambah sesudah verifikasi
+  independen), e2e mock 2 run lulus, regresi demo+P30 byte-identik +
+  frame 504/504 (2 run), cek UI 20/20. Verifikasi independen: LAYAK
+  DENGAN CATATAN (12/12 lulus; temuan 1 diperbaiki di commit penutup,
+  temuan 2 dicatat di §7 butir 6). Uji live tetap gerbang PC (§7).

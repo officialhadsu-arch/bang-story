@@ -30,7 +30,10 @@ import { ApiError, downloadTo, sleep } from './http'
  *   input shapes ...... `prompt` + `aspect_ratio` (+ `image_urls` for a first frame,
  *                       `duration` in seconds for per-second video models); Veo takes
  *                       `prompt` + `model` + `imageUrls` + `aspectRatio` + `duration`
- *   Veo status ........ successFlag 1 = success, 2 = failed, anything else = still running
+ *   Veo status ........ successFlag 1 = success, 2/3 = failed, 0 = still running
+ *                       (two independent sources citing docs.kie.ai list flag 3 as
+ *                       "generation failed"; corrected after independent verification,
+ *                       13 Nov 2026 — the first draft treated 3 as "still running")
  *   idempotency ....... no key is sent: createTask shows no idempotency support in the docs,
  *                       so a lost response followed by a manual retry may charge twice
  *   cancel ............ no cancel endpoint is documented — cancelling only stops the local
@@ -233,13 +236,16 @@ export async function getTaskStatus(opts: KieStatusOptions, modelId: string): Pr
       { baseUrl: opts.baseUrl, apiKey: opts.apiKey, timeoutMs: KIE_TIMEOUTS.test, init: { signal: opts.signal } }
     )
     const data = body?.data ?? {}
-    // Assumed vocabulary (K4-01): 1 = success, 2 = failed, anything else = still running.
+    // Assumed vocabulary (K4-01), corrected 13 Nov 2026 after independent
+    // verification (two sources citing docs.kie.ai: 0 = running, 1 = success,
+    // 2 = task failed to create, 3 = generation failed): 1 = success,
+    // 2/3 = failed, 0 = still running.
     const flag = typeof data.successFlag === 'number' ? data.successFlag : 0
     if (flag === 1) {
       const urls = data.response?.resultUrls ?? data.resultUrls ?? []
       return { status: 'success', resultUrls: urls, error: null }
     }
-    if (flag === 2) {
+    if (flag === 2 || flag === 3) {
       return { status: 'fail', resultUrls: [], error: typeof data.error === 'string' ? data.error : 'Generate video kie.ai gagal.' }
     }
     return { status: 'generating', resultUrls: [], error: null }
