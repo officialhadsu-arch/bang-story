@@ -469,7 +469,7 @@ export function generateClipImage(clipId: string): Job {
         prompt,
         run: (c: TaskCtx) =>
           nexa
-            .submitImage({ baseUrl, apiKey, prompt, refs: refs.images.map((r) => toDataUri(r.bytes, r.mime)), signal: c.signal }, model.id)
+            .submitImage({ baseUrl, apiKey, prompt, aspectRatio: project.aspectRatio, refs: refs.images.map((r) => toDataUri(r.bytes, r.mime)), signal: c.signal }, model.id)
             .then((media) => ({ media, remoteId: null }))
       }
     })
@@ -521,7 +521,8 @@ export function generateCharacterSheet(characterId: string): Job {
         model,
         prompt,
         run: (ctx: TaskCtx) =>
-          nexa.submitImage({ baseUrl, apiKey, prompt, refs: [], signal: ctx.signal }, model.id).then((media) => ({ media, remoteId: null }))
+          // Character sheets are always 16:9, like the Flow2API and Higgsfield sheet paths.
+          nexa.submitImage({ baseUrl, apiKey, prompt, refs: [], aspectRatio: '16:9', signal: ctx.signal }, model.id).then((media) => ({ media, remoteId: null }))
       }
     })
   }
