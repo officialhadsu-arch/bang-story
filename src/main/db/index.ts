@@ -141,6 +141,13 @@ const MIGRATIONS: string[] = [
   ALTER TABLE clips ADD COLUMN visual_provider TEXT NOT NULL DEFAULT 'auto';
   UPDATE clips SET scene_key = printf('%02d', sort + 1) WHERE scene_key IS NULL OR scene_key = '';
   CREATE UNIQUE INDEX clips_project_scene_key ON clips(project_id, scene_key);
+  `,
+  // Fase 4 (0.4): motion scenes — which babak folder and beat a scene belongs
+  // to, plus the per-scene caption switch (B6; null = default by provider).
+  `
+  ALTER TABLE clips ADD COLUMN motion_babak_id TEXT;
+  ALTER TABLE clips ADD COLUMN motion_beat_id TEXT;
+  ALTER TABLE clips ADD COLUMN caption_on INTEGER;
   `
 ]
 

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { create } from 'zustand'
-import { timelineChunks, type CaptionChunk } from '@shared/captions'
+import { captionOnForClip, timelineChunks, type CaptionChunk } from '@shared/captions'
 import { transitionSecOf } from '@shared/motion'
 import { clipCaptionWords, voiceSpan } from '@shared/timeline'
 import type { Asset, Clip, Overlay, TransitionId } from '@shared/types'
@@ -118,9 +118,10 @@ export function useTimeline(): { items: TimelineItem[]; total: number; chunks: C
       }
     })
     // Captions follow each clip's voice as trimmed and placed on the timeline (as in the export).
+    // A scene whose caption is off (B6) contributes no words — same rule as the export.
     const chunks = timelineChunks(
       items.map((it) => {
-        if (!it.audio) return { start: it.start, words: [] }
+        if (!it.audio || !captionOnForClip(it.clip)) return { start: it.start, words: [] }
         const shown = clipCaptionWords(it.clip, it.audio.meta.words ?? [], it.audio.durationMs ?? UNKNOWN_AUDIO_MS)
         return { start: it.start, words: shown.words, key: it.audio.id, offset: shown.offset }
       })

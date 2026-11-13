@@ -187,6 +187,57 @@ UNIQUE per proyek, backfill dari `sort`) yang dipakai untuk mencocokkan berkas h
   (Pengaturan › Panduan Manual & Ekstensi, `ManualGuideSection.tsx`) dan pemetaannya di
   `docs/manual-fadli-pemetaan.md`. Uji live 1 klip adalah gerbang PC (belum diuji di VM, seperti G3 tier 1).
 
+## Motion (`services/motion.ts`, `services/renderer.ts`, `shared/motion-contract.ts`, `shared/motion-templates.ts`)
+
+Fase 4 (0.4+): adegan motion digambar sebagai kode animasi (HTML + GSAP) oleh agent coding — Claude, Kiro, atau
+Antigravity — lalu aplikasi merendernya jadi MP4. Motion adalah provider tingkat 3 (`visualProvider: 'motion'`),
+bukan mode lahir; sakelar induknya mati bawaan dan `auto` tidak pernah memilih motion sendiri.
+
+- Alur dua tahap + satu gerbang: **Tahap 1** agent menulis `beats.json` (waktu tiap adegan dari waktu kata narasi)
+  dan satu frame kunci per adegan, lalu **berhenti**; pengguna menyetujui/menolak tiap beat di langkah Rancangan.
+  **Gerbang Tahap 1** — ekspor berhenti dengan pesan jelas bila ada beat motion yang belum disetujui
+  (`renderMotionSegment` menolak beat yang statusnya bukan `approved`). **Tahap 2** agent menulis halaman babak
+  (`index.html` + `style.js` + `act-*.js`); aplikasi merendernya frame demi frame.
+- Kontrak babak (D-21, `shared/motion-contract.ts`): `beats.json` v1 (`version`, `fps`, `width`, `height`,
+  `durationSec`, `styleId`, `captionZone`, `beats[]` dengan `words` berwaktu kata); `validateBeatsJson` menolak
+  tumpang tindih, beat di luar durasi, kata tanpa waktu, kata di luar rentang beat, keyframe hilang, easing/status
+  tak dikenal. `validateBabakHtml` mewajibkan `window.OPENER` (`ready`, `DURATION`, `clipsReady`, `seek`) dan
+  melarang nondeterminisme (`Date.now`, `Math.random`, `setTimeout`/`setInterval`, `repeat: -1`), font CDN, dan
+  `<script src>` lokal (file:// + CORS — JS harus inline). Satu babak 3–8 adegan.
+- Renderer (`services/renderer.ts`): jendela tersembunyi + `useContentSize`, ukuran dipaksa dari konfigurasi
+  (D-11: frame pertama yang ukurannya ≠ konfigurasi menghentikan render), settle 50 ms + tangkap dua kali, maju
+  hanya bila hash sha256 sama, maks 3 percobaan (W7). Cadangan Puppeteer lewat dynamic import (dependensi opsional,
+  tidak terpasang — gagal dengan pesan jelas bila belum dipasang); jalur offscreen hanya pembanding spike, bukan
+  jalur produksi. Render berjalan satu per satu (mutex) demi puncak RAM di laptop 4 GB. Jalur utama D-22 diputus
+  spike 4.0 (`harness-fase4-spike.json`, `run-fase4-spike.sh`): S1d 20/20 DAN ukuran sesuai konfigurasi; bila lebih
+  dari satu lolos, pilih RAM terendah (metode pohon proses). **Putusan: hidden menang untuk landscape; potret 9:16
+  butuh Puppeteer** (kedua jalur Electron terjepit ke tinggi layar — lihat `keputusan-teknis.md` D-22). HyperFrames hanya kontrak referensi + verifikasi
+  silang, bukan renderer dalam aplikasi; Remotion tidak dipakai di renderer.
+- Folder kerja (`services/motion.ts`): `<folder aset proyek>/motion-work/`. `motion:prepareWorkFolder` menulis
+  `CLAUDE.md`/`AGENTS.md` (instruksi agent), `folme.md` (instruksi global pengguna — tidak pernah ditimpa),
+  `input/` (naskah + waktu kata + audio narasi + `gaya.md`), `style/style.js` (skeleton), `tools/validate-beats.mjs`
+  + README. `motion:listBabak`/`getBabak` membaca `out/<babakId>/` (stage 0/1/2 + galat/missing); `approveBeat`
+  dan `overrideEasing` mengubah `beats.json`; `syncMotionBeatIds` menautkan beat ke klip lewat `sceneKey`;
+  `renderBabak` merender satu babak utuh ke `out/<babakId>/render/babak.mp4`.
+- Gaya: 6 template di `shared/motion-templates.ts` (Kartun Panggung, Jurnalisme Visual, Katalog, Sketsa,
+  Aksi Kontinu, WebGL/Partikel). WebGL/Partikel adalah gaya Berat — terkunci sampai diukur di Fase 4 (D-17).
+  Timpa gaya proyek (`motion-work/style/style.js`) menandai beat yang sudah disetujui jadi `redo`.
+- Caption (B6, `shared/captions.ts`): `captionOnForClip` — setelan eksplisit per adegan menang; default motion
+  MATI, adegan lain MENYALA. Dipakai pratinjau dan ekspor (satu fungsi, paritas terjaga). Caption milik aplikasi;
+  halaman motion tidak pernah menggambar caption sendiri; bila menyala, pita bawah 12% frame dicadangkan.
+- Biaya (F4-11): **Rp0 tunai dari aplikasi.** Agent memakai langganan pengguna sendiri di luar aplikasi; KenStory
+  tidak menyimpan kunci agent apa pun. `estimateCredits` mengembalikan null untuk motion; `startMotionJob` membuat
+  job `video` provider `motion` (queued, tanpa tugas jalan — selesai saat agent menulis babak + pengguna menyetujui).
+  `generateMissingVideos` tidak menuntut gambar untuk adegan motion; `resumeJobs` melewatkan provider `motion`
+  seperti `manual`.
+- UI: Pengaturan › Motion (sakelar induk, preset "Motion Grafik penuh"/"Hybrid", daftar gaya, Panduan Motion);
+  langkah Rancangan (label langkah 3 berubah jadi "Rancangan" bila proyek punya adegan motion) — kartu per babak,
+  daftar beat + keyframe + easing override + Setujui/Minta ulang, tombol Render babak, editor timpa gaya proyek.
+  Pratinjau v1 = keyframe + render MP4 on-demand (bukan iframe HTML live — scripting iframe `file://` diblokir
+  CORS). Tutorial lengkap berbahasa Indonesia ada di dalam aplikasi (Pengaturan › Panduan Motion,
+  `MotionGuideSection.tsx`) dan pemetaannya di `docs/fase4-renderer-pemetaan.md`. Uji live adalah gerbang PC
+  (belum diuji di VM, seperti G3 tier 1); lari S3 v2 di laptop Bos (E(3)) tetap gerbang PC.
+
 ## Whisper lokal (`src/main/whisper.ts`)
 
 - Biner: `resources/whisper/whisper-cli.exe` + DLL (whisper.cpp, lisensi MIT). Saat ini hanya untuk Windows.

@@ -9,6 +9,12 @@ Cara menaikkan versi ada di [docs/pengembangan.md](docs/pengembangan.md#versi-da
 ## [Belum dirilis]
 
 - Rebrand aplikasi menjadi **KenStory** (fork dari bangtutorial/bang-story tetap berlisensi MIT, lihat NOTICE.md).
+- **Motion (Fase 4, 0.4+)**: adegan motion sebagai provider visual tingkat 3 — agent coding (Claude/Kiro/
+  Antigravity) menulis babak HTML+GSAP di `motion-work/`, pengguna menyetujui tiap beat di langkah Rancangan,
+  aplikasi merender MP4 di jendela tersembunyi (D-22, diputus spike 4.0). Sakelar induk mati bawaan, preset
+  "Motion Grafik penuh"/"Hybrid", 6 template gaya (WebGL/Partikel terkunci sampai diukur), caption per adegan
+  (default mati di motion), tutorial Bahasa Indonesia di dalam aplikasi. Biaya tunai dari aplikasi Rp0.
+  Pemetaan: `docs/fase4-renderer-pemetaan.md`.
 
 ## [1.0.0] - 2026-10-02
 

@@ -48,10 +48,12 @@ function SaveStatus() {
 }
 
 export function ProjectHeader({ doneSteps, right }: { doneSteps: Step[]; right?: ReactNode }) {
-  const { project, updateProject, save, flush } = useProject()
+  const { project, clips, updateProject, save, flush } = useProject()
   const { go } = useApp()
   const [editing, setEditing] = useState(false)
   if (!project) return null
+  // Step 3 is "Rancangan" when the project has motion scenes (Fase 4), "Storyboard" otherwise.
+  const steps = STEPS.map((s) => (s.n === 3 && clips.some((c) => c.visualProvider === 'motion') ? { ...s, label: 'Rancangan' } : s))
 
   const setStep = (n: Step): void => {
     const s = project.status
@@ -108,7 +110,7 @@ export function ProjectHeader({ doneSteps, right }: { doneSteps: Step[]; right?:
       </div>
 
       <nav aria-label="Langkah pembuatan" className="flex items-center gap-1 rounded-full border border-line bg-sand p-1">
-        {STEPS.map((s) => {
+        {steps.map((s) => {
           const active = project.step === s.n
           const done = doneSteps.includes(s.n) && !active
           return (

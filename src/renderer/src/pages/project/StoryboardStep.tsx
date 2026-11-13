@@ -38,6 +38,7 @@ import { useNarration } from '../../lib/useNarration'
 import { useApp } from '../../store/app'
 import { isRunning, jobFor, useProject } from '../../store/project'
 import { CharacterModal } from './CharacterModal'
+import { RancanganStep } from './RancanganStep'
 
 function useAudio(): { play: (url: string) => void; stop: () => void; playing: string | null } {
   const ref = useRef<HTMLAudioElement | null>(null)
@@ -108,7 +109,7 @@ function MotionPreview({ image, clip }: { image: Asset; clip: Clip }) {
   )
 }
 
-function ClipPanel({ clip, index, total }: { clip: Clip; index: number; total: number }) {
+function ClipPanel({ clip, index, total, motionEnabled }: { clip: Clip; index: number; total: number; motionEnabled: boolean }) {
   const { project, clips, characters, assets, jobs, updateClip, updateProject, removeClip, moveClip, addClip, select, flush } = useProject()
   const { toast } = useApp()
   const audio = useAudio()
@@ -128,6 +129,8 @@ function ClipPanel({ clip, index, total }: { clip: Clip; index: number; total: n
     (clip.visualProvider === 'manual' || clip.visualProvider === 'extension') &&
     ((imageJob?.provider === 'manual' && imageJob.status === 'queued' && !clip.imageAssetId) ||
       (videoJob?.provider === 'manual' && videoJob.status === 'queued' && !clip.videoAssetId))
+  // A motion job waits for the agent's babak, like a manual job waits for a file.
+  const motionWaiting = clip.visualProvider === 'motion' && videoJob?.provider === 'motion' && videoJob.status === 'queued'
   const versions = Object.values(assets)
     .filter((a) => a.clipId === clip.id && a.kind === 'image')
     .sort((a, b) => a.createdAt - b.createdAt)
@@ -203,7 +206,7 @@ function ClipPanel({ clip, index, total }: { clip: Clip; index: number; total: n
           ) : (
             <ClipVisual clip={clip} image={image} video={video} job={imageJob} large playVideo />
           )}
-          {!image && !isRunning(imageJob) && (
+          {!image && clip.visualProvider !== 'motion' && !isRunning(imageJob) && (
             <div className="absolute inset-x-0 bottom-6 flex justify-center">
               <Button variant="accent" icon={<Sparkles className="size-4" />} onClick={() => void run(() => window.api.generate.clipImage(clip.id))}>
                 Generate gambar
@@ -214,6 +217,13 @@ function ClipPanel({ clip, index, total }: { clip: Clip; index: number; total: n
             <div className="absolute inset-x-0 bottom-6 flex justify-center px-4">
               <span className="rounded-full bg-ink/80 px-3 py-1.5 text-center text-xs text-paper">
                 Menunggu hasil manual — salin prompt, generate di luar, lalu pindai folder kerja
+              </span>
+            </div>
+          )}
+          {!image && motionWaiting && (
+            <div className="absolute inset-x-0 bottom-6 flex justify-center px-4">
+              <span className="rounded-full bg-ink/80 px-3 py-1.5 text-center text-xs text-paper">
+                Menunggu babak motion — siapkan folder kerja, agent menulis babak, lalu setujui di Rancangan
               </span>
             </div>
           )}
@@ -282,7 +292,7 @@ function ClipPanel({ clip, index, total }: { clip: Clip; index: number; total: n
             label="Jalur visual adegan ini"
             value={clip.visualProvider}
             onChange={(v) => updateClip(clip.id, { visualProvider: v })}
-            options={VISUAL_PROVIDERS.map((p) => ({ value: p.id, label: p.label, hint: p.hint }))}
+            options={VISUAL_PROVIDERS.filter((p) => p.id !== 'motion' || motionEnabled).map((p) => ({ value: p.id, label: p.label, hint: p.hint }))}
           />
           <p className="text-xs leading-relaxed text-muted">
             {clip.visualProvider === 'manual'
@@ -293,7 +303,28 @@ function ClipPanel({ clip, index, total }: { clip: Clip; index: number; total: n
                   ? 'Otomatis: mengikuti model gambar/video yang dipilih proyek.'
                   : clip.visualProvider === 'flow2api'
                     ? 'Google Flow: gambar/video dibuat lewat server Flow2API.'
-                    : 'Higgsfield: gambar/video dibuat lewat Higgsfield, apa pun model proyeknya.'}
+                    : clip.visualProvider === 'motion'
+                      ? 'Motion: visualnya kode HTML+GSAP di folder kerja motion — agent menulis babak, aplikasi merender MP4-nya (Rp0 dari aplikasi). Pada adegan motion, efek otomatis, gerak kamera, dan transisi editor tidak dipakai.'
+                      : 'Higgsfield: gambar/video dibuat lewat Higgsfield, apa pun model proyeknya.'}
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <span className="text-sm font-semibold">Caption adegan ini</span>
+          <Select
+            label="Caption adegan ini"
+            value={clip.captionOn === null ? 'default' : clip.captionOn ? 'on' : 'off'}
+            onChange={(v) => updateClip(clip.id, { captionOn: v === 'default' ? null : v === 'on' })}
+            options={[
+              { value: 'default', label: `Bawaan (${clip.visualProvider === 'motion' ? 'mati di adegan motion' : 'menyala'})`, hint: 'Ikut aturan bawaan' },
+              { value: 'on', label: 'Menyala', hint: 'Caption dibakar di adegan ini' },
+              { value: 'off', label: 'Mati', hint: 'Tanpa caption di adegan ini' }
+            ]}
+          />
+          <p className="text-xs leading-relaxed text-muted">
+            {clip.visualProvider === 'motion'
+              ? 'Caption di adegan motion defaultnya mati — halaman motion memakai seluruh frame. Bila dinyalakan, pita bawah 12% frame dicadangkan untuk caption.'
+              : 'Caption karaoke mengikuti suara adegan ini, sama di pratinjau dan di ekspor.'}
           </p>
         </div>
 
@@ -499,7 +530,15 @@ export function StoryboardStep() {
   const [workFolder, setWorkFolder] = useState<string | null>(null)
   const [folderHint, setFolderHint] = useState(false)
   const [pickScene, setPickScene] = useState<Record<string, string>>({})
+  const [motionEnabled, setMotionEnabled] = useState(false)
+  const [view, setView] = useState<'storyboard' | 'rancangan'>('storyboard')
   const lastNarration = useRef<string | null>(null)
+
+  useEffect(() => {
+    void window.api.settings.get().then((s) => setMotionEnabled(s.motionEnabled))
+  }, [project?.id])
+
+  const hasMotion = clips.some((c) => c.visualProvider === 'motion')
 
   // A failed narration take is reported once, when it happens.
   useEffect(() => {
@@ -527,24 +566,28 @@ export function StoryboardStep() {
   }, [project?.id, project?.imageModel, project?.aspectRatio, clips])
 
   const stats = useMemo(() => {
-    const imgs = clips.filter((c) => c.imageAssetId).length
+    // Motion scenes have no picture: they are rendered from the babak, not generated as images.
+    const imgs = clips.filter((c) => c.visualProvider !== 'motion' && c.imageAssetId).length
     const voices = clips.filter((c) => c.audioAssetId).length
-    const needImg = clips.filter((c) => !c.imageAssetId && !isRunning(jobFor(jobs, 'image', { clipId: c.id }))).length
+    const needImg = clips.filter((c) => c.visualProvider !== 'motion' && !c.imageAssetId && !isRunning(jobFor(jobs, 'image', { clipId: c.id }))).length
     const videoRunning = clips.filter((c) => isRunning(jobFor(jobs, 'video', { clipId: c.id }))).length
     const needVideo = clips.filter((c) => !c.videoAssetId && !isRunning(jobFor(jobs, 'video', { clipId: c.id })))
-    const pendingImg = clips.filter((c) => !c.imageAssetId)
+    const needVideoAi = needVideo.filter((c) => c.visualProvider !== 'motion')
+    const motionVideo = needVideo.filter((c) => c.visualProvider === 'motion').length
+    const pendingImg = clips.filter((c) => c.visualProvider !== 'motion' && !c.imageAssetId)
     const pendingVideo = clips.filter((c) => !c.videoAssetId)
     const manualImgOnly = pendingImg.length > 0 && pendingImg.every((c) => c.visualProvider === 'manual' || c.visualProvider === 'extension')
     const manualVideoOnly = pendingVideo.length > 0 && pendingVideo.every((c) => c.visualProvider === 'manual' || c.visualProvider === 'extension')
-    return { imgs, voices, needImg, videoRunning, needVideo, total: clips.reduce((n, c) => n + c.durationMs, 0), manualImgOnly, manualVideoOnly }
+    return { imgs, imgTotal: clips.filter((c) => c.visualProvider !== 'motion').length, voices, needImg, videoRunning, needVideo, needVideoAi, motionVideo, total: clips.reduce((n, c) => n + c.durationMs, 0), manualImgOnly, manualVideoOnly }
   }, [clips, jobs])
 
   // Video length follows each clip's voice, so the cost is estimated per video length and summed.
+  // Motion scenes are excluded: their video is rendered from the babak (Rp0), not generated per clip.
   const videoLengths = useMemo(() => {
     if (!project) return ''
     const model = getVideoModel(project.videoModel)
-    return stats.needVideo.map((c) => fitDuration(model, c.durationMs / 1000) ?? 5).join(',')
-  }, [stats.needVideo, project?.videoModel])
+    return stats.needVideoAi.map((c) => fitDuration(model, c.durationMs / 1000) ?? 5).join(',')
+  }, [stats.needVideoAi, project?.videoModel])
   useEffect(() => {
     if (!project || !videoLengths) return setVideoCredits(null)
     if (stats.manualVideoOnly) return setVideoCredits(null)
@@ -584,14 +627,16 @@ export function StoryboardStep() {
 
   const narration = useNarration()
   // Videos are made last: every clip has its picture, and the voice is final so each video matches its clip length.
+  // Motion scenes need no picture — their visual is the babak.
   const readyForVideo =
     clips.length > 0 &&
-    clips.every((c) => c.imageAssetId) &&
+    clips.every((c) => c.imageAssetId || c.visualProvider === 'motion') &&
     narration.voiced > 0 &&
     narration.stale === 0 &&
     !narration.running
   const makeVideos = async (): Promise<void> => {
-    const n = stats.needVideo.length
+    const n = stats.needVideoAi.length
+    const motionN = stats.motionVideo
     // Total cost: the summed estimate when it arrived, else the fixed catalog price. The amount shown is
     // always the batch total (videoCredits already sums every clip); the breakdown per video is shown too,
     // so the total can never be mistaken for the per-video price.
@@ -603,12 +648,15 @@ export function StoryboardStep() {
           ? ` Perkiraan biaya ${idrLabel(totalIdr)} (NexaBot, ${n} video × ${idrLabel(n > 0 ? Math.round(totalIdr / n) : 0)}). Biaya dipotong dari kredit NexaBot kamu saat setiap video dibuat; membatalkan di tengah jalan tidak mengembalikan kredit video yang sudah jadi.`
           : ` Perkiraan biaya ${Math.round(videoCredits! * 10) / 10} kredit Higgsfield.`
     const ok = await confirmDialog({
-      title: `Jadikan ${n} klip video AI?`,
+      title: `Jadikan ${n + motionN} klip video?`,
       body:
-        `Setiap gambar klip dianimasikan dengan ${getVideoModel(project!.videoModel).name}, panjangnya mengikuti suara narasi klip itu.` +
+        (n > 0 ? `Setiap gambar klip dianimasikan dengan ${getVideoModel(project!.videoModel).name}, panjangnya mengikuti suara narasi klip itu.` : '') +
+        (motionN > 0
+          ? ` ${motionN} adegan motion membuat job yang menunggu babak dari agent (tanpa biaya dari aplikasi) — visualnya dirender dari babak di langkah Rancangan, bukan dari gambar.`
+          : '') +
         costText +
         ' Klip yang sudah punya video tidak dibuat ulang.',
-      confirm: `Buat ${n} video`
+      confirm: `Buat ${n + motionN} video`
     })
     if (ok) await bulk(() => window.api.generate.missingVideos(project!.id))
   }
@@ -814,10 +862,24 @@ export function StoryboardStep() {
         )}
       </div>
 
-      <div className="grid min-h-0 grid-cols-[minmax(0,1fr)_540px]">
-        <section className="scroll-thin flex min-h-0 flex-col gap-3.5 overflow-y-auto px-6 pb-6 pt-[18px]">
+      <div className={cx('grid min-h-0', view === 'rancangan' && hasMotion ? 'grid-cols-[minmax(0,1fr)]' : 'grid-cols-[minmax(0,1fr)_540px]')}>
+        {view === 'rancangan' && hasMotion ? (
+          <RancanganStep />
+        ) : (
+          <section className="scroll-thin flex min-h-0 flex-col gap-3.5 overflow-y-auto px-6 pb-6 pt-[18px]">
           <div className="flex flex-wrap items-center gap-3">
             <h1 className="shrink-0 font-display text-2xl font-bold">Storyboard</h1>
+            {hasMotion && (
+              <Segmented
+                value={view}
+                onChange={setView}
+                size="sm"
+                options={[
+                  { id: 'storyboard', label: 'Storyboard' },
+                  { id: 'rancangan', label: 'Rancangan' }
+                ]}
+              />
+            )}
             <span className="shrink-0 whitespace-nowrap text-sm text-muted">
               {clips.length} klip · {mmss(stats.total)}
             </span>
@@ -911,15 +973,19 @@ export function StoryboardStep() {
               const ttsRunning = isRunning(jobFor(jobs, 'tts', { clipId: c.id }))
               const manualWaiting =
                 (c.visualProvider === 'manual' || c.visualProvider === 'extension') && imageJob?.provider === 'manual' && imageJob.status === 'queued'
+              const videoJob = jobFor(jobs, 'video', { clipId: c.id })
+              const motionWaiting = c.visualProvider === 'motion' && videoJob?.provider === 'motion' && videoJob.status === 'queued'
               const status = c.imageAssetId
                 ? { label: 'Siap', tone: 'ok' as const }
-                : manualWaiting
-                  ? { label: 'Menunggu hasil', tone: 'warn' as const }
-                  : isRunning(imageJob)
-                    ? { label: 'Proses', tone: 'warn' as const }
-                    : imageJob?.status === 'failed'
-                      ? { label: 'Gagal', tone: 'bad' as const }
-                      : { label: 'Draf', tone: 'draft' as const }
+                : motionWaiting
+                  ? { label: 'Menunggu babak', tone: 'warn' as const }
+                  : manualWaiting
+                    ? { label: 'Menunggu hasil', tone: 'warn' as const }
+                    : isRunning(imageJob)
+                      ? { label: 'Proses', tone: 'warn' as const }
+                      : imageJob?.status === 'failed'
+                        ? { label: 'Gagal', tone: 'bad' as const }
+                        : { label: 'Draf', tone: 'draft' as const }
               return (
                 <button
                   key={c.id}
@@ -968,14 +1034,15 @@ export function StoryboardStep() {
             })}
           </div>
         </section>
-        {sel && <ClipPanel key={sel.id} clip={sel} index={selIndex} total={clips.length} />}
+        )}
+        {view !== 'rancangan' && sel && <ClipPanel key={sel.id} clip={sel} index={selIndex} total={clips.length} motionEnabled={motionEnabled} />}
       </div>
 
       <footer className="flex items-center gap-4 border-t border-line bg-surface px-6">
         <div className="flex w-[320px] flex-col gap-1.5">
           <div className="flex justify-between text-[13px]">
             <span className="font-semibold">
-              {stats.imgs} dari {clips.length} gambar siap
+              {stats.imgs} dari {stats.imgTotal} gambar siap
             </span>
             <span className="text-muted">
               {stats.voices} dari {clips.length} suara siap

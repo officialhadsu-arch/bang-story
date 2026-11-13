@@ -1,4 +1,16 @@
-import type { CaptionPosition, CaptionSize, CaptionStyleId, WordTiming } from './types'
+import type { CaptionPosition, CaptionSize, CaptionStyleId, Clip, WordTiming } from './types'
+
+/**
+ * Whether captions burn on one scene (B6, Fase 4). The explicit per-scene
+ * setting wins; otherwise motion scenes default OFF (the motion page owns the
+ * frame, and the bottom 12% is only reserved when captions are on) and every
+ * other scene defaults ON. Preview (editor/engine.ts) and export
+ * (exporter.ts) both call this one function, so they can never disagree.
+ */
+export function captionOnForClip(clip: Pick<Clip, 'visualProvider' | 'captionOn'>): boolean {
+  if (clip.captionOn !== null && clip.captionOn !== undefined) return clip.captionOn
+  return clip.visualProvider !== 'motion'
+}
 
 /**
  * Caption looks shared by the preview (CSS) and the export (ASS subtitles via libass).

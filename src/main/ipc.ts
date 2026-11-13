@@ -18,6 +18,7 @@ import type {
 import type { VisualProvider, WorkFileKind } from '@shared/manual'
 import { startExport } from './exporter'
 import {
+  applyMotionPreset,
   estimateCredits,
   forgetEstimates,
   generateCharacterSheet,
@@ -32,7 +33,7 @@ import {
 import { cancelJob } from './jobs'
 import { generateNarration, syncCaptions } from './narration'
 import { cancelDownload, downloadModel, openModelFolder, removeModel, whisperStatus } from './whisper'
-import { assetAbsPath, manualWorkFolder } from './paths'
+import { assetAbsPath, manualWorkFolder, motionWorkFolder } from './paths'
 import { detachVoice, splitClip } from './editing'
 import { emit } from './events'
 import {
@@ -57,6 +58,18 @@ import * as hf from './services/higgsfield'
 import * as llm from './services/llm'
 import * as nexa from './services/nexabot'
 import { importManualFile, prepareWorkFolder, scanWorkFolder } from './services/manual'
+import {
+  approveMotionBeat,
+  motionBabaksOf,
+  motionTemplates,
+  overrideMotionEasing,
+  prepareMotionWorkFolder,
+  readMotionBabak,
+  readProjectStyleOverride,
+  saveProjectStyleOverride,
+  syncMotionBeatIds
+} from './services/motion'
+import { renderBabakFull } from './services/renderer'
 import { generateScript, generateVisuals, generateMusicPrompt } from './story'
 
 
@@ -129,6 +142,30 @@ export function registerIpc(): void {
     getProject(projectId)
     const err = await shell.openPath(manualWorkFolder(projectId))
     if (err) throw new Error(`Folder kerja tidak bisa dibuka: ${err}`)
+  })
+
+  // Fase 4 (0.4): motion — the agent's work folder + the babak renderer.
+  handle('motion:prepareWorkFolder', (projectId: string, styleId?: string) => prepareMotionWorkFolder(projectId, styleId))
+  handle('motion:listBabak', (projectId: string) => motionBabaksOf(projectId))
+  handle('motion:getBabak', (projectId: string, babakId: string) => {
+    syncMotionBeatIds(projectId, babakId)
+    return readMotionBabak(projectId, babakId)
+  })
+  handle('motion:approveBeat', (projectId: string, babakId: string, beatId: string, status: 'approved' | 'redo' | 'pending') =>
+    approveMotionBeat(projectId, babakId, beatId, status)
+  )
+  handle('motion:overrideEasing', (projectId: string, babakId: string, beatId: string, easing: string | null) =>
+    overrideMotionEasing(projectId, babakId, beatId, easing)
+  )
+  handle('motion:renderBabak', (projectId: string, babakId: string) => renderBabakFull(projectId, babakId))
+  handle('motion:getTemplates', () => motionTemplates())
+  handle('motion:applyPreset', (projectId: string, preset: 'penuh' | 'hybrid') => applyMotionPreset(projectId, preset))
+  handle('motion:getStyleOverride', (projectId: string) => readProjectStyleOverride(projectId))
+  handle('motion:saveStyleOverride', (projectId: string, styleJs: string) => saveProjectStyleOverride(projectId, styleJs))
+  handle('motion:openWorkFolder', async (projectId: string) => {
+    getProject(projectId)
+    const err = await shell.openPath(motionWorkFolder(projectId))
+    if (err) throw new Error(`Folder kerja motion tidak bisa dibuka: ${err}`)
   })
 
   handle('assets:setActive', (clipId: string, assetId: string) => setActiveAsset(clipId, assetId))
