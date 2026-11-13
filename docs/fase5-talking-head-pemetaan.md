@@ -112,7 +112,7 @@ Dibaca sebelum menulis rencana ini: `src/main/whisper.ts`,
 | --- | --- | --- |
 | Mode proyek (`shared/types.ts`, `db/index.ts`) | Tidak ada field mode | Tambah `mode: 'gambar-video' \| 'talking-head'` (nama akhir diputus saat implementasi), migrasi baru di akhir `MIGRATIONS`, nilai bawaan `gambar-video` untuk proyek lama |
 | Sakelar fitur (`settings.ts`) | `flow2apiEnabled`, `nexabotEnabled` (mati bawaan) | Tambah `talkingHeadEnabled: boolean` (default `false`) |
-| Langkah Ide (`IdeaStep.tsx`) | Field sinopsis/durasi/bahasa/rasio/suara/gaya | Tambah pemilih mode lahir (chip Gambar & Video / Talking Head); Talking Head hanya tampil bila flag nyala; mode terkunci sesudah proyek dibuat |
+| Langkah Ide (`IdeaStep.tsx`) | Field sinopsis/durasi/bahasa/rasio/suara/gaya | Tambah pemilih mode lahir (chip Gambar & Video / Talking Head); Talking Head hanya tampil bila flag nyala; mode terkunci begitu ada klip |
 | Langkah proyek (`ProjectPage.tsx`) | Langkah 2 Naskah, 3 Storyboard | Bila `mode === 'talking-head'`: langkah 2 = Transkrip, langkah 3 = Adegan; langkah 1 dan 4 sama |
 | Impor rekaman (`ipc.ts` + `shared/api.ts` + `preload`) | `assets:pickClipVideo` per klip | Tambah `talkinghead:importFootage` (pola IPC 3 tempat): pilih berkas video → salin ke folder aset proyek (kind `video`, tingkat proyek) → probe FFmpeg (durasi/resolusi) |
 | Ekstraksi audio (baru, `src/main/`) | Tidak ada | Ekstrak trek audio rekaman jadi WAV 16 kHz mono (FFmpeg, pola `whisper.ts:recognize`); simpan sebagai aset audio proyek; sumber transkrip |
@@ -129,8 +129,10 @@ Dibaca sebelum menulis rencana ini: `src/main/whisper.ts`,
 
 - **F5-01 — Mode lahir + feature flag.** `Project.mode` adalah atribut
   lahir proyek (`gambar-video` | `talking-head`), dipilih di langkah Ide
-  dan **terkunci sesudahnya** (ganti mode = buat proyek baru — sama seperti
-  keputusan mode di Bab 10 §10.4 untuk mode lain). `talkingHeadEnabled`
+  dan **terkunci begitu ada klip/adegan** (ganti mode = buat proyek baru —
+  sama seperti keputusan mode di Bab 10 §10.4 untuk mode lain). Proyek
+  kosong yang belum punya klip masih boleh ganti mode, karena belum ada
+  yang dibangun di atasnya. `talkingHeadEnabled`
   di `AppSettings`, default `false`; pilihan Talking Head hanya tampil
   bila flag nyala. Tiga mode lain tidak mengenal flag ini dan tidak
   tersentuh.

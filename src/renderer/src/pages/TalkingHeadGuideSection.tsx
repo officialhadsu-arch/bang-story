@@ -89,7 +89,8 @@ export function TalkingHeadGuideSection() {
           </>,
           <>
             <strong className="text-ink">Susun adegan.</strong> AI mengelompokkan transkrip jadi adegan 30–60 detik (judul bisa diubah). Kalau AI tidak tersedia — tidak ada
-            kunci LLM — adegan disusun otomatis dari jeda panjang. Tidak ada jalan buntu.
+            kunci LLM — adegan disusun otomatis dari jeda panjang. Tidak ada jalan buntu. Susunan adegan tidak disimpan — setelah memuat ulang,
+            klik Susun adegan lagi; selama transkrip dan tanda buang tidak berubah, hasilnya sama.
           </>,
           <>
             <strong className="text-ink">Buat adegan, periksa, ekspor.</strong> Tombol <strong className="text-ink">Buat adegan</strong> memotong tiap adegan dari rekaman

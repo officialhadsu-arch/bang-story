@@ -236,7 +236,7 @@ export function IdeaStep() {
               </div>
             )}
 
-            <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] gap-5">
+            <div className={isTH ? 'grid grid-cols-1 gap-5' : 'grid grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] gap-5'}>
               <Field label="Bahasa naskah dan suara">
                 <Select
                   label="Bahasa naskah dan suara"
@@ -326,14 +326,17 @@ export function IdeaStep() {
             )}
           </div>
 
-          <aside className="flex flex-col gap-3.5 self-start rounded-[18px] border border-line bg-surface p-5">
-            <div className="flex items-baseline justify-between">
-              <h2 className="font-display text-[22px] font-bold">Gaya visual</h2>
-              <span className="text-[13px] text-muted">{getStyle(project.styleId).name}</span>
-            </div>
-            <p className="-mt-1.5 text-[13px] text-ink-2">Dipakai untuk semua gambar di proyek ini, termasuk lembar karakter.</p>
-            <StylePicker value={project.styleId} onChange={(id) => updateProject({ styleId: id })} />
-          </aside>
+          {/* Talking Head generates no images, so the visual style picker has no effect there. */}
+          {!isTH && (
+            <aside className="flex flex-col gap-3.5 self-start rounded-[18px] border border-line bg-surface p-5">
+              <div className="flex items-baseline justify-between">
+                <h2 className="font-display text-[22px] font-bold">Gaya visual</h2>
+                <span className="text-[13px] text-muted">{getStyle(project.styleId).name}</span>
+              </div>
+              <p className="-mt-1.5 text-[13px] text-ink-2">Dipakai untuk semua gambar di proyek ini, termasuk lembar karakter.</p>
+              <StylePicker value={project.styleId} onChange={(id) => updateProject({ styleId: id })} />
+            </aside>
+          )}
         </div>
       </div>
 
