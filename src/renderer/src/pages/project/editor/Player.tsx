@@ -53,7 +53,10 @@ function Frame({ item, local, playing, style }: { item: TimelineItem; local: num
   const videoCam = cameraAt(item.clip.videoCamera ?? 'static', item.clip.videoStrength ?? 'halus', p, local)
   // A talking-head composition crops the frame before the camera move, exactly as the export does.
   const comp = compositionFrame(item.clip.composition ?? 'penuh')
-  const videoEl = (
+  // Built only when a video is actually shown: item.video is null for image
+  // clips, and reading its url eagerly would crash the whole editor (no
+  // error boundary), so this must stay lazy.
+  const videoEl = useVideo ? (
     <video
       ref={video}
       src={item.video!.url}
@@ -66,7 +69,7 @@ function Frame({ item, local, playing, style }: { item: TimelineItem; local: num
       // which would snap the camera move to whole pixels and make it tremble.
       style={{ transform: cameraCss(videoCam), opacity: (item.clip.videoCamera ?? 'static') === 'static' ? 1 : 0.999 }}
     />
-  )
+  ) : null
   return (
     <div data-clip={item.clip.id} className="absolute inset-0 overflow-hidden bg-sand" style={style}>
       {useVideo ? (
