@@ -230,6 +230,9 @@ export interface Asset {
   createdAt: number
 }
 
+/** Which engine transcribes the talking-head recording: the local Whisper Small model, or Groq's cloud Whisper Large V3. */
+export type TranscriptProvider = 'local' | 'groq'
+
 /** "narration" voices several scenes in one take and cuts it per scene. "transcribe" recognises the talking-head recording once. */
 export type JobKind = 'story' | 'image' | 'sheet' | 'video' | 'tts' | 'narration' | 'align' | 'export' | 'transcribe'
 export type JobStatus = 'queued' | 'running' | 'done' | 'failed' | 'canceled'
@@ -345,6 +348,8 @@ export interface AppSettings {
   motionPreset: 'penuh' | 'hybrid'
   /** Talking Head (narration-first mode) is off until the user turns it on in Settings. */
   talkingHeadEnabled: boolean
+  /** Which engine transcribes the talking-head recording: local Whisper Small (default) or Groq cloud Whisper Large V3. */
+  transcriptProvider: TranscriptProvider
   /** kie.ai (pay-as-you-go in USD, premium models) is off until the user reads the cost warning in Settings and turns it on. */
   kieaiEnabled: boolean
   /** Base URL of the kie.ai REST API (verified from docs.kie.ai, 13 Nov 2026). */

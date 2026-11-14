@@ -28,7 +28,7 @@ Pengguna memasukkan kuncinya sendiri di **Pengaturan › Layanan AI dan kunci**.
 | `higgsfield` | gambar, lembar karakter, video |
 | `gemini` | LLM (naskah/visual) dan Gemini TTS |
 | `elevenlabs` | TTS |
-| `openrouter`, `groq`, `custom` | LLM lewat API kompatibel OpenAI |
+| `openrouter`, `groq`, `custom` | LLM lewat API kompatibel OpenAI; `groq` juga dipakai untuk transkrip Talking Head (Whisper Large V3, lihat di bawah) |
 
 ## LLM (`services/llm.ts`, `services/gemini.ts`)
 
@@ -49,6 +49,30 @@ Pengguna memasukkan kuncinya sendiri di **Pengaturan › Layanan AI dan kunci**.
 | ElevenLabs | `services/elevenlabs.ts` | memakai endpoint with-timestamps untuk waktu per kata; tag `<...>` diubah ke `[tag]` untuk model v3, atau ke `<break>` untuk model lama (`toElevenLabsText`) |
 
 Narasi selalu dibuat satu rekaman utuh lalu dipotong. Lihat [alur-produksi.md](alur-produksi.md#4-narasi-srcmainnarrationts).
+
+## Transkrip Groq (`services/groq-transcribe.ts`, `shared/groq.ts`)
+
+Opsi transkrip Talking Head selain Whisper lokal: `POST https://api.groq.com/openai/v1/audio/transcriptions` dengan model
+`whisper-large-v3` (kelas large-v3, terverifikasi di console.groq.com/docs/speech-to-text, 14 Nov 2026; varian turbo
+`whisper-large-v3-turbo` lebih murah tapi tidak dipakai — Bos meminta large v3). `response_format=verbose_json` dengan
+`timestamp_granularities=["word"]` supaya waktu per kata tersedia langsung dari Groq — tanpa langkah DTW seperti Whisper
+lokal. Kata-kata dinormalisasi dengan aturan monoton yang sama seperti `recognize` lokal, lalu masuk ke alur yang sama
+(`meta.words`, potong, susun adegan, caption karaoke); `timedBy` = `groq-whisper-large-v3`, `estimatedTimings: false`.
+
+- **Kunci dipakai ulang:** kunci `groq` yang sama dengan LLM Groq (`getSecret('groq')`) — tidak ada penyimpanan kunci
+  kedua. Bila belum tersimpan, transkrip Groq gagal-tertutup dengan pesan "isi kunci Groq di Pengaturan dulu".
+- **Pilihan eksplisit, tanpa fallback diam-diam:** `settings.transcriptProvider` (`'local'` bawaan | `'groq'`), dipilih di
+  Pengaturan (Talking Head) dan di langkah Transkrip. Provider yang gagal menggagalkan job dengan pesan Indonesia
+  (401 kunci salah · 413 berkas terlalu besar · 429 batas tier gratis · 5xx server Groq) — tidak pernah beralih diam-diam
+  ke provider lain.
+- **Batas:** tier gratis Groq membatasi berkas **25 MB** (sekitar 13 menit WAV 16 kHz mono); berkas lebih besar
+  gagal-tertutup dengan saran memotong rekaman atau memakai Whisper lokal. Tidak ada chunking di versi ini.
+  Audio dikirim ke server Groq — privasi ini dinyatakan eksplisit di Pengaturan, halaman Transkrip, dan panduan.
+- **Uji koneksi tanpa biaya:** `talkinghead:testGroq` (IPC, 3 tempat) memanggil `GET /openai/v1/models` dengan kunci
+  tersimpan dan memeriksa `whisper-large-v3` terdaftar — tanpa mengirim audio.
+- Base URL bisa ditimpa di dev lewat `STUDIO_GROQ_BASE` (pola `STUDIO_KIE_BASE`); aplikasi terpaket selalu memakai
+  `api.groq.com`. Timeout 300 detik. Tidak ada `prompt` (alasan yang sama seperti Whisper lokal: prompt memicu
+  halusinasi, lihat keputusan-teknis.md).
 
 ## Higgsfield (`services/higgsfield.ts`, `shared/higgsfield.ts`)
 

@@ -73,7 +73,7 @@ import {
 } from './services/motion'
 import { renderBabakFull } from './services/renderer'
 import { generateScript, generateVisuals, generateMusicPrompt } from './story'
-import { arrangeScenes, buildScenes, getFootage, importFootage, setDroppedWords, setFillers, transcribeFootage } from './talkinghead'
+import { arrangeScenes, buildScenes, getFootage, importFootage, setDroppedWords, setFillers, testGroq, transcribeFootage } from './talkinghead'
 
 
 type Handler = (...args: any[]) => unknown
@@ -184,6 +184,7 @@ export function registerIpc(): void {
   })
   handle('talkinghead:getFootage', (projectId: string) => getFootage(projectId))
   handle('talkinghead:transcribe', (projectId: string) => transcribeFootage(projectId))
+  handle('talkinghead:testGroq', () => testGroq())
   handle('talkinghead:setDroppedWords', (assetId: string, dropped: number[]) => setDroppedWords(assetId, dropped))
   handle('talkinghead:setFillers', (assetId: string, fillers: string[]) => setFillers(assetId, fillers))
   handle('talkinghead:arrange', (projectId: string) => arrangeScenes(projectId))

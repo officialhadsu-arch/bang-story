@@ -4,6 +4,7 @@ import { copyFileSync, existsSync, mkdirSync, renameSync, rmSync, writeFileSync 
 import { basename, dirname, extname, join } from 'node:path'
 import ffmpegStatic from 'ffmpeg-static'
 import { WHISPER_TIMING } from '@shared/captions'
+import { GROQ_TIMING } from '@shared/groq'
 import {
   DEFAULT_FILLERS,
   arrangeDeterministic,
@@ -18,7 +19,8 @@ import {
   type ArrangeResult,
   type SceneDef
 } from '@shared/talkinghead'
-import type { Asset, Job, ProjectBundle, WordTiming } from '@shared/types'
+import type { Asset, Job, KeyTestResult, ProjectBundle, WordTiming } from '@shared/types'
+import type { Heard } from './align'
 import { emit } from './events'
 import { runJob } from './jobs'
 import { assetAbsPath, binPath, dataDir } from './paths'
@@ -35,6 +37,9 @@ import {
 } from './repo'
 import { probeDurationMs, probeSize } from './services/audio'
 import { generateJson } from './services/llm'
+import { testGroqConnection, transcribeWithGroq } from './services/groq-transcribe'
+import { getSecret } from './secrets'
+import { getSettings } from './settings'
 import { recognize } from './whisper'
 
 /**
@@ -111,9 +116,10 @@ export async function importFootage(projectId: string, srcPath: string): Promise
 }
 
 /**
- * Recognises the recording once with the local Whisper model (the same `recognize` the captions use:
- * no prompt, DTW word times). Fails hard with a clear message when the model is missing or nothing is
- * heard — no fake transcript. Filler words are auto-marked to cut; the user can restore any of them.
+ * Recognises the recording once — with the local Whisper model by default, or with Groq's cloud
+ * Whisper Large V3 when the user picked it (G6-01). The engine is the user's explicit choice: a
+ * failing engine fails the job with a clear message, never a silent fallback (G6-06). Filler words
+ * are auto-marked to cut; the user can restore any of them.
  */
 export function transcribeFootage(projectId: string): Job {
   const running = activeProjectJob(projectId, 'transcribe')
@@ -122,7 +128,8 @@ export function transcribeFootage(projectId: string): Job {
   if (project.mode !== 'talking-head') throw new Error('Transkrip hanya untuk proyek Talking Head.')
   const { audio } = getFootage(projectId)
   if (!audio) throw new Error('Impor rekaman dulu sebelum membuat transkrip.')
-  const job = insertJob({ projectId, kind: 'transcribe', provider: 'whisper' })
+  const provider = getSettings().transcriptProvider
+  const job = insertJob({ projectId, kind: 'transcribe', provider: provider === 'groq' ? 'groq' : 'whisper' })
   emit.job(job)
   return runJob(job, 'whisper', async (ctx) => {
     const tmp = join(dataDir(), 'tmp', `transcribe-${ctx.jobId}`)
@@ -130,13 +137,24 @@ export function transcribeFootage(projectId: string): Job {
     try {
       const p = getProject(projectId)
       const asset = getAsset(audio.id)!
-      ctx.progress(0.1, 'Mengenali kata-kata rekaman dengan Whisper…')
-      const heard = await recognize(assetAbsPath(projectId, asset.localPath), p.language, tmp, ctx.signal)
+      // Groq returns word times directly (no DTW step); the local path times words with DTW.
+      let heard: Heard[]
+      let timedBy = WHISPER_TIMING
+      if (provider === 'groq') {
+        const key = getSecret('groq')
+        if (!key) throw new Error('Kunci Groq belum diisi. Isi kunci Groq di Pengaturan › Kunci API dan model.')
+        ctx.progress(0.1, 'Mengirim audio ke Groq…')
+        heard = await transcribeWithGroq({ apiKey: key, audioPath: assetAbsPath(projectId, asset.localPath), language: p.language, signal: ctx.signal })
+        timedBy = GROQ_TIMING
+      } else {
+        ctx.progress(0.1, 'Mengenali kata-kata rekaman dengan Whisper…')
+        heard = await recognize(assetAbsPath(projectId, asset.localPath), p.language, tmp, ctx.signal)
+      }
       const words: WordTiming[] = heard.map((w) => ({ text: w.text, start: w.start, end: w.end }))
       if (!words.length) throw new Error('Whisper tidak mengenali kata apa pun di rekaman ini. Periksa audionya.')
       const fillers = asset.meta.fillerWords ?? DEFAULT_FILLERS
       const dropped = autoDroppedIndexes(words, fillers)
-      updateAssetMeta(asset.id, { ...asset.meta, words, droppedWordIndexes: dropped, estimatedTimings: false, timedBy: WHISPER_TIMING })
+      updateAssetMeta(asset.id, { ...asset.meta, words, droppedWordIndexes: dropped, estimatedTimings: false, timedBy })
       emit.asset(getAsset(asset.id)!)
       const summary = summarizeTranscript(words, computeCuts(words, { fillers, dropped }))
       return {
@@ -146,6 +164,13 @@ export function transcribeFootage(projectId: string): Job {
       rmSync(tmp, { recursive: true, force: true })
     }
   })
+}
+
+/** Proves the stored Groq key works for transcription (no audio sent, no cost). */
+export async function testGroq(): Promise<KeyTestResult> {
+  const key = getSecret('groq')
+  if (!key) return { ok: false, message: 'Kunci Groq belum diisi. Isi kunci Groq di Pengaturan › Kunci API dan model.' }
+  return testGroqConnection({ apiKey: key })
 }
 
 /** Marks transcript words to cut (or restores them): the effective cut list for arranging and building. */

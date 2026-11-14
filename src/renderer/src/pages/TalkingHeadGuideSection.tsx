@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react'
 
 /**
- * In-app Talking Head tutorial (Fase 5, 0.5). The narration-first flow: import a recording of a
- * person speaking, transcribe it once with local Whisper, cut the pauses and filler words, group it
+ * In-app Talking Head tutorial (Fase 5, 0.5; opsi transkrip Groq 0.6). The narration-first flow: import a recording of a
+ * person speaking, transcribe it once with local Whisper or Groq cloud, cut the pauses and filler words, group it
  * into scenes, and export. No face tracking, no diarization, no B-roll, no TTS in this mode.
  */
 
@@ -80,8 +80,10 @@ export function TalkingHeadGuideSection() {
             diekstrak sekali jadi WAV 16 kHz mono — semua suara adegan berasal dari ekstraksi ini, bukan dari trek audio file video.
           </>,
           <>
-            <strong className="text-ink">Buat transkrip.</strong> Whisper lokal (model Small, diunduh sekali di Pengaturan, bagian Caption akurat) mengenali kata per
-            kata beserta waktunya. Tanpa kunci API, tanpa biaya. Transkrip dibuat sekali; kalau rekaman diganti, transkrip harus dibuat ulang.
+            <strong className="text-ink">Buat transkrip.</strong> Pilih dulu mesin transkrip di langkah Transkrip (atau Pengaturan → Talking Head):{' '}
+            <strong className="text-ink">Whisper lokal</strong> (model Small, diunduh sekali di Pengaturan, bagian Caption akurat — tanpa kunci
+            API, tanpa biaya) atau <strong className="text-ink">Groq cloud</strong> (Whisper Large V3, lebih akurat; audio dikirim ke server
+            Groq, gratis di tier gratis, perlu kunci Groq). Transkrip dibuat sekali; kalau rekaman diganti, transkrip harus dibuat ulang.
           </>,
           <>
             <strong className="text-ink">Tandai yang dipotong.</strong> Jeda di atas 0,5 detik dan kata pengisi (<Code>eh, ehm, hmm, anu, apa, ya, kan, gitu, nah</Code>)
@@ -100,7 +102,34 @@ export function TalkingHeadGuideSection() {
         ]}
       />
 
-      <H2>2 · Aturan potong</H2>
+      <H2>2 · Mesin transkrip: lokal vs Groq</H2>
+      <P>
+        Transkrip dibuat oleh salah satu dari dua mesin — pilihannya di Pengaturan → Talking Head → Mesin transkrip, atau langsung di langkah
+        Transkrip. Pilihan berlaku untuk transkrip berikutnya; transkrip yang sudah dibuat tidak berubah sampai dibuat ulang.
+      </P>
+      <Table
+        head={['', 'Lokal (Whisper Small)', 'Groq (Whisper Large V3)']}
+        rows={[
+          ['Di mana jalan', 'Di komputer ini', 'Di server Groq (cloud)'],
+          ['Biaya', 'Gratis (Rp0)', 'Gratis di tier gratis Groq'],
+          ['Kunci', 'Tidak perlu', 'Kunci Groq — sama dengan LLM Groq, isi sekali di Pengaturan'],
+          ['Akurasi', 'Cukup untuk potong adegan', 'Lebih akurat (kelas large-v3)'],
+          ['Privasi', 'Audio tidak keluar dari mesin', 'Audio rekaman dikirim ke server Groq'],
+          ['Batas berkas', 'Tidak ada batas khusus', 'Maksimum 25 MB (tier gratis)'],
+          ['Internet', 'Tidak perlu', 'Perlu']
+        ]}
+      />
+      <P>
+        Tidak ada fallback diam-diam: kalau mesin yang dipilih gagal (misalnya kunci Groq salah, atau berkas lebih dari 25 MB), transkrip
+        berhenti dengan pesan yang menjelaskan penyebabnya — aplikasi tidak diam-diam beralih ke mesin lain. Kunci Groq tidak pernah disimpan
+        terpisah: yang dipakai adalah kunci <Code>groq</Code> yang sama dengan LLM Groq.
+      </P>
+      <P>
+        Uji koneksi Groq (tanpa mengirim audio, tanpa biaya): di Pengaturan → Talking Head → Uji Koneksi Groq. Tombol ini hanya memeriksa kunci
+        dan ketersediaan model Whisper Large V3 di akun Groq.
+      </P>
+
+      <H2>3 · Aturan potong</H2>
       <Table
         head={['Yang dipotong', 'Aturan', 'Bisa diubah?']}
         rows={[
@@ -114,14 +143,14 @@ export function TalkingHeadGuideSection() {
         Potongan diterapkan saat adegan dibuat; mengubah tanda sesudah adegan dibuat tidak mengubah adegan lama — buat ulang adegannya.
       </P>
 
-      <H2>3 · Komposisi dan zoom</H2>
+      <H2>4 · Komposisi dan zoom</H2>
       <P>
         Tiap adegan punya komposisi: <strong className="text-ink">Penuh</strong> (seluruh frame), <strong className="text-ink">Close-up tengah / kiri / kanan</strong>{' '}
         (memperbesar 60% bagian frame itu). Zoom otomatis hanya zoom-in halus di tengah frame, memakai mesin kamera yang sama dengan mode lain.
         Yang tampil di pratinjau itulah yang keluar di ekspor — rumusnya sama di kedua sisi.
       </P>
 
-      <H2>4 · Batas versi ini (v1)</H2>
+      <H2>5 · Batas versi ini (v1)</H2>
       <Table
         head={['Tidak ada di v1', 'Artinya']}
         rows={[
@@ -134,26 +163,30 @@ export function TalkingHeadGuideSection() {
         ]}
       />
 
-      <H2>5 · Caption</H2>
+      <H2>6 · Caption</H2>
       <P>
         Caption karaoke dibuat dari kata-kata transkrip beserta waktunya (bukan perkiraan), jadi kata yang tampil mengikuti suara rekaman. Caption
         bisa dibakar ke video atau ditulis sebagai file .srt di dialog Ekspor, sama seperti mode lain. Gaya caption diatur di Editor.
       </P>
 
-      <H2>6 · Biaya</H2>
+      <H2>7 · Biaya</H2>
       <P>
-        Transkrip (Whisper lokal), potong, susun adegan otomatis, dan ekspor semuanya <strong className="text-ink">gratis (Rp0)</strong> — tidak ada
-        panggilan berbayar. Satu-satunya yang memakai kunci adalah susun adegan dengan AI (LLM yang sudah diatur di Pengaturan); tanpa kunci itu,
-        susun adegan otomatis yang dipakai, tanpa biaya dan tanpa galat.
+        Transkrip (Whisper lokal), potong, susun adegan otomatis, dan ekspor semuanya <strong className="text-ink">gratis (Rp0)</strong> — tidak
+        ada panggilan berbayar. Transkrip Groq juga gratis di tier gratis Groq (batas tier gratis berlaku, berkas dibatasi 25 MB). Satu-satunya
+        yang memakai kunci adalah susun adegan dengan AI (LLM yang sudah diatur di Pengaturan); tanpa kunci itu, susun adegan otomatis yang
+        dipakai, tanpa biaya dan tanpa galat.
       </P>
 
-      <H2>7 · Pemecahan masalah</H2>
+      <H2>8 · Pemecahan masalah</H2>
       <Table
         head={['Gejala', 'Penyebab dan jalan keluar']}
         rows={[
           ['Pilihan Talking Head tidak muncul di langkah Ide', 'Mode masih dimatikan. Nyalakan di Pengaturan → Layanan AI dan kunci → Talking Head.'],
-          ['Tombol Buat transkrip tidak bisa diklik', 'Model Whisper belum diunduh. Unduh dulu di Pengaturan, bagian Caption akurat.'],
+          ['Tombol Buat transkrip tidak bisa diklik', 'Mesin yang dipilih belum siap: model Whisper belum diunduh (mesin Lokal) atau kunci Groq belum diisi (mesin Groq). Periksa mesin yang dipilih, lalu unduh model di Pengaturan, bagian Caption akurat, atau isi kunci Groq di Pengaturan › Kunci API dan model.'],
           ['Transkrip gagal: "tidak mengenali kata apa pun"', 'Whisper tidak mendengar kata di audio rekaman. Periksa audionya — rekaman tanpa suara atau suara terlalu pelan.'],
+          ['Transkrip Groq gagal: "kunci Groq salah"', 'Kunci Groq yang tersimpan tidak diterima server. Periksa kunci di Pengaturan › Kunci API dan model (penyedia Groq) — kunci yang sama dipakai LLM Groq.'],
+          ['Transkrip Groq gagal: "berkas audio lebih dari 25 MB"', 'Tier gratis Groq membatasi berkas 25 MB (sekitar 13 menit rekaman). Potong rekaman jadi lebih pendek, atau pakai mesin Lokal.'],
+          ['Transkrip Groq gagal: "batas pemakaian tercapai"', 'Tier gratis Groq membatasi jumlah permintaan. Tunggu sebentar lalu coba lagi, atau pakai mesin Lokal.'],
           ['Susun adegan selalu "otomatis (AI tidak tersedia)"', 'Tidak ada kunci LLM yang diatur. Itu bukan galat — fallback deterministik tetap menyusun adegan. Untuk susun AI, atur kunci LLM di Pengaturan.'],
           ['Adegan kosong / tidak ada adegan yang dibuat', 'Transkrip tidak punya kata terpakai (semuanya terpotong?). Biarkan sebagian kata, lalu susun dan buat ulang.'],
           ['Suara adegan tidak sama dengan gambarnya', 'Video dan audio adegan dipotong dari daftar potong yang sama, jadi mestinya sinkron. Kalau tetap tidak sinkron, laporkan beserta nama proyek dan nomor adegannya.'],
