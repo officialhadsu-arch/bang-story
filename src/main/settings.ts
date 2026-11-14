@@ -23,6 +23,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   motionEnabled: false,
   motionPreset: 'hybrid',
   talkingHeadEnabled: false,
+  transcriptProvider: 'local',
   kieaiEnabled: false,
   kieaiBaseUrl: KIE_DEFAULT_BASE_URL,
   whisperAuto: true
