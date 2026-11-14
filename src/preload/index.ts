@@ -101,6 +101,9 @@ const api: StudioApi = {
   nexabot: {
     testConnection: call('nexabot:testConnection')
   },
+  kieai: {
+    testConnection: call('kieai:testConnection')
+  },
   exporter: {
     start: call('export:start'),
     defaultFolder: call('export:defaultFolder'),

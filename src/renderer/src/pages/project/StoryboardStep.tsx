@@ -22,6 +22,7 @@ import {
   Volume2
 } from 'lucide-react'
 import { effectiveResolution, fitDuration, getImageModel, getVideoModel } from '@shared/higgsfield'
+import { KIE_CREDIT_IDR, KIE_CREDIT_USD, isKieModelId, kieaiUsd, kiePriceIdr } from '@shared/kieai'
 import { VISUAL_PROVIDERS, kindOfWorkFileExtension, type ManualScanUnmatched } from '@shared/manual'
 import { idrLabel, isNexaModelId, nexaPriceIdr } from '@shared/nexabot'
 import { CAMERA_PRESETS, MOTION_STRENGTHS, cameraAt, cameraCss } from '@shared/motion'
@@ -33,7 +34,7 @@ import { CharacterAvatar } from '../../components/CharacterAvatar'
 import { ClipVisual } from '../../components/ClipVisual'
 import { Select } from '../../components/Select'
 import { Badge, Button, Chip, IconButton, Menu, Progress, Segmented, confirmDialog, cx, inputCls } from '../../components/ui'
-import { clipNumber, errorText, mmss, secLabel } from '../../lib/format'
+import { clipNumber, errorText, mmss, secLabel, usdLabel } from '../../lib/format'
 import { useNarration } from '../../lib/useNarration'
 import { useApp } from '../../store/app'
 import { isRunning, jobFor, useProject } from '../../store/project'
@@ -586,7 +587,8 @@ export function StoryboardStep() {
   const videoLengths = useMemo(() => {
     if (!project) return ''
     const model = getVideoModel(project.videoModel)
-    return stats.needVideoAi.map((c) => fitDuration(model, c.durationMs / 1000) ?? 5).join(',')
+    // A kie.ai per-second model bills the clip's own length, not a flat 5 s.
+    return stats.needVideoAi.map((c) => fitDuration(model, c.durationMs / 1000) ?? (isKieModelId(project.videoModel) ? Math.ceil(c.durationMs / 1000) : 5)).join(',')
   }, [stats.needVideoAi, project?.videoModel])
   useEffect(() => {
     if (!project || !videoLengths) return setVideoCredits(null)
@@ -615,6 +617,12 @@ export function StoryboardStep() {
   /** Fixed catalog prices, used when the estimate has not arrived (yet) — the cost gate never depends on the estimate alone. */
   const nexaImgPrice = nexaImg && project.imageModel ? nexaPriceIdr(project.imageModel) : null
   const nexaVidPrice = nexaVid && project.videoModel ? nexaPriceIdr(project.videoModel) : null
+  /** A kie.ai batch charges per generate in USD, so its cost is shown in Rupiah + USD and confirmed before it starts (K4-05b). */
+  const kieImg = isKieModelId(project.imageModel)
+  const kieVid = isKieModelId(project.videoModel)
+  /** Fixed catalog prices, used when the estimate has not arrived (yet) — the cost gate never depends on the estimate alone. */
+  const kieImgPrice = kieImg && project.imageModel ? kiePriceIdr(project.imageModel) : null
+  const kieImgUsd = kieImg && project.imageModel ? kieaiUsd(project.imageModel) : null
 
   const bulk = async (fn: () => Promise<unknown>): Promise<void> => {
     try {
@@ -637,18 +645,41 @@ export function StoryboardStep() {
   const makeVideos = async (): Promise<void> => {
     const n = stats.needVideoAi.length
     const motionN = stats.motionVideo
-    // Total cost: the summed estimate when it arrived, else the fixed catalog price. The amount shown is
+    // Catalog total for a kie.ai video batch (fallback when the estimate has not arrived yet):
+    // per-clip prices summed over the clips that still need a video.
+    const kieBatch = ((): { idr: number; usd: number } | null => {
+      if (!kieVid || !project.videoModel) return null
+      const model = getVideoModel(project.videoModel)
+      let idr = 0
+      let usd = 0
+      for (const c of stats.needVideoAi) {
+        const s = fitDuration(model, c.durationMs / 1000) ?? Math.ceil(c.durationMs / 1000)
+        idr += kiePriceIdr(project.videoModel, s * 1000) ?? 0
+        usd += kieaiUsd(project.videoModel, s * 1000) ?? 0
+      }
+      return { idr, usd }
+    })()    // Total cost: the summed estimate when it arrived, else the fixed catalog price. The amount shown is
     // always the batch total (videoCredits already sums every clip); the breakdown per video is shown too,
     // so the total can never be mistaken for the per-video price.
-    const totalIdr = videoCredits != null ? Math.round(videoCredits * 1000) : nexaVid && nexaVidPrice != null ? nexaVidPrice * n : null
+    const totalIdr =
+      videoCredits != null
+        ? Math.round(videoCredits * (kieVid ? KIE_CREDIT_IDR : 1000))
+        : nexaVid && nexaVidPrice != null
+          ? nexaVidPrice * n
+          : kieVid
+            ? (kieBatch?.idr ?? null)
+            : null
+    const totalUsd = videoCredits != null ? videoCredits * KIE_CREDIT_USD : (kieBatch?.usd ?? null)
     const costText =
       totalIdr == null
         ? ''
         : nexaVid
           ? ` Perkiraan biaya ${idrLabel(totalIdr)} (NexaBot, ${n} video × ${idrLabel(n > 0 ? Math.round(totalIdr / n) : 0)}). Biaya dipotong dari kredit NexaBot kamu saat setiap video dibuat; membatalkan di tengah jalan tidak mengembalikan kredit video yang sudah jadi.`
-          : ` Perkiraan biaya ${Math.round(videoCredits! * 10) / 10} kredit Higgsfield.`
+          : kieVid && totalUsd != null
+            ? ` Perkiraan biaya ${idrLabel(totalIdr)} (≈ ${usdLabel(totalUsd)}) (Kie.ai, ${n} video × ${idrLabel(n > 0 ? Math.round(totalIdr / n) : 0)}). kie.ai menagih dalam USD (kurs katalog Rp18.200) — total ini sekitar 10–75× lipat NexaBot untuk klip yang sama. Biaya dipotong dari kredit kie.ai kamu saat setiap video dibuat; membatalkan di tengah jalan tidak mengembalikan kredit video yang sudah jadi, dan tugas yang sudah terkirim di server bisa terus berjalan.`
+            : ` Perkiraan biaya ${Math.round(videoCredits! * 10) / 10} kredit Higgsfield.`
     const ok = await confirmDialog({
-      title: `Jadikan ${n + motionN} klip video?`,
+      title: kieVid ? `Jadikan ${n} klip video AI dengan Kie.ai?` : `Jadikan ${n + motionN} klip video?`,
       body:
         (n > 0 ? `Setiap gambar klip dianimasikan dengan ${getVideoModel(project!.videoModel).name}, panjangnya mengikuti suara narasi klip itu.` : '') +
         (motionN > 0
@@ -674,6 +705,22 @@ export function StoryboardStep() {
             ? `Perkiraan biaya ${idrLabel(perIdr * n)} (${n} gambar × ${idrLabel(perIdr)}). `
             : 'Perkiraan biaya tidak dapat dihitung saat ini. ') +
           'Biaya dipotong dari kredit NexaBot kamu saat setiap gambar dibuat; membatalkan di tengah jalan tidak mengembalikan kredit gambar yang sudah jadi.',
+        confirm: `Generate ${n} gambar`
+      })
+      if (!ok) return
+    }
+    // A kie.ai image batch charges per generate in USD, so it gets the same cost confirmation (K4-05b).
+    if (kieImg && n > 0) {
+      // The catalog price is the fallback when the estimate has not arrived (yet) — the gate never depends on the estimate alone.
+      const perIdr = credits != null ? Math.round(credits * KIE_CREDIT_IDR) : kieImgPrice
+      const perUsd = credits != null ? credits * KIE_CREDIT_USD : kieImgUsd
+      const ok = await confirmDialog({
+        title: `Generate ${n} gambar dengan Kie.ai?`,
+        body:
+          (perIdr != null && perUsd != null
+            ? `Perkiraan biaya ${idrLabel(perIdr * n)} (≈ ${usdLabel(perUsd * n)}) (${n} gambar × ${idrLabel(perIdr)}). `
+            : 'Perkiraan biaya tidak dapat dihitung saat ini. ') +
+          'kie.ai menagih dalam USD (kurs katalog Rp18.200). Biaya dipotong dari kredit kie.ai kamu saat setiap gambar dibuat; membatalkan di tengah jalan tidak mengembalikan kredit gambar yang sudah jadi.',
         confirm: `Generate ${n} gambar`
       })
       if (!ok) return
@@ -835,7 +882,12 @@ export function StoryboardStep() {
           Generate {stats.needImg} gambar
           {credits != null && stats.needImg > 0 && (
             <span className="font-normal text-ink-2">
-              ≈ {nexaImg ? idrLabel(credits * stats.needImg * 1000) : `${Math.round(credits * stats.needImg * 10) / 10} kr`}
+              ≈{' '}
+              {nexaImg
+                ? idrLabel(credits * stats.needImg * 1000)
+                : kieImg
+                  ? idrLabel(credits * stats.needImg * KIE_CREDIT_IDR)
+                  : `${Math.round(credits * stats.needImg * 10) / 10} kr`}
             </span>
           )}
         </Button>
@@ -855,7 +907,12 @@ export function StoryboardStep() {
                 : `Jadikan ${stats.needVideo.length} video`}
             {stats.videoRunning === 0 && videoCredits != null && stats.needVideo.length > 0 && (
               <span className="font-normal text-white/80">
-                ≈ {nexaVid ? idrLabel(videoCredits * 1000) : `${Math.round(videoCredits * 10) / 10} kr`}
+                ≈{' '}
+                {nexaVid
+                  ? idrLabel(videoCredits * 1000)
+                  : kieVid
+                    ? idrLabel(videoCredits * KIE_CREDIT_IDR)
+                    : `${Math.round(videoCredits * 10) / 10} kr`}
               </span>
             )}
           </Button>
