@@ -64,6 +64,7 @@ const api: StudioApi = {
     importFootage: call('talkinghead:importFootage'),
     getFootage: call('talkinghead:getFootage'),
     transcribe: call('talkinghead:transcribe'),
+    testGroq: call('talkinghead:testGroq'),
     setDroppedWords: call('talkinghead:setDroppedWords'),
     setFillers: call('talkinghead:setFillers'),
     arrange: call('talkinghead:arrange'),

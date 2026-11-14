@@ -101,8 +101,10 @@ export interface StudioApi {
     importFootage(projectId: string): Promise<{ video: Asset; audio: Asset } | null>
     /** The project's recording and extracted audio, if any. */
     getFootage(projectId: string): Promise<{ video: Asset | null; audio: Asset | null }>
-    /** Recognises the recording once with local Whisper (a job; progress in the jobs list). */
+    /** Recognises the recording once with the chosen engine (local Whisper, or Groq cloud Whisper Large V3). A job; progress in the jobs list. */
     transcribe(projectId: string): Promise<Job>
+    /** Proves the stored Groq key works for transcription (no audio sent, no cost). */
+    testGroq(): Promise<KeyTestResult>
     /** Marks transcript words to cut (or restores them). */
     setDroppedWords(assetId: string, dropped: number[]): Promise<Asset>
     /** Replaces the filler-word list and re-marks the auto-cut words. */
