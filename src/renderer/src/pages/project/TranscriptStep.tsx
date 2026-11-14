@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ArrowRight, Clapperboard, FileText, Scissors, Sparkles, Upload, Wand2 } from 'lucide-react'
 import { DEFAULT_FILLERS, PAUSE_CUT_SEC, computeCuts, findFootage, summarizeTranscript, type ArrangeResult } from '@shared/talkinghead'
-import type { WhisperStatus } from '@shared/types'
+import { TRANSCRIPT_PROVIDERS } from '@shared/groq'
+import type { AppSettings, TranscriptProvider, WhisperStatus } from '@shared/types'
 import { Badge, Button, cx, inputCls } from '../../components/ui'
+import { Select } from '../../components/Select'
 import { errorText, mmss } from '../../lib/format'
 import { useApp } from '../../store/app'
 import { isRunning, jobFor, useProject } from '../../store/project'
@@ -13,6 +15,8 @@ export function TranscriptStep() {
   const { toast, go } = useApp()
   const jobs = useProject((s) => s.jobs)
   const [whisper, setWhisper] = useState<WhisperStatus | null>(null)
+  const [settings, setSettings] = useState<AppSettings | null>(null)
+  const [groqConfigured, setGroqConfigured] = useState(false)
   const [busy, setBusy] = useState<'import' | 'arrange' | 'build' | null>(null)
   const [scenes, setScenes] = useState<ArrangeResult | null>(null)
   const [fillerText, setFillerText] = useState('')
@@ -30,6 +34,22 @@ export function TranscriptStep() {
   useEffect(() => {
     void window.api.whisper.status().then(setWhisper)
   }, [])
+
+  useEffect(() => {
+    void window.api.settings.get().then(setSettings)
+    void window.api.settings.keys().then((keys) => setGroqConfigured(!!keys.find((k) => k.provider === 'groq')?.configured))
+  }, [])
+
+  const provider = settings?.transcriptProvider ?? 'local'
+
+  const setProvider = async (v: TranscriptProvider): Promise<void> => {
+    try {
+      setSettings(await window.api.settings.set({ transcriptProvider: v }))
+      toast('success', v === 'groq' ? 'Transkrip memakai Groq (Whisper Large V3, cloud).' : 'Transkrip memakai Whisper Small lokal.')
+    } catch (e) {
+      toast('error', errorText(e))
+    }
+  }
 
   useEffect(() => {
     setFillerText(fillers.join(', '))
@@ -139,7 +159,8 @@ export function TranscriptStep() {
               <p className="text-[13px] font-semibold text-accent">Langkah 2 dari 4</p>
               <h1 className="mt-1.5 font-display text-[40px] font-bold leading-tight tracking-[-0.02em]">Transkrip rekaman</h1>
               <p className="mt-2 text-[15px] text-ink-2">
-                Impor rekaman orang berbicara, kenali kata-katanya sekali dengan Whisper, buang jeda dan kata pengisi, lalu susun jadi adegan.
+                Impor rekaman orang berbicara, kenali kata-katanya sekali — dengan Whisper lokal atau Groq cloud — buang jeda dan kata pengisi,
+                lalu susun jadi adegan.
               </p>
             </div>
 
@@ -170,20 +191,54 @@ export function TranscriptStep() {
                 <p className="text-[14px] text-ink-2">Impor rekaman dulu — audionya diekstrak otomatis saat impor.</p>
               ) : words.length === 0 ? (
                 <>
-                  <p className="text-[14px] leading-relaxed text-ink-2">
-                    Audio rekaman siap ({mmss(footage.audio.durationMs ?? 0)}). Whisper lokal mengenali kata per kata beserta waktunya — tanpa
-                    kunci API, tanpa biaya.
-                  </p>
-                  {!whisperReady && (
-                    <p className="text-[13px] leading-relaxed text-sun-ink">
-                      Model Whisper belum diunduh ({whisper?.state ?? '…'}). Unduh dulu di Pengaturan, bagian Caption akurat.
-                      <button type="button" onClick={() => void openSettings()} className="ml-1 font-semibold text-accent-dark hover:underline">
-                        Buka Pengaturan
-                      </button>
-                    </p>
+                  <label className="flex flex-col gap-1.5">
+                    <span className="text-[13px] font-semibold text-ink-2">Mesin transkrip (berlaku untuk transkrip berikutnya)</span>
+                    <Select<TranscriptProvider>
+                      value={provider}
+                      options={TRANSCRIPT_PROVIDERS.map((p) => ({ value: p.id, label: p.label, hint: p.hint }))}
+                      onChange={(v) => void setProvider(v)}
+                      label="Mesin transkrip"
+                    />
+                  </label>
+                  {provider === 'groq' ? (
+                    <>
+                      <p className="text-[14px] leading-relaxed text-ink-2">
+                        Audio rekaman siap ({mmss(footage.audio.durationMs ?? 0)}). Groq mengenali kata per kata dengan Whisper Large V3 —
+                        audio dikirim ke server Groq, gratis di tier gratis (berkas dibatasi 25 MB).
+                      </p>
+                      {!groqConfigured && (
+                        <p className="text-[13px] leading-relaxed text-sun-ink">
+                          Kunci Groq belum diisi. Isi dulu di Pengaturan › Kunci API dan model (penyedia Groq).
+                          <button type="button" onClick={() => void openSettings()} className="ml-1 font-semibold text-accent-dark hover:underline">
+                            Buka Pengaturan
+                          </button>
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-[14px] leading-relaxed text-ink-2">
+                        Audio rekaman siap ({mmss(footage.audio.durationMs ?? 0)}). Whisper lokal mengenali kata per kata beserta waktunya —
+                        tanpa kunci API, tanpa biaya.
+                      </p>
+                      {!whisperReady && (
+                        <p className="text-[13px] leading-relaxed text-sun-ink">
+                          Model Whisper belum diunduh ({whisper?.state ?? '…'}). Unduh dulu di Pengaturan, bagian Caption akurat.
+                          <button type="button" onClick={() => void openSettings()} className="ml-1 font-semibold text-accent-dark hover:underline">
+                            Buka Pengaturan
+                          </button>
+                        </p>
+                      )}
+                    </>
                   )}
                   <div>
-                    <Button variant="accent" loading={transcribing} disabled={!whisperReady} icon={<Sparkles className="size-4" />} onClick={() => void doTranscribe()}>
+                    <Button
+                      variant="accent"
+                      loading={transcribing}
+                      disabled={provider === 'local' ? !whisperReady : !groqConfigured}
+                      icon={<Sparkles className="size-4" />}
+                      onClick={() => void doTranscribe()}
+                    >
                       {transcribing ? 'Mengenali kata…' : 'Buat transkrip'}
                     </Button>
                   </div>
@@ -198,6 +253,15 @@ export function TranscriptStep() {
                 </>
               ) : (
                 <>
+                  <label className="flex flex-col gap-1.5">
+                    <span className="text-[13px] font-semibold text-ink-2">Mesin transkrip (berlaku bila transkrip dibuat ulang)</span>
+                    <Select<TranscriptProvider>
+                      value={provider}
+                      options={TRANSCRIPT_PROVIDERS.map((p) => ({ value: p.id, label: p.label, hint: p.hint }))}
+                      onChange={(v) => void setProvider(v)}
+                      label="Mesin transkrip"
+                    />
+                  </label>
                   <div className="flex flex-wrap gap-2">
                     <Badge tone="ok">{summary.words} kata</Badge>
                     <Badge tone="info">{summary.keptWords} kata terpakai</Badge>

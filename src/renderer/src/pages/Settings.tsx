@@ -21,12 +21,13 @@ import {
   TriangleAlert
 } from 'lucide-react'
 import { FLOW_DEFAULT_BASE_URL, FLOW_IMAGE_MODELS, FLOW_VIDEO_MODELS } from '@shared/flow2api'
+import { TRANSCRIPT_PROVIDERS } from '@shared/groq'
 import { HF_IMAGE_MODELS, HF_VIDEO_MODELS } from '@shared/higgsfield'
 import { MOTION_TEMPLATES } from '@shared/motion-templates'
 import { KIE_DEFAULT_BASE_URL, KIE_IMAGE_MODELS, KIE_VIDEO_MODELS } from '@shared/kieai'
 import { NEXA_DEFAULT_BASE_URL, NEXA_IMAGE_MODELS, NEXA_VIDEO_MODELS } from '@shared/nexabot'
 import { LANGUAGES, LLM_PROVIDERS } from '@shared/models'
-import type { ApiProvider, AppSettings, KeyStatus, KeyTestResult, LlmProvider, TtsProvider } from '@shared/types'
+import type { ApiProvider, AppSettings, KeyStatus, KeyTestResult, LlmProvider, TranscriptProvider, TtsProvider } from '@shared/types'
 import { Logo } from '../components/Logo'
 import { ModelPicker } from '../components/ModelPicker'
 import { ProviderLogo, type ProviderLogoId } from '../components/ProviderLogo'
@@ -885,14 +886,19 @@ function MotionSection({ settings, onSettings, onOpenGuide }: { settings: AppSet
  *  whether new projects may pick the Talking Head birth mode. */
 function TalkingHeadSection({
   settings,
+  statusOf,
   onSettings,
   onOpenGuide
 }: {
   settings: AppSettings
+  statusOf: (p: ApiProvider) => KeyStatus | undefined
   onSettings: (s: AppSettings) => void
   onOpenGuide: () => void
 }) {
   const { toast } = useApp()
+  const [testing, setTesting] = useState(false)
+  const [test, setTest] = useState<KeyTestResult | null>(null)
+  const groqKey = statusOf('groq')
 
   const toggle = async (v: boolean): Promise<void> => {
     onSettings(await window.api.settings.set({ talkingHeadEnabled: v }))
@@ -904,12 +910,35 @@ function TalkingHeadSection({
     )
   }
 
+  const setProvider = async (v: TranscriptProvider): Promise<void> => {
+    onSettings(await window.api.settings.set({ transcriptProvider: v }))
+    setTest(null)
+    toast(
+      'success',
+      v === 'groq'
+        ? 'Transkrip memakai Groq (Whisper Large V3, cloud). Audio rekaman dikirim ke server Groq.'
+        : 'Transkrip memakai Whisper Small lokal (gratis, tanpa kunci).'
+    )
+  }
+
+  const runTest = async (): Promise<void> => {
+    setTesting(true)
+    setTest(null)
+    try {
+      setTest(await window.api.talkinghead.testGroq())
+    } catch (e) {
+      setTest({ ok: false, message: errorText(e) })
+    } finally {
+      setTesting(false)
+    }
+  }
+
   return (
     <>
       <SectionTitle
         icon={<Clapperboard className="size-5" />}
         title="Talking Head"
-        sub="Ubah rekaman orang berbicara jadi video adegan-per-adegan — transkrip Whisper lokal, tanpa kunci."
+        sub="Ubah rekaman orang berbicara jadi video adegan-per-adegan — transkrip Whisper lokal atau Groq cloud."
       />
       <Card>
         <div className="flex items-center gap-3">
@@ -920,6 +949,48 @@ function TalkingHeadSection({
           </div>
           <Switch on={settings.talkingHeadEnabled} onChange={(v) => void toggle(v)} label="Nyalakan Talking Head" />
         </div>
+        <Field
+          label="Mesin transkrip"
+          hint="Berlaku untuk transkrip berikutnya. Transkrip yang sudah dibuat tidak berubah sampai dibuat ulang."
+        >
+          <Select<TranscriptProvider>
+            value={settings.transcriptProvider}
+            options={TRANSCRIPT_PROVIDERS.map((p) => ({ value: p.id, label: p.label, hint: p.hint }))}
+            onChange={(v) => void setProvider(v)}
+            label="Mesin transkrip"
+          />
+        </Field>
+        {settings.transcriptProvider === 'groq' ? (
+          <>
+            <p className="text-[13px] leading-relaxed text-ink-2">
+              Groq mengirim audio rekaman ke servernya dan mengenali kata per kata dengan <strong className="text-ink">Whisper Large V3</strong>{' '}
+              (kelas large-v3, lebih akurat dari Whisper Small lokal). <strong className="text-ink">Gratis di tier gratis Groq</strong>; batas
+              tier gratis berlaku dan berkas dibatasi 25 MB. Kunci yang dipakai adalah kunci Groq yang sama dengan LLM Groq — isi sekali di
+              atas, bagian Kunci API dan model.
+            </p>
+            {!groqKey?.configured ? (
+              <p className="flex items-start gap-2.5 rounded-xl border border-amber-600/40 bg-amber-50 px-4 py-3.5 text-[13px] leading-relaxed text-amber-900">
+                <TriangleAlert className="mt-0.5 size-4 shrink-0" />
+                <span>
+                  <strong>Kunci Groq belum diisi.</strong> Transkrip Groq tidak bisa jalan sampai kunci diisi di atas, bagian Kunci API dan
+                  model (penyedia Groq).
+                </span>
+              </p>
+            ) : (
+              <div className="flex flex-wrap items-center gap-3">
+                <Button onClick={() => void runTest()} disabled={testing}>
+                  {testing ? 'Menguji…' : 'Uji Koneksi Groq'}
+                </Button>
+                {test && <span className={cx('text-[13px] font-medium', test.ok ? 'text-emerald-700' : 'text-red-700')}>{test.message}</span>}
+              </div>
+            )}
+          </>
+        ) : (
+          <p className="text-[13px] leading-relaxed text-ink-2">
+            Whisper Small berjalan di komputer ini — <strong className="text-ink">gratis, tanpa kunci, tanpa internet</strong>. Model perlu
+            diunduh sekali (lihat bagian Caption akurat di bawah).
+          </p>
+        )}
         <div className="flex flex-wrap items-center gap-3">
           <Button variant="ghost" onClick={onOpenGuide} icon={<BookOpenText className="size-4" />}>
             Buka Panduan Talking Head
@@ -928,8 +999,7 @@ function TalkingHeadSection({
         <p className="flex items-start gap-2.5 border-t border-dashed border-line pt-4 text-[13px] leading-relaxed text-ink-2">
           <Clapperboard className="mt-0.5 size-4 shrink-0" />
           <span>
-            Semua proses berjalan lokal di komputer ini (Whisper + FFmpeg) dan <strong className="text-ink">gratis</strong>. Susun adegan
-            dengan AI memakai kunci LLM yang sudah diatur; tanpa kunci itu, adegan disusun otomatis dari jeda panjang. Mode ini{' '}
+            Susun adegan dengan AI memakai kunci LLM yang sudah diatur; tanpa kunci itu, adegan disusun otomatis dari jeda panjang. Mode ini{' '}
             <strong className="text-ink">tanpa pelacakan wajah</strong> — close-up hanya memperbesar bagian frame yang dipilih.
           </span>
         </p>
@@ -1161,7 +1231,7 @@ export function Settings() {
                 <FlowSection settings={settings} onSettings={setSettings} onOpenGuide={() => setTab('flow-guide')} />
                 <NexaSection settings={settings} statusOf={statusOf} onChanged={reload} onSettings={setSettings} onOpenGuide={() => setTab('nexabot-guide')} />
                 <MotionSection settings={settings} onSettings={setSettings} onOpenGuide={() => setTab('motion-guide')} />
-                <TalkingHeadSection settings={settings} onSettings={setSettings} onOpenGuide={() => setTab('talkinghead-guide')} />
+                <TalkingHeadSection settings={settings} statusOf={statusOf} onSettings={setSettings} onOpenGuide={() => setTab('talkinghead-guide')} />
                 <KieSection settings={settings} statusOf={statusOf} onChanged={reload} onSettings={setSettings} onOpenGuide={() => setTab('kieai-guide')} />
                 <WhisperSection settings={settings} onSettings={setSettings} />
               </>
