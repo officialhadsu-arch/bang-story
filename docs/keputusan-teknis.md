@@ -143,3 +143,15 @@ diam-diam.
 terletak seluruhnya di antara dua kata, jadi jeda ikut terhitung "terpakai" dan ikut masuk media adegan.
 Sekarang run juga putus bila interval potong tumpang tindih dengan celah antara dua kata terpakai.
 Ditemukan service-test `talkinghead` (Fase 5, 62 butir).
+
+### Transkrip Groq: provider eksplisit, waktu kata langsung dari server, tanpa DTW (G6)
+Mode Talking Head punya dua mesin transkrip: Whisper Small lokal (bawaan) dan Groq cloud (`whisper-large-v3`).
+Pilihannya eksplisit (`settings.transcriptProvider`), disimpan lewat setelan key/value yang sudah ada — tanpa
+migrasi DB. Groq mengembalikan waktu per kata langsung (`verbose_json` + `timestamp_granularities: ["word"]`),
+jadi tidak ada langkah DTW; kata dinormalisasi dengan aturan monoton yang sama seperti `recognize` lokal dan
+masuk ke alur yang sama lewat `meta.words`. Kunci dipakai ulang dari LLM Groq (`getSecret('groq')`) — tidak ada
+penyimpanan kunci kedua. Tidak ada fallback diam-diam antar provider: provider yang gagal menggagalkan job
+dengan pesan Indonesia. Batas tier gratis Groq 25 MB per berkas ditegakkan di klien (gagal-tertutup, tanpa
+chunking). Model ditetapkan ke `whisper-large-v3` (yang diminta Bos); bila Groq menghapusnya, gagal-tertutup
+dengan pesan jelas — tidak ada pergantian model diam-diam ke turbo. Lihat `docs/groq-transkrip-pemetaan.md`
+(keputusan G6-01–G6-10) dan `docs/layanan-ai.md` (bagian Transkrip Groq).
