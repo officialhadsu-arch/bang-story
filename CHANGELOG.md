@@ -9,6 +9,10 @@ Cara menaikkan versi ada di [docs/pengembangan.md](docs/pengembangan.md#versi-da
 ## [Belum dirilis]
 
 - Rebrand aplikasi menjadi **KenStory** (fork dari bangtutorial/bang-story tetap berlisensi MIT, lihat NOTICE.md).
+- **Flow2API: kunci API server (Bearer)** — server Flow2API versi sekarang menuntut `Authorization: Bearer <kunci>` di
+  tiap permintaan; tanpanya generate gagal HTTP 401 (terbukti di uji live PC, 20 Nov 2026). Kolom baru "Kunci API
+  server" di Pengaturan › Google Flow, tersimpan terenkripsi; kosong berarti permintaan tanpa header seperti
+  sebelumnya. Pesan galat 401 kini membedakan kunci belum diisi vs kunci tersimpan yang ditolak.
 - **Motion (Fase 4, 0.4+)**: adegan motion sebagai provider visual tingkat 3 — agent coding (Claude/Kiro/
   Antigravity) menulis babak HTML+GSAP di `motion-work/`, pengguna menyetujui tiap beat di langkah Rancangan,
   aplikasi merender MP4 di jendela tersembunyi (D-22, diputus spike 4.0). Sakelar induk mati bawaan, preset

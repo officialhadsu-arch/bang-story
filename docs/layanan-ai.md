@@ -135,10 +135,13 @@ dari klien Flow2API De-Story (`flow2api.rs`) — pola saja, bukan salinan kode.
   jalur Higgsfield tidak berubah. `estimateCredits` mengembalikan null untuk model flow — server tidak punya endpoint
   estimasi; biayanya kredit Google Flow dari langganan AI Pro pengguna.
 - Pengaturan: `flow2apiEnabled` (mati bawaan) dan `flow2apiBaseUrl` (`AppSettings`). Sakelarnya terkunci di balik
-  peringatan risiko akun D-16 dan kotak persetujuan di Pengaturan (`Settings.tsx`, `FlowSection`). IPC
-  `flow2api:testConnection` memeriksa `GET /health`, cadangan `GET /v1/models`.
-- Tier 1 tidak memakai kunci Bearer dan tidak memakai layanan captcha berbayar; server yang butuh kunci Bearer belum
-  didukung. Tutorial lengkap berbahasa Indonesia ada di dalam aplikasi (Pengaturan › Panduan Flow2API,
+  peringatan risiko akun D-16 dan kotak persetujuan di Pengaturan (`Settings.tsx`, `FlowSection`). **Kunci API server**
+  disimpan terenkripsi sebagai penyedia `flow2api` (`secrets.ts`, `KeyForm` yang sama dengan provider lain) dan
+  dikirim sebagai `Authorization: Bearer` di `POST /v1/chat/completions` dan di cadangan `GET /v1/models` pada
+  `flow2api:testConnection`; kosong berarti permintaan tanpa header (server lama tanpa kunci). Kunci terlihat di
+  halaman admin server (System Settings › API Key Settings). IPC `flow2api:testConnection` memeriksa `GET /health`,
+  cadangan `GET /v1/models`.
+- Tier 1 tidak memakai layanan captcha berbayar. Tutorial lengkap berbahasa Indonesia ada di dalam aplikasi (Pengaturan › Panduan Flow2API,
   `FlowGuideSection.tsx`) dan pemetaannya di `docs/flow2api-pemetaan-destory.md`.
 
 ## NexaBot (`services/nexabot.ts`, `shared/nexabot.ts`)

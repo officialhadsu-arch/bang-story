@@ -211,8 +211,11 @@ python main.py`}</Cmd>
             <Code>Silent clip: no background music, no soundtrack, no singing or humming.</Code>
           </>,
           <>
-            <strong className="text-ink">Tidak ada kunci Bearer di tier 1.</strong> Server yang butuh kunci Bearer belum didukung; jalur yang
-            didokumentasikan adalah server lokal tanpa kunci. Resolusi gambar/video memakai bawaan server.
+            <strong className="text-ink">Kunci API server dikirim sebagai Bearer.</strong> Server Flow2API meminta kunci API
+            di setiap permintaan — isi <strong className="text-ink">Kunci API server</strong> di{' '}
+            <strong className="text-ink">Pengaturan › Google Flow</strong> (kuncinya terlihat di halaman admin server, System
+            Settings › API Key Settings). Bila kunci di server diganti, perbarui juga di KenStory — kalau tidak, generate
+            gagal dengan HTTP 401. Resolusi gambar/video memakai bawaan server.
           </>
         ]}
       />
