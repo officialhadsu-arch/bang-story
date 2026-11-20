@@ -160,12 +160,16 @@ async function referenceImages(model: HfModel, chars: Character[], signal: Abort
   return { images, names }
 }
 
-/** Flow2API stays off until the user reads the D-16 account-risk warning and turns it on in Settings. */
-function requireFlowEnabled(): string {
+/**
+ * Flow2API stays off until the user reads the D-16 account-risk warning and turns it on in Settings.
+ * The server API key is optional: null keeps the old keyless requests for servers without one;
+ * a saved key is sent as `Authorization: Bearer` (servers since late 2026 require it).
+ */
+function requireFlow(): { baseUrl: string; apiKey: string | null } {
   const settings = getSettings()
   if (!settings.flow2apiEnabled)
     throw new Error('Flow2API belum dinyalakan. Nyalakan di Pengaturan › Layanan AI dan kunci › Google Flow, lalu baca Panduan Flow2API.')
-  return settings.flow2apiBaseUrl
+  return { baseUrl: settings.flow2apiBaseUrl, apiKey: getSecret('flow2api') }
 }
 
 /** Saves a Flow2API result and attaches it to the clip or character, mirroring finishHiggsfield's tail. */
@@ -585,7 +589,7 @@ export function generateClipImage(clipId: string): Job {
   if (provider === 'flow2api') {
     const job = insertJob({ projectId: clip.projectId, clipId, kind: 'image', provider: 'flow2api' })
     return startFlow(job, async (ctx) => {
-      const baseUrl = requireFlowEnabled()
+      const { baseUrl, apiKey } = requireFlow()
       const fresh = getClip(clipId)
       const project = getProject(fresh.projectId)
       const model = getImageModel(project.imageModel)
@@ -596,7 +600,7 @@ export function generateClipImage(clipId: string): Job {
         target: 'clip-image' as const,
         model,
         prompt,
-        run: (c: TaskCtx) => flow.generateImage({ baseUrl, model, prompt, aspect: project.aspectRatio, refs: refs.images, signal: c.signal })
+        run: (c: TaskCtx) => flow.generateImage({ baseUrl, model, prompt, aspect: project.aspectRatio, refs: refs.images, signal: c.signal, apiKey })
       }
     })
   }
@@ -668,7 +672,7 @@ export function generateCharacterSheet(characterId: string): Job {
   if (isFlowModelId(getProject(c.projectId).imageModel)) {
     const job = insertJob({ projectId: c.projectId, characterId, kind: 'sheet', provider: 'flow2api' })
     return startFlow(job, async () => {
-      const baseUrl = requireFlowEnabled()
+      const { baseUrl, apiKey } = requireFlow()
       const project = getProject(c.projectId)
       const model = getImageModel(project.imageModel)
       const prompt = sheetPrompt(project, getCharacter(characterId))
@@ -676,7 +680,7 @@ export function generateCharacterSheet(characterId: string): Job {
         target: 'sheet' as const,
         model,
         prompt,
-        run: (ctx: TaskCtx) => flow.generateImage({ baseUrl, model, prompt, aspect: '16:9', refs: [], signal: ctx.signal })
+        run: (ctx: TaskCtx) => flow.generateImage({ baseUrl, model, prompt, aspect: '16:9', refs: [], signal: ctx.signal, apiKey })
       }
     })
   }
@@ -742,7 +746,7 @@ export function generateClipVideo(clipId: string): Job {
   if (provider === 'flow2api') {
     const job = insertJob({ projectId: clip.projectId, clipId, kind: 'video', provider: 'flow2api' })
     return startFlow(job, async (ctx) => {
-      const baseUrl = requireFlowEnabled()
+      const { baseUrl, apiKey } = requireFlow()
       const fresh = getClip(clipId)
       const image = getAsset(fresh.imageAssetId)
       if (!image) throw new Error('Gambar klip tidak ditemukan')
@@ -757,7 +761,7 @@ export function generateClipVideo(clipId: string): Job {
         model,
         prompt,
         run: (c: TaskCtx) =>
-          flow.generateVideo({ baseUrl, model, prompt, firstFrame, seconds: fresh.durationMs / 1000, aspect: project.aspectRatio, signal: c.signal })
+          flow.generateVideo({ baseUrl, model, prompt, firstFrame, seconds: fresh.durationMs / 1000, aspect: project.aspectRatio, signal: c.signal, apiKey })
       }
     })
   }

@@ -94,6 +94,7 @@ async function testProvider(provider: ApiProvider, key?: string): Promise<KeyTes
   if (provider === 'elevenlabs') return eleven.testKey(key)
   if (provider === 'nexabot') return nexa.testConnection(getSettings().nexabotBaseUrl, key ?? getSecret('nexabot') ?? undefined)
   if (provider === 'kieai') return kie.testCredentials(getSettings().kieaiBaseUrl, key ?? getSecret('kieai') ?? undefined)
+  if (provider === 'flow2api') return flow.testConnection(getSettings().flow2apiBaseUrl, key ?? getSecret('flow2api') ?? undefined)
   return llm.testLlm(provider, key)
 }
 
@@ -365,7 +366,7 @@ export function registerIpc(): void {
     if (provider === 'gemini') return gemini.listVoices()
     return eleven.listVoices()
   })
-  handle('flow2api:testConnection', (baseUrl: string) => flow.testConnection(baseUrl))
+  handle('flow2api:testConnection', (baseUrl: string) => flow.testConnection(baseUrl, getSecret('flow2api') ?? undefined))
   handle('nexabot:testConnection', (baseUrl: string) => nexa.testConnection(baseUrl, getSecret('nexabot') ?? undefined))
   handle('kieai:testConnection', (baseUrl: string) => kie.testConnection(baseUrl, getSecret('kieai') ?? undefined))
 

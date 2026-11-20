@@ -3,7 +3,7 @@ import type { ApiProvider, KeyStatus } from '@shared/types'
 import { getDb } from './db'
 import { getSettings } from './settings'
 
-const PROVIDERS: ApiProvider[] = ['higgsfield', 'gemini', 'elevenlabs', 'openrouter', 'groq', 'custom', 'nexabot', 'kieai']
+const PROVIDERS: ApiProvider[] = ['higgsfield', 'gemini', 'elevenlabs', 'openrouter', 'groq', 'custom', 'nexabot', 'kieai', 'flow2api']
 
 export const PROVIDER_NAMES: Record<ApiProvider, string> = {
   higgsfield: 'Higgsfield',
@@ -13,7 +13,8 @@ export const PROVIDER_NAMES: Record<ApiProvider, string> = {
   groq: 'Groq',
   custom: 'endpoint custom',
   nexabot: 'NexaBot',
-  kieai: 'Kie.ai'
+  kieai: 'Kie.ai',
+  flow2api: 'Flow2API'
 }
 
 interface SecretRow {

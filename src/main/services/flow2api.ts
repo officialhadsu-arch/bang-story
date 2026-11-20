@@ -8,9 +8,10 @@ import { fitDuration, type HfModel } from '@shared/higgsfield'
  * (Nano Banana image models, Veo/Omni video) with the user's own Google account.
  *
  * Pattern only, rewritten in TypeScript from De-Story's `flow2api.rs` (public
- * repository without a LICENSE — no code copied). Tier 1 supports servers that
- * need no Bearer key (the usual localhost setup); a server that requires one
- * is out of scope for now.
+ * repository without a LICENSE — no code copied). The server's own API key is
+ * optional: when the user saves one (Settings › Google Flow), it is sent as
+ * `Authorization: Bearer <key>`; when empty, requests go without a header,
+ * as before. The key is never logged.
  */
 
 export function sanitizeUrl(base: string): string {
@@ -63,7 +64,8 @@ function connectError(base: string, e: unknown): Error {
   return new Error(`Tidak dapat terhubung ke server Flow2API di ${base}. Pastikan servernya jalan, lalu coba lagi.`)
 }
 
-export async function testConnection(baseUrl: string): Promise<KeyTestResult> {
+/** Pings the server. `/health` needs no key; the `/v1/models` fallback sends the saved server API key when one exists. */
+export async function testConnection(baseUrl: string, apiKey?: string | null): Promise<KeyTestResult> {
   const base = sanitizeUrl(baseUrl)
   const t = combinedSignal(undefined, FLOW_TIMEOUTS.test)
   try {
@@ -77,11 +79,20 @@ export async function testConnection(baseUrl: string): Promise<KeyTestResult> {
     if (health?.ok) return { ok: true, message: `Terhubung ke Flow2API di ${base}` }
     let models: Response | null = null
     try {
-      models = await fetch(`${base}/v1/models`, { signal: t.signal })
+      models = await fetch(`${base}/v1/models`, {
+        signal: t.signal,
+        ...(apiKey ? { headers: { Authorization: `Bearer ${apiKey}` } } : {})
+      })
     } catch {
       if (t.isTimeout()) return { ok: false, message: 'Server Flow2API tidak merespons dalam 8 detik.' }
     }
     if (models?.ok) return { ok: true, message: `Terhubung ke Flow2API (${base})` }
+    if (models?.status === 401)
+      return {
+        ok: false,
+        message:
+          'Server Flow2API menolak (HTTP 401): kunci API server tidak valid atau belum diisi di Pengaturan › Google Flow (kuncinya terlihat di halaman admin server, API Key Settings).'
+      }
     if (models) return { ok: false, message: `Server Flow2API mengembalikan status HTTP ${models.status}` }
     return { ok: false, message: `Tidak dapat terhubung ke server Flow2API di ${base}` }
   } finally {
@@ -311,6 +322,8 @@ interface ChatRequest {
   timeoutMs: number
   signal?: AbortSignal
   what: string
+  /** Server API key; sent as `Authorization: Bearer` only when set. */
+  apiKey?: string | null
 }
 
 async function chatCompletions(req: ChatRequest): Promise<string> {
@@ -323,7 +336,11 @@ async function chatCompletions(req: ChatRequest): Promise<string> {
       res = await guard(
         fetch(`${base}/v1/chat/completions`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'text/event-stream',
+            ...(req.apiKey ? { Authorization: `Bearer ${req.apiKey}` } : {})
+          },
           body: JSON.stringify({ model: req.model, messages: [{ role: 'user', content: req.content }], stream: true }),
           signal: t.signal
         }),
@@ -340,12 +357,15 @@ async function chatCompletions(req: ChatRequest): Promise<string> {
       const reason = bodyErrorReason(bodyText)
       if (reason) {
         if (res.status === 401) {
-          // The server's wording for "no token configured" (observed Nov 2026) is
+          // The server's wording for a rejected API key (observed Nov 2026) is
           // Mandarin; translate the one known string so the message stays Indonesian.
           const reasonText = reason === 'API Key 无效' ? 'kunci API server tidak valid' : reason
-          throw new Error(
-            `Server Flow2API menolak permintaan (HTTP 401): ${reasonText}. Periksa login Google di halaman admin server — token mungkin belum ditambahkan atau sudah kedaluwarsa.`
-          )
+          // A 401 with no key sent means the server requires one; a 401 with a key
+          // sent means the saved key is wrong. Say which, so the user knows the fix.
+          const hint = req.apiKey
+            ? 'Kunci API server yang tersimpan ditolak — periksa kuncinya di Pengaturan › Google Flow (kuncinya terlihat di halaman admin server, API Key Settings).'
+            : 'Server ini meminta kunci API — isi Kunci API server di Pengaturan › Google Flow (kuncinya terlihat di halaman admin server, API Key Settings). Login Google di server mungkin juga belum ditambahkan atau sudah kedaluwarsa.'
+          throw new Error(`Server Flow2API menolak permintaan (HTTP 401): ${reasonText}. ${hint}`)
         }
         throw new Error(friendlyFlowError(reason))
       }
@@ -371,6 +391,8 @@ export async function generateImage(opts: {
   aspect: AspectRatio
   refs: FlowImageRef[]
   signal?: AbortSignal
+  /** Server API key; sent as `Authorization: Bearer` only when set. */
+  apiKey?: string | null
 }): Promise<FlowMedia> {
   const base = sanitizeUrl(opts.baseUrl)
   const targetModel = flowImageModelName(opts.model, opts.aspect)
@@ -381,7 +403,7 @@ export async function generateImage(opts: {
           { type: 'text', text: opts.prompt },
           ...opts.refs.map((r) => ({ type: 'image_url', image_url: { url: `data:${r.mime};base64,${r.bytes.toString('base64')}` } }))
         ]
-  const contentStr = await chatCompletions({ baseUrl: base, model: targetModel, content, timeoutMs: FLOW_TIMEOUTS.image, signal: opts.signal, what: 'membuat gambar' })
+  const contentStr = await chatCompletions({ baseUrl: base, model: targetModel, content, timeoutMs: FLOW_TIMEOUTS.image, signal: opts.signal, what: 'membuat gambar', apiKey: opts.apiKey })
   const target = extractMediaUrlOrData(contentStr)
   if (!target) throw new Error(`Tidak dapat menemukan URL atau data gambar di respons Flow2API: ${snippet(contentStr)}`)
   const media = await fetchOrDecodeBytes(base, target, opts.signal)
@@ -397,6 +419,8 @@ export async function generateVideo(opts: {
   seconds: number
   aspect: AspectRatio
   signal?: AbortSignal
+  /** Server API key; sent as `Authorization: Bearer` only when set. */
+  apiKey?: string | null
 }): Promise<FlowMedia> {
   const base = sanitizeUrl(opts.baseUrl)
   const sec = fitDuration(opts.model, opts.seconds) ?? 4
@@ -405,7 +429,7 @@ export async function generateVideo(opts: {
     { type: 'text', text: `${opts.prompt.trim()} Silent clip: no background music, no soundtrack, no singing or humming.` },
     { type: 'image_url', image_url: { url: `data:${opts.firstFrame.mime};base64,${opts.firstFrame.bytes.toString('base64')}` } }
   ]
-  const contentStr = await chatCompletions({ baseUrl: base, model: targetModel, content, timeoutMs: FLOW_TIMEOUTS.video, signal: opts.signal, what: 'membuat video' })
+  const contentStr = await chatCompletions({ baseUrl: base, model: targetModel, content, timeoutMs: FLOW_TIMEOUTS.video, signal: opts.signal, what: 'membuat video', apiKey: opts.apiKey })
   const target = extractMediaUrlOrData(contentStr)
   if (!target) throw new Error(`Tidak dapat menemukan URL atau data video di respons Flow2API: ${snippet(contentStr)}`)
   const media = await fetchOrDecodeBytes(base, target, opts.signal)

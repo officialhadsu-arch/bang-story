@@ -150,7 +150,7 @@ export interface StudioApi {
     list(source: ModelSource, refresh?: boolean): Promise<ModelList>
   }
   flow2api: {
-    /** Pings the Flow2API server at `baseUrl` (GET /health, fallback /v1/models). */
+    /** Pings the Flow2API server at `baseUrl` (GET /health, fallback /v1/models) with the stored server API key when one exists. */
     testConnection(baseUrl: string): Promise<KeyTestResult>
   }
   nexabot: {
