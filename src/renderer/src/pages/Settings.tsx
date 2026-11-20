@@ -564,10 +564,14 @@ function HiggsfieldSection({ status, onChanged }: { status?: KeyStatus; onChange
 
 function FlowSection({
   settings,
+  statusOf,
+  onChanged,
   onSettings,
   onOpenGuide
 }: {
   settings: AppSettings
+  statusOf: (p: ApiProvider) => KeyStatus | undefined
+  onChanged: () => void
   onSettings: (s: AppSettings) => void
   onOpenGuide: () => void
 }) {
@@ -644,6 +648,16 @@ function FlowSection({
             </label>
           </div>
         </div>
+        <KeyForm
+          provider="flow2api"
+          name="Flow2API"
+          label="Kunci API server"
+          status={statusOf('flow2api')}
+          help="Kunci API server Flow2API — terlihat di halaman admin server (System Settings › API Key Settings). Server meminta kunci ini di setiap permintaan (tanpanya: HTTP 401). Kunci tersimpan terenkripsi di perangkat ini dan hanya dikirim ke server Flow2API kamu. Kosongkan bila servermu tidak meminta kunci."
+          link={null}
+          linkLabel=""
+          onChanged={onChanged}
+        />
         <Field
           label="Alamat server Flow2API"
           hint="Biasanya http://localhost:8000 — server yang kamu jalankan di komputer ini. Kosongkan untuk memakai alamat bawaan."
@@ -1228,7 +1242,7 @@ export function Settings() {
                 <LlmSection settings={settings} statusOf={statusOf} onChanged={reload} onSettings={setSettings} />
                 <TtsSection settings={settings} statusOf={statusOf} onChanged={reload} onSettings={setSettings} />
                 <HiggsfieldSection status={statusOf('higgsfield')} onChanged={reload} />
-                <FlowSection settings={settings} onSettings={setSettings} onOpenGuide={() => setTab('flow-guide')} />
+                <FlowSection settings={settings} statusOf={statusOf} onChanged={reload} onSettings={setSettings} onOpenGuide={() => setTab('flow-guide')} />
                 <NexaSection settings={settings} statusOf={statusOf} onChanged={reload} onSettings={setSettings} onOpenGuide={() => setTab('nexabot-guide')} />
                 <MotionSection settings={settings} onSettings={setSettings} onOpenGuide={() => setTab('motion-guide')} />
                 <TalkingHeadSection settings={settings} statusOf={statusOf} onSettings={setSettings} onOpenGuide={() => setTab('talkinghead-guide')} />
