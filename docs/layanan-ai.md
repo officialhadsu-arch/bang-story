@@ -141,8 +141,61 @@ dari klien Flow2API De-Story (`flow2api.rs`) — pola saja, bukan salinan kode.
   `flow2api:testConnection`; kosong berarti permintaan tanpa header (server lama tanpa kunci). Kunci terlihat di
   halaman admin server (System Settings › API Key Settings). IPC `flow2api:testConnection` memeriksa `GET /health`,
   cadangan `GET /v1/models`.
+- Penyambungan akun (pengalaman 19–21 Nov 2026, lengkap di Panduan Flow2API dalam aplikasi): Token Management kosong
+  (Total 0) di awal itu normal. Pasang **Flow2API-Token-Updater** dari repositori GitHub-nya (unduh ZIP → ekstrak →
+  `chrome://extensions` → Developer mode → Load unpacked → pilih folder hasil ekstrak); folder `extension/` di dalam
+  folder server adalah ekstensi CAPTCHA, **bukan** Token-Updater — jangan tertukar. Token koneksi dibuat di admin:
+  System Settings › Extension Connection Settings › Random › Copy › Save settings, lalu ditempel di popup addon.
+  Jebakan: kolom popup yang tampak terisi bisa jadi hanya placeholder abu-abu — ketik ulang sampai teksnya hitam pekat,
+  klik Simpan (tombol biru) → Allow di dialog Chrome → Tes sekarang. Berhasil bila Token Management menampilkan
+  Total 1, Active 1, beserta Credits.
+- Metode CAPTCHA (admin server): bawaan **YesCaptcha itu berbayar dan kuncinya kosong** — ganti ke metode gratis
+  (Built-in browser atau Flow2API Team) dan **klik Save settings** sesudah mengganti dropdown (mengubah saja belum
+  menyimpan). `Failed to obtain reCAPTCHA token` berarti browser bawaan server gagal menghasilkan token — ganti ke
+  Flow2API Team (built-in) lalu Generate ulang.
+- Kunci API server: mengetik saja **belum menyimpan** — klik Simpan (atau Enter) sampai ada toast sukses dan kolom
+  berubah jadi titik-titik. Tulisan hijau "Terhubung ke Flow2API" hanya mengecek servernya jalan, bukan kuncinya.
+  Pesan 401 dibedakan (sejak v1.1d): "Server ini meminta kunci API — isi Kunci API server…" = kolom kunci masih
+  kosong; "Kunci API server yang tersimpan ditolak…" = kunci yang diketik tidak cocok dengan yang di server.
+- Jendela login Google: saat sesi kedaluwarsa, server membuka jendela browsernya sendiri (profil terpisah, bukan
+  Chrome pengguna) dan jendela itu bisa menutup sendiri sebelum sempat mengetik (terutama di RAM 4 GB). Jalan pintas:
+  login `flow.google.com` di Chrome sendiri dan generate manual sekali — Token-Updater menyinkronkan token segar
+  otomatis.
+- **UNUSUAL_ACTIVITY** adalah kontrol risiko Google, bukan salah ketik: berhenti, jangan Generate berulang,
+  istirahatkan akun, cek akun lewat generate manual di `flow.google.com`, sementara pakai jalur Manual. Jangan batch
+  besar sekaligus — pakai mode "Generate berurutan" (di bawah).
+- Urutan uji minimal yang benar: isi kunci → Uji Koneksi → Generate 1 gambar + 1 video dulu, baru batch.
 - Tier 1 tidak memakai layanan captcha berbayar. Tutorial lengkap berbahasa Indonesia ada di dalam aplikasi (Pengaturan › Panduan Flow2API,
   `FlowGuideSection.tsx`) dan pemetaannya di `docs/flow2api-pemetaan-destory.md`.
+
+## Generate berurutan (`main/sequential.ts`, `main/generation.ts`)
+
+Mode batch gambar satu adegan demi satu adegan, mengikuti pola antrean KenFlow v3.6.6 (serial 1, jeda acak 0–20 dtk
+antar-prompt dari prompt ke-2, tick 1 detik yang bisa dibatalkan, retry maks 2× lalu lanjut) — lihat
+`../fase0-0.2a/kenflow-v36-study/LAPORAN-STUDI-ANTREAN-KENFLOW.md`. Jeda adalah ritme yang lebih mirip manusia,
+**bukan** jaminan lolos dari kontrol risiko Google; itu ditulis apa adanya di panduan dan di tooltip tombol.
+
+- Mesin (`runSequentialImages` di `main/sequential.ts`) murni dan tanpa dependensi Electron/DB/provider: semua efek
+  samping masuk lewat `deps` (`generateOne`, `waitJob`, `delay`, `random`, `emit`, `isCanceled`) supaya aturan
+  pacing, retry, dan gate-stop bisa diuji di Node polos (`../fase0-0.2a/test-sequential-service.mjs`, 38 butir).
+  Konstanta di kode, bukan settings, tanpa migrasi DB: jeda acak 0–20 dtk (`SEQUENTIAL_DELAY_MIN_MS/MAX_MS`),
+  maks 3 percobaan per adegan (`SEQUENTIAL_MAX_ATTEMPTS`), poll status job 500 ms, tick jeda 1 dtk.
+- Antrean serial 1 sesuai urutan storyboard; jeda hanya antar-adegan (bukan sebelum adegan pertama), sebagai tidur
+  yang bisa dibatalkan dalam tick 1 detik dengan hitung mundur per detik. Batalkan berhenti sesudah job yang sedang
+  jalan selesai (job-nya sendiri tidak dibatalkan) dan tidak memulai adegan berikut.
+- Retry maks 2× per adegan; bila tetap gagal, adegan ditandai gagal dan batch lanjut ke adegan berikut. Pengaman
+  gerbang G3 (`isGateError`): satu job gagal dengan 401 / 429 / UNUSUAL_ACTIVITY / pesan mengandung "reCAPTCHA" atau
+  "unusual activity" → seluruh batch berhenti segera tanpa retry, dengan pesan berbahasa Indonesia.
+- Adegan manual/extension dilewati (job-nya menunggu berkas dari pengguna sehingga tidak pernah selesai dan akan
+  mengganjal antrean selamanya); jumlahnya dilaporkan di pesan akhir. Adegan motion juga dilewati (tidak memakai
+  gambar). Mode batch lama ("Generate N gambar") tidak diubah. Konfirmasi biaya NexaBot/kie.ai dipakai bersama oleh
+  kedua tombol (`confirmImageCost` di `StoryboardStep.tsx`).
+- Wiring (`startSequentialImages` / `cancelSequentialImages` / `sequentialStatus` di `main/generation.ts`): run
+  in-memory per proyek (restart mengakhirinya; job gambar per adegan tetap tersimpan seperti job biasa). IPC baru
+  mengikuti aturan 3 tempat (`generate:sequentialImages`, `generate:cancelSequential`, `generate:sequentialStatus`;
+  event `event:sequential` dengan tipe `SequentialProgress` di `shared/types.ts`). Tombol "Generate berurutan" di
+  header Storyboard, di antara "Rekam ulang suara narasi" dan "Generate N gambar", dengan strip progres di bawah
+  header (adegan ke-n dari total, hitung mundur jeda, tombol Batalkan/Tutup).
 
 ## NexaBot (`services/nexabot.ts`, `shared/nexabot.ts`)
 
@@ -244,8 +297,10 @@ UNIQUE per proyek, backfill dari `sort`) yang dipakai untuk mencocokkan berkas h
   lewat `startManualJob`; `resumeJobs` melewatkan job manual (tetap menunggu, bukan gagal); `setActiveAsset`
   menuntaskan job manual yang menunggu. `estimateCredits` mengembalikan null untuk manual/extension.
 - Folder kerja (`services/manual.ts`): `<folder aset proyek>/manual/`. `manual:prepareWorkFolder` menulis
-  `prompts.txt` (prompt bernomor adegan, untuk manusia) + `manual.json` (manifest mesin: sceneKey, clipId, judul,
-  kind, prompt, videoPrompt, aspek, durasi). `manual:scanWorkFolder` memasangkan berkas `<sceneKey>[-akhiran].<ext>`
+  `prompts.txt` (satu `Gambar:` per adegan, untuk manusia) + `manual.json` (manifest mesin: sceneKey, clipId, judul,
+  kind, prompt, videoPrompt, aspek, durasi); `manual:prepareVideoWorkFolder` menulis `prompts-video.txt` (satu
+  `Video:` per adegan, dari field `videoPrompt` yang sama di tiap baris manifest) + `manual.json` lagi. Kedua daftar
+  sengaja terpisah — tiap langkah kerja butuh satu daftar saja. `manual:scanWorkFolder` memasangkan berkas `<sceneKey>[-akhiran].<ext>`
   (awalan `scene-`/`clip-` diabaikan; PNG/JPG/WebP, MP4/MOV/WebM) — disalin ke `images/`/`videos/`, `insertAsset`
   provider `manual`/`extension` sesuai provider adegan, `patchClip`, job manual selesai; berkas tak cocok masuk
   daftar "belum terpasang" dan dipasangkan lewat `manual:importFile`. Pindai dua kali tidak menduplikasi.
@@ -255,7 +310,7 @@ UNIQUE per proyek, backfill dari `sort`) yang dipakai untuk mencocokkan berkas h
   di checkout server Flow2API (`<folder server>/extension/`, Flow2API Captcha Worker, manifest v3); yang ditangkapnya
   hanya token reCAPTCHA Enterprise dari Chrome pengguna, bukan hasil generate. Metode CAPTCHA (`browser` gratis,
   `extension` gratis, berbayar butuh kunci, `flow2api_team`) adalah setelan panel admin server, bukan KenStory.
-- UI: Storyboard (`StoryboardStep.tsx`) — Salin Semua Prompt, Impor Gambar/Video, Pindai Folder Kerja, pemilih jalur
+- UI: Storyboard (`StoryboardStep.tsx`) — Salin Prompt Teks to Image, Salin Prompt Image to Video, Impor Gambar/Video, Pindai Folder Kerja, pemilih jalur
   per adegan, lencana jalur + status "Menunggu hasil", panel folder kerja + daftar belum terpasang; Inspector —
   Salin prompt gambar + status jalur manual. Tutorial lengkap berbahasa Indonesia ada di dalam aplikasi
   (Pengaturan › Panduan Manual & Ekstensi, `ManualGuideSection.tsx`) dan pemetaannya di

@@ -10,6 +10,7 @@ import type {
   CharacterPatchEvent,
   ClipPatchEvent,
   CreditEstimate,
+  SequentialProgress,
   WhisperStatus,
   WordTiming,
   ExportOptions,
@@ -51,6 +52,18 @@ export interface StudioApi {
     clipTts(clipId: string): Promise<Job>
     characterSheet(characterId: string): Promise<Job>
     missingImages(projectId: string): Promise<Job[]>
+    /**
+     * Images one scene at a time, in storyboard order, with a random 0-20 s
+     * pause between scenes (never before the first). A scene gets 2 retries,
+     * then the run moves on; a 401 / 429 / UNUSUAL_ACTIVITY / reCAPTCHA error
+     * stops the whole run at once. Manual scenes are skipped (they wait for a
+     * file). The run itself is in-memory; cancel with cancelSequential.
+     */
+    sequentialImages(projectId: string): Promise<SequentialProgress>
+    /** Stops after the scene that is currently generating; the running job is left alone. */
+    cancelSequential(projectId: string): Promise<SequentialProgress | null>
+    /** Last known state of the project's sequential run, if any. */
+    sequentialStatus(projectId: string): Promise<SequentialProgress | null>
     /** An AI video for every clip that has an image but no video yet. */
     missingVideos(projectId: string): Promise<Job[]>
     missingTts(projectId: string): Promise<Job[]>
@@ -65,6 +78,8 @@ export interface StudioApi {
   manual: {
     /** Writes prompts.txt + manual.json into the project's work folder and returns the numbered prompt text. */
     prepareWorkFolder(projectId: string): Promise<ManualWorkFolder>
+    /** Writes prompts-video.txt (one `Video:` per scene) + manual.json, and returns the numbered video-prompt text. */
+    prepareVideoWorkFolder(projectId: string): Promise<ManualWorkFolder>
     /** Pairs result files in the work folder with their scenes; files with no scene come back as unmatched. */
     scanWorkFolder(projectId: string): Promise<ManualScanResult>
     /** Attaches one work-folder file to the scene the user picked. */
@@ -187,6 +202,8 @@ export interface StudioApi {
     asset(cb: (asset: Asset) => void): () => void
     /** A file arrived or changed in a watched work folder (a hint to press Pindai). */
     manual(cb: (e: ManualWatchEvent) => void): () => void
+    /** Progress of a "Generate berurutan" run: scene n of total, pause countdown, end state. */
+    sequential(cb: (p: SequentialProgress) => void): () => void
   }
 }
 
@@ -196,5 +213,6 @@ export const EVENTS = {
   character: 'event:character',
   asset: 'event:asset',
   whisper: 'event:whisper',
-  manual: 'event:manual'
+  manual: 'event:manual',
+  sequential: 'event:sequential'
 } as const

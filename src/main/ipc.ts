@@ -20,6 +20,7 @@ import type { SceneDef } from '@shared/talkinghead'
 import { startExport } from './exporter'
 import {
   applyMotionPreset,
+  cancelSequentialImages,
   estimateCredits,
   forgetEstimates,
   generateCharacterSheet,
@@ -29,7 +30,9 @@ import {
   generateMissingImages,
   generateMissingVideos,
   generateMissingTts,
-  setActiveAsset
+  sequentialStatus,
+  setActiveAsset,
+  startSequentialImages
 } from './generation'
 import { cancelJob } from './jobs'
 import { generateNarration, syncCaptions } from './narration'
@@ -59,7 +62,7 @@ import * as hf from './services/higgsfield'
 import * as kie from './services/kieai'
 import * as llm from './services/llm'
 import * as nexa from './services/nexabot'
-import { importManualFile, prepareWorkFolder, scanWorkFolder } from './services/manual'
+import { importManualFile, prepareVideoWorkFolder, prepareWorkFolder, scanWorkFolder } from './services/manual'
 import {
   approveMotionBeat,
   motionBabaksOf,
@@ -119,6 +122,9 @@ export function registerIpc(): void {
   handle('generate:clipTts', (clipId: string) => generateClipTts(clipId))
   handle('generate:characterSheet', (characterId: string) => generateCharacterSheet(characterId))
   handle('generate:missingImages', (projectId: string) => generateMissingImages(projectId))
+  handle('generate:sequentialImages', (projectId: string) => startSequentialImages(projectId))
+  handle('generate:cancelSequential', (projectId: string) => cancelSequentialImages(projectId))
+  handle('generate:sequentialStatus', (projectId: string) => sequentialStatus(projectId))
   handle('generate:missingVideos', (projectId: string) => generateMissingVideos(projectId))
   handle('generate:missingTts', (projectId: string) => generateMissingTts(projectId))
   handle('generate:narration', (projectId: string, mode: 'missing' | 'all') => generateNarration(projectId, mode === 'all' ? 'all' : 'missing'))
@@ -141,6 +147,7 @@ export function registerIpc(): void {
 
   // Tier 2 (0.3+): the manual / extension work folder.
   handle('manual:prepareWorkFolder', (projectId: string) => prepareWorkFolder(projectId))
+  handle('manual:prepareVideoWorkFolder', (projectId: string) => prepareVideoWorkFolder(projectId))
   handle('manual:scanWorkFolder', (projectId: string) => scanWorkFolder(projectId))
   handle('manual:importFile', (projectId: string, fileName: string, clipId: string, kind: WorkFileKind) => importManualFile(projectId, fileName, clipId, kind))
   handle('manual:openWorkFolder', async (projectId: string) => {

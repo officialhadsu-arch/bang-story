@@ -37,6 +37,21 @@ export function prepareWorkFolder(projectId: string): ManualWorkFolder {
   return { text, manifest, workFolder: dir, fileCount: manifest.clips.length }
 }
 
+/**
+ * The video twin of prepareWorkFolder: writes `prompts-video.txt` (one `Video:` per scene,
+ * from the same manifest rows — no new formula) and `manual.json` again (it already carries
+ * both fields), for pasting scene by scene into an image-to-video tool such as KenFlow.
+ */
+export function prepareVideoWorkFolder(projectId: string): ManualWorkFolder {
+  const project = getProject(projectId)
+  const { manifest, videoText } = buildWorkFolderContent(project, clipsOf(projectId), charactersOf(projectId))
+  const dir = workFolder(projectId)
+  writeFileSync(join(dir, 'prompts-video.txt'), videoText, 'utf8')
+  writeFileSync(join(dir, 'manual.json'), `${JSON.stringify(manifest, null, 2)}\n`, 'utf8')
+  startManualWatch(projectId)
+  return { text: videoText, manifest, workFolder: dir, fileCount: manifest.clips.length }
+}
+
 /** Marks every waiting manual job for this clip and kind as done, with the asset that finished it. */
 export function completeManualJobs(projectId: string, clipId: string, kind: WorkFileKind, assetId: string): void {
   const rows = getDb()
@@ -112,7 +127,7 @@ export async function scanWorkFolder(projectId: string): Promise<ManualScanResul
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     if (!entry.isFile()) continue
     const file = entry.name
-    if (file === 'prompts.txt' || file === 'manual.json') continue
+    if (file === 'prompts.txt' || file === 'prompts-video.txt' || file === 'manual.json') continue
     const match = matchWorkFile(file)
     const clip = match ? clips.find((c) => c.sceneKey === match.sceneKey) : undefined
     if (!match || !clip) {

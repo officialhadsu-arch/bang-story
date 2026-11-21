@@ -151,7 +151,7 @@ export function buildWorkFolderContent(
   project: Project,
   clips: Clip[],
   characters: Character[]
-): { rows: ManualPromptRow[]; manifest: ManualManifest; text: string } {
+): { rows: ManualPromptRow[]; manifest: ManualManifest; text: string; videoText: string } {
   const imageModel = getImageModel(project.imageModel)
   const videoRef = getVideoModel(project.videoModel).input.mode === 'reference'
   const rows: ManualPromptRow[] = [...clips]
@@ -177,12 +177,20 @@ export function buildWorkFolderContent(
     generatedAt: new Date().toISOString(),
     clips: rows
   }
+  // One list per job, never mixed: the image list (text) is for text-to-image,
+  // the video list (videoText) is for image-to-video — e.g. pasted scene by scene
+  // into KenFlow. Both come from the same manifest rows, so they can never drift.
   const lines = [`Prompt ${project.title} — ${rows.length} adegan`, '']
   for (const r of rows) {
     lines.push(`Adegan ${r.sceneKey} — ${r.title || 'Tanpa judul'}`)
     lines.push(`Gambar: ${r.prompt}`)
-    if (r.kind === 'video') lines.push(`Video: ${r.videoPrompt}`)
     lines.push('')
   }
-  return { rows, manifest, text: lines.join('\n') }
+  const videoLines = [`Prompt video ${project.title} — ${rows.length} adegan`, '']
+  for (const r of rows) {
+    videoLines.push(`Adegan ${r.sceneKey} — ${r.title || 'Tanpa judul'}`)
+    videoLines.push(`Video: ${r.videoPrompt}`)
+    videoLines.push('')
+  }
+  return { rows, manifest, text: lines.join('\n'), videoText: videoLines.join('\n') }
 }

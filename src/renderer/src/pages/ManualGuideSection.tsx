@@ -162,9 +162,12 @@ export function ManualGuideSection({ baseUrl }: { baseUrl: string }) {
             lalu membuka aplikasi tidak membatalkannya.
           </>,
           <>
-            Klik <strong className="text-ink">Salin Semua Prompt</strong> di atas storyboard. KenStory menulis dua berkas ke folder kerja
-            proyek (<Code>&lt;folder aset proyek&gt;/manual/</Code>) — <Code>prompts.txt</Code> untuk manusia dan <Code>manual.json</Code>{' '}
-            untuk mesin/agen — lalu menyalin semua prompt bernomor adegan ke clipboard.
+            Klik <strong className="text-ink">Salin Prompt Teks to Image</strong> di atas storyboard untuk daftar gambar, atau{' '}
+            <strong className="text-ink">Salin Prompt Image to Video</strong> untuk daftar video. KenStory menulis berkas ke folder kerja
+            proyek (<Code>&lt;folder aset proyek&gt;/manual/</Code>) — <Code>prompts.txt</Code> (satu <Code>Gambar:</Code> per adegan) dan{' '}
+            <Code>prompts-video.txt</Code> (satu <Code>Video:</Code> per adegan) untuk manusia, plus <Code>manual.json</Code> untuk
+            mesin/agen (memuat kedua field) — lalu menyalin daftar yang kamu pilih ke clipboard. Kedua daftar sengaja terpisah: tiap
+            langkah kerja butuh satu daftar saja.
           </>,
           <>
             Generate di mana pun: tempel prompt adegan ke Google Flow di browser, ke situs AI lain, atau serahkan berkas{' '}
@@ -200,7 +203,8 @@ export function ManualGuideSection({ baseUrl }: { baseUrl: string }) {
       <Table
         head={['Berkas', 'Isi', 'Untuk siapa']}
         rows={[
-          ['prompts.txt', 'Prompt bernomor adegan, untuk dibaca manusia (satu adegan satu blok: Gambar, lalu Video bila adegannya video).', 'Kamu'],
+          ['prompts.txt', 'Prompt gambar bernomor adegan, untuk dibaca manusia (satu adegan satu blok: Gambar).', 'Kamu'],
+          ['prompts-video.txt', 'Prompt video bernomor adegan, untuk dibaca manusia (satu adegan satu blok: Video) — untuk ditempel ke mode image-to-video.', 'Kamu'],
           ['manual.json', 'Manifest mesin: sceneKey, clipId, judul, kind (image/video), prompt, videoPrompt, aspek, durasi per adegan.', 'Agen/ekstensi luar'],
           ['03.png, 03-v2.mp4, …', 'Hasil generate, bernama nomor adegan. Disalin ke images//videos/ saat dipindai; berkas aslinya tetap di folder kerja.', 'Pindai']
         ]}
@@ -310,7 +314,7 @@ export function ManualGuideSection({ baseUrl }: { baseUrl: string }) {
           ['Pindai: tidak ada berkas baru', 'Berkas belum tersimpan di folder kerja proyek yang benar. Klik Buka folder di panel folder kerja dan pastikan berkasnya ada di sana (bukan di folder proyek lain).'],
           ['Job manual macet (tetap Menunggu hasil)', 'Job manual memang menunggu sampai hasil dipasangkan — itu bukan macet. Bila kamu tidak jadi menunggu, batalkan jobnya dari daftar pekerjaan (status jadi dibatalkan) atau ganti jalur adegan ke Otomatis lalu Generate ulang.'],
           ['Gambar terpasang ke adegan yang salah', 'Nomor adegan dipakai ulang sesudah adegan lama dihapus (batas yang diketahui). Pakai Ganti gambar di panel adegan, atau ganti nama berkas dan Pindai lagi.'],
-          ['Salin Semua Prompt: prompt adegan kosong', 'Adegan itu belum punya rencana visual. Buat visual dulu di Storyboard (tombol Buat visual), lalu salin lagi.']
+          ['Salin Prompt Teks to Image / Salin Prompt Image to Video: prompt adegan kosong', 'Adegan itu belum punya rencana visual. Buat visual dulu di Storyboard (tombol Buat visual), lalu salin lagi.']
         ]}
       />
 
@@ -343,7 +347,7 @@ export function ManualGuideSection({ baseUrl }: { baseUrl: string }) {
       <Steps
         items={[
           <>Di proyek apa pun, atur 1 adegan ke jalur Manual dan klik Generate (job manual muncul, status Menunggu hasil).</>,
-          <>Klik Salin Semua Prompt, lalu generate gambar adegan itu di Google Flow lewat browser dan simpan hasilnya sebagai 01.png (atau nomor adegannya) ke folder kerja.</>,
+          <>Klik Salin Prompt Teks to Image, lalu generate gambar adegan itu di Google Flow lewat browser dan simpan hasilnya sebagai 01.png (atau nomor adegannya) ke folder kerja.</>,
           <>Klik Pindai Folder Kerja. Pastikan gambarnya terpasang di adegan dan job manualnya selesai.</>,
           <>Ulangi untuk 1 video pendek (jalur Ekstensi bila ekstensi sudah terpasang): hasil video bernama 01.mp4 terpasang dan bisa diputar di Editor.</>,
           <>Bila salah satu langkah gagal, catat pesan galat persisnya dan lihat tabel pemecahan masalah di atas.</>

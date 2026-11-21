@@ -8,6 +8,33 @@ Cara menaikkan versi ada di [docs/pengembangan.md](docs/pengembangan.md#versi-da
 
 ## [Belum dirilis]
 
+- **Generate berurutan (gambar, 0.3)** — tombol baru di header Storyboard, di antara "Rekam ulang suara narasi" dan
+  "Generate N gambar": gambar dibuat satu adegan demi satu adegan sesuai urutan storyboard, dengan jeda acak 0–20
+  detik antar-adegan (bukan sebelum adegan pertama), hitung mundur "Adegan berikut dalam X detik", dan tombol
+  Batalkan (berhenti sesudah job yang sedang jalan selesai). Tiap adegan dicoba maks 3× (1 + 2 retry); bila tetap
+  gagal, adegan ditandai gagal dan batch lanjut. Pengaman gerbang G3: gagal dengan 401 / 429 / UNUSUAL_ACTIVITY /
+  reCAPTCHA menghentikan seluruh batch segera tanpa retry. Adegan manual/extension dilewati (job-nya menunggu berkas
+  dan tidak pernah selesai). Antrean in-memory, tanpa migrasi DB dan tanpa setelan baru; mode batch lama tidak
+  berubah; konfirmasi biaya NexaBot/kie.ai dipakai kedua tombol. Jeda adalah ritme yang lebih mirip manusia mengikuti
+  pola KenFlow v3.6.6 — bukan jaminan lolos dari kontrol risiko Google. Mesin di `src/main/sequential.ts` (murni,
+  bisa diuji) + wiring di `generation.ts` + IPC `generate:sequentialImages` / `cancelSequential` /
+  `sequentialStatus` + event `event:sequential`.
+- **Panduan Flow2API diperjelas** (dalam aplikasi, Pengaturan › Panduan Flow2API, dan `docs/layanan-ai.md`):
+  pemasangan ekstensi Token-Updater langkah-demi-langkah (ZIP → ekstrak → `chrome://extensions` → Developer mode →
+  Load unpacked; folder `extension/` di dalam server adalah ekstensi CAPTCHA, bukan Token-Updater), jebakan
+  placeholder abu-abu di popup addon (ketik ulang sampai hitam pekat), langkah sambung token (Random → Copy → Save
+  settings → Simpan → Allow → Tes sekarang; berhasil = Total 1, Active 1 + Credits), metode CAPTCHA bawaan YesCaptcha
+  itu berbayar dan kuncinya kosong (ganti ke Built-in browser atau Flow2API Team, lalu klik Save settings), cara isi
+  Kunci API server yang benar (klik Simpan sampai kolom jadi titik-titik; tulisan hijau "Terhubung" hanya mengecek
+  servernya jalan) dan arti dua pesan 401, jendela login Google yang bisa menutup sendiri (jalan pintas: login
+  flow.google.com di Chrome sendiri), `Failed to obtain reCAPTCHA token`, dan UNUSUAL_ACTIVITY (berhenti, jangan
+  Generate berulang, pakai jalur Manual / Generate berurutan). Urutan uji minimal: isi kunci → Uji Koneksi →
+  1 gambar + 1 video dulu, baru batch.
+- **Dua tombol salin prompt Manual (Storyboard)** — "Salin Semua Prompt" menjadi "Salin Prompt Teks to Image" (satu
+  `Gambar:` per adegan, `prompts.txt` + `manual.json`), dan tombol baru di sebelahnya "Salin Prompt Image to Video"
+  (satu `Video:` per adegan dari field `videoPrompt` yang sama, `prompts-video.txt` + `manual.json`). Kedua daftar
+  sengaja terpisah — tiap langkah kerja butuh satu daftar saja. `manual.json` tetap memuat kedua field; pemindai
+  mengabaikan `prompts-video.txt` seperti `prompts.txt`.
 - Rebrand aplikasi menjadi **KenStory** (fork dari bangtutorial/bang-story tetap berlisensi MIT, lihat NOTICE.md).
 - **Flow2API: kunci API server (Bearer)** — server Flow2API versi sekarang menuntut `Authorization: Bearer <kunci>` di
   tiap permintaan; tanpanya generate gagal HTTP 401 (terbukti di uji live PC, 20 Nov 2026). Kolom baru "Kunci API
