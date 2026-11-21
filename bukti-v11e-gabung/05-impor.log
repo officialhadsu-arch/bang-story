@@ -1,0 +1,29 @@
+[debug] [vite] connecting...
+[debug] [vite] connected.
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[info] IMPOR-SETUP id=4d0858d9-8bb7-478f-b9e9-42579a89856c clips=4 durationSec=30 step=4
+[info] IMPOR-A LULUS imported=3 skipped=[] durationSec=13 expMs=12955 titles=["Pagi di Pasar","Pelanggan Pertama","Pulang"]
+[info] IMPOR-C LULUS title=Kisah Pasar Pagi clips=2
+[info] IMPOR-D LULUS err=Error invoking remote method 'story:importScript': Error: Naskah tidak bisa diimpor: tidak ada adegan yang bisa dibaca. Tulis tiap adegan diawali "## Judul Adegan", lalu "Alur:" dan "Narasi:". Naskah lamamu tetap utuh. clipsBefore=2 clipsAfter=2
+[info] IMPOR-E LULUS imported=2 skipped=[2] titles=["Satu","Tiga"]
+[harness] importScriptFile 4d0858d9-8bb7-478f-b9e9-42579a89856c imported=2 skipped=[] durationSec=10 title=Judul Dari Berkas
+[info] IMPOR-B LULUS title=Judul Dari Berkas titles=["Dari Berkas Satu","Dari Berkas Dua"]
+[debug] [vite] connecting...
+[debug] [vite] connected.
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[info] IMPOR-UI-SETUP id=4d0858d9-8bb7-478f-b9e9-42579a89856c
+[info] IMPOR-UI kartu diklik
+[info] IMPOR-UI ke Storyboard
+[info] IMPOR-UI ke langkah Naskah
+[info] IMPOR-UI-A LULUS cards=2 titles=["Dari Berkas Satu","Dari Berkas Dua"] targetTerlihat=true
+[info] IMPOR-F dialog dibuka
+[info] IMPOR-F teks ditempel
+[info] IMPOR-F-PRATINJAU LULUS pratinjau="Impor naskah\n\nTempel naskahmu atau pilih berkas .txt/.md. Pratinjau dulu, baru ganti naskah.\n\nPilih berkas .txt/.md\nPakai contoh\nNaskah\nLihat contoh format\n2 adegan\n± 0:07 narasi\n01\nDari Dialog Satu\n7"
+[info] IMPOR-F klik Ganti naskah
+[info] IMPOR-F-KONFIRMASI LULUS teks="Ganti naskah yang ada?\n\nNaskah yang sekarang diganti seluruhnya dengan 2 adegan dari naskah impor ini. Gambar dan suara adegan lama tetap tersimpan di riwayat p"
+[info] IMPOR-F klik Batal
+[info] IMPOR-F-BATAL LULUS clips=2 first=Dari Berkas Satu
+[info] IMPOR-F2 klik Ganti naskah
+[info] IMPOR-F2 konfirmasi Ganti
+[info] IMPOR-F2 LULUS clips=2 titles=["Dari Dialog Satu","Dari Dialog Dua"] durationSec=10
+[info] IMPOR-SELESAI

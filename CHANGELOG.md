@@ -8,6 +8,10 @@ Cara menaikkan versi ada di [docs/pengembangan.md](docs/pengembangan.md#versi-da
 
 ## [Belum dirilis]
 
+- **Gabung 4 branch Tier 1 untuk paket uji v1.1e** — pacing berurutan + tombol Unggah lembar + naskah per bagian
+  (lanjutkan + durasi custom sampai 30 menit) + impor naskah bawa sendiri, digabung di branch `v1.1e-gabung`
+  (tanpa merge ke main). Semua bentrok diselesaikan dengan kedua sisi dipertahankan; tidak ada perubahan perilaku
+  di luar keempat fitur itu. Bukti verifikasi di `bukti-v11e-gabung/`.
 - **Generate berurutan (gambar, 0.3)** — tombol baru di header Storyboard, di antara "Rekam ulang suara narasi" dan
   "Generate N gambar": gambar dibuat satu adegan demi satu adegan sesuai urutan storyboard, dengan jeda acak 0–20
   detik antar-adegan (bukan sebelum adegan pertama), hitung mundur "Adegan berikut dalam X detik", dan tombol

@@ -1,0 +1,40 @@
+PASS gate: 401
+PASS gate: 429
+PASS gate: UNUSUAL_ACTIVITY
+PASS gate: reCAPTCHA
+PASS gate: unusual activity lowercase
+PASS gate: plain error is not a gate
+PASS gate: 4010 is not 401
+PASS gate: null is not a gate
+PASS gate: empty is not a gate
+PASS delay: random 0 -> 0 ms
+PASS delay: random 0.5 -> 10000 ms
+PASS delay: random 1 -> 20000 ms
+PASS cancellableDelay: 2500 ms ticks 2,1,0 then done
+PASS cancellableDelay: 0 ms returns done at once
+PASS cancellableDelay: cancel mid-delay returns canceled
+PASS max attempts is 3 (1 + 2 retries)
+PASS order: scenes run in storyboard order
+PASS order: never two jobs at once
+PASS order: pause between scenes only (2 pauses, none before first)
+PASS order: summary done=3 failed=0
+PASS order: waiting states carry the countdown
+PASS order: no waiting state before the first scene
+PASS retry: failed scene tried 3 times then next scene ran
+PASS retry: summary done=1 failed=1 scene 01
+PASS retry-then-ok: scene retried once and finished
+PASS retry-then-ok: summary done=2 failed=0
+PASS retry-then-ok: progress reports attempt 2
+PASS throw: config error retried then scene marked failed, run continues
+PASS gate-stop: UNUSUAL_ACTIVITY tried once only
+PASS gate-stop: status stopped with a plain-language message
+PASS gate-stop: no pause after a gate stop
+PASS gate-stop: 429 stops the run
+PASS gate-stop: reCAPTCHA stops the run
+PASS cancel-pause: next scene never starts
+PASS cancel-pause: status canceled
+PASS cancel-before-start: no job started
+PASS cancel-job: externally canceled job stops the run
+PASS skipped: final message names the skipped manual scenes
+
+38 passed, 0 failed

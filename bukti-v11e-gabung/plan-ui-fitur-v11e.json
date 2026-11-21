@@ -1,0 +1,104 @@
+[
+ {
+  "main": "seed",
+  "wait": 1500
+ },
+ {
+  "main": "uploadSheet",
+  "projectTitle": "Demo Sumpah Palapa",
+  "images": [
+   "/home/hatch/workspace/fase0-0.2a/mock-flow2api-fixtures/test.png"
+  ],
+  "wait": 1000
+ },
+ {
+  "js": "(async () => { const l = await window.api.projects.list(); const p = l.find((x) => x.title === 'Demo Sumpah Palapa'); const b = await window.api.projects.get(p.id); const c = b.characters[0]; const a = c.sheetAssetId ? b.assets.find((x) => x.id === c.sheetAssetId) : null; console.log('FITUR-SHEET char=' + c.name + ' sheet=' + (a ? a.localPath + ' ' + a.width + 'x' + a.height : 'TIDAK ADA')); })()",
+  "wait": 1000
+ },
+ {
+  "js": "location.reload()",
+  "wait": 2500
+ },
+ {
+  "js": "(() => { const b=[...document.querySelectorAll('button')].find((e)=>e.textContent.includes('Demo Sumpah Palapa')); if(b){b.click();console.log('FITUR-OPEN klik proyek');} else console.log('FITUR-OPEN proyek TIDAK DITEMUKAN'); })()",
+  "wait": 1000
+ },
+ {
+  "wait": 3500
+ },
+ {
+  "js": "(() => { const nav=[...document.querySelectorAll('nav[aria-label=\"Langkah pembuatan\"] button')]; const sb=nav.find((e)=>e.textContent.includes('Storyboard')); if(sb){sb.click();console.log('FITUR-SB ke Storyboard');} else console.log('FITUR-SB tombol TIDAK DITEMUKAN'); })()",
+  "wait": 1000
+ },
+ {
+  "wait": 2000
+ },
+ {
+  "js": "(() => { const btns=[...document.querySelectorAll('button')]; const seq=btns.find((b)=>b.textContent.trim()==='Generate berurutan'); const hdr=btns.map((b)=>b.textContent.trim()).filter((t)=>t.includes('Generate')||t.includes('Rekam')); console.log('FITUR-PACING tombol=' + (seq?'ADA':'TIDAK ADA') + ' disabled=' + (seq?seq.disabled:'?') + ' headerGenerate=' + JSON.stringify(hdr)); })()",
+  "wait": 1000
+ },
+ {
+  "shot": "/home/hatch/workspace/fase0-0.2a/bang-story-03-v11e-gabung/bukti-v11e-gabung/ui-storyboard-pacing.png",
+  "wait": 500
+ },
+ {
+  "js": "(() => { const chip=[...document.querySelectorAll('button')].find((b)=>b.textContent.trim().startsWith('Gajah Mada')); if(!chip){console.log('FITUR-MODAL chip TIDAK DITEMUKAN');return;} chip.click(); console.log('FITUR-MODAL chip diklik'); })()",
+  "wait": 1000
+ },
+ {
+  "wait": 1500
+ },
+ {
+  "js": "(() => { const dlg=[...document.querySelectorAll('[role=\"dialog\"]')].pop(); const t=dlg?dlg.innerText:''; const up=dlg&&[...dlg.querySelectorAll('button')].find((b)=>b.textContent.includes('Unggah lembar')); const img=dlg&&dlg.querySelector('img'); console.log('FITUR-MODAL dialog=' + (!!dlg) + ' unggahLembar=' + (!!up) + ' imgRendered=' + (img?((img.naturalWidth||0)+'x'+(img.naturalHeight||0)):'tidak ada')); })()",
+  "wait": 1000
+ },
+ {
+  "shot": "/home/hatch/workspace/fase0-0.2a/bang-story-03-v11e-gabung/bukti-v11e-gabung/ui-modal-lembar.png",
+  "wait": 500
+ },
+ {
+  "js": "(() => { const b=document.querySelector('button[aria-label=\"Tutup\"]'); if(b){b.click();console.log('FITUR-MODAL tutup');} else console.log('FITUR-MODAL tombol Tutup TIDAK DITEMUKAN'); })()",
+  "wait": 1000
+ },
+ {
+  "wait": 1200
+ },
+ {
+  "js": "(() => { const nav=[...document.querySelectorAll('nav[aria-label=\"Langkah pembuatan\"] button')]; const ide=nav.find((e)=>e.textContent.includes('Ide')); if(ide){ide.click();console.log('FITUR-IDE ke Ide');} else console.log('FITUR-IDE tombol TIDAK DITEMUKAN'); })()",
+  "wait": 1000
+ },
+ {
+  "wait": 2000
+ },
+ {
+  "js": "(() => { window.__isiDurasi=(v)=>{const el=document.querySelector('#durasi-custom'); if(!el) return false; const s=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set; s.call(el,v); el.dispatchEvent(new Event('input',{bubbles:true})); return true;}; window.__klikTombol=(t)=>{const b=[...document.querySelectorAll('button')].find((x)=>x.textContent.trim()===t); if(!b) return false; b.click(); return true;}; const input=document.querySelector('#durasi-custom'); console.log('FITUR-DURASI input=' + (input?'ADA':'TIDAK ADA') + ' labelAtauDurasiLain=' + document.body.innerText.includes('Atau durasi lain') + ' isi90=' + window.__isiDurasi('90') + ' klikPakai=' + window.__klikTombol('Pakai')); })()",
+  "wait": 1000
+ },
+ {
+  "wait": 2500
+ },
+ {
+  "js": "(() => { const teks=[...document.querySelectorAll('span')].map((x)=>x.textContent).filter((t)=>t&&(t.includes('Sekitar')||t.includes('klip'))); console.log('FITUR-DURASI-90 teks=' + JSON.stringify(teks)); })()",
+  "wait": 1000
+ },
+ {
+  "js": "(() => { console.log('FITUR-DURASI-1800 isi=' + window.__isiDurasi('1800') + ' klik=' + window.__klikTombol('Pakai')); })()",
+  "wait": 1000
+ },
+ {
+  "wait": 2500
+ },
+ {
+  "js": "(() => { const teks=[...document.querySelectorAll('span')].map((x)=>x.textContent).filter((t)=>t&&(t.includes('Sekitar')||t.includes('klip'))); console.log('FITUR-DURASI-1800 teks=' + JSON.stringify(teks)); })()",
+  "wait": 1000
+ },
+ {
+  "shot": "/home/hatch/workspace/fase0-0.2a/bang-story-03-v11e-gabung/bukti-v11e-gabung/ui-ide-durasi.png",
+  "wait": 500
+ },
+ {
+  "js": "(() => { console.log('FITUR-UI-SELESAI'); })()",
+  "quit": true,
+  "wait": 500
+ }
+]

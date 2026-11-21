@@ -1,0 +1,11 @@
+# Regresi ekspor gabung v1.1e — hasil
+- Rencana: plan-regress-v11e.json (salinan plan-regress.json naskah-per-bagian, folder output diarahkan ke bukti-v11e-gabung/regress)
+- Fixture: salinan segar userdata-regress naskah-per-bagian (studio.db + projects/ baseline 0.6, 8 proyek)
+- REGRESS_EXIT=0; EXPORT COUNT 151 event, done=3, failed=1 (P30-30klip, pesan baseline)
+- Demo mp4: 58737978ec1477334c4b858238bbbe7ce7b5d4b7b361497d5d407206aeb126d8 (2.552.920 byte) — BEDA 1 byte dari baseline 1e348c47… (2.552.919 byte); varian jitter ekor AAC yang sudah dikenal sejak Tier 2, BUKAN regresi: frame 504/504 identik vs baseline-06 r1 dan vs baseline-03
+- Demo SRT: f403c5ec9bf6159d088858d0fff2e9944ce93d4071a4915d88ef7666cea60c88 — identik baseline
+- P30-split mp4: 5bcf2ec73312298ad5c3ee26f595d1433906595874231ffbfbd513389e0ac01e — byte-identik baseline
+- P30-split SRT: 6aa500d6f91ba1f7b58bb547e1d58048ef5860187fa6a69beb116c9987ef959e — identik baseline
+- P30-4klip kontrol: cea26d5d48f4a019b8df2482a69548ba36de273bb2490f227062e64c4d038c97 — cocok
+- P30-30klip: gagal, pesan persis baseline: Klip 01 ("Senja di Majapahit") belum punya gambar.
+- Frame (ffprobe count + frame_hash.py per-frame sha256): demo 504/504, P30-split 504/504

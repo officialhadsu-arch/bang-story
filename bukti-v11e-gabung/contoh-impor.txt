@@ -1,0 +1,7 @@
+# Judul Dari Berkas
+## 1. Dari Berkas Satu
+Alur: Adegan pertama yang dibaca dari berkas .txt.
+Narasi: Ini adegan pertama yang dibaca dari berkas teks.
+## 2. Dari Berkas Dua
+Alur: Adegan kedua yang dibaca dari berkas .txt.
+Narasi: Ini adegan kedua yang dibaca dari berkas teks.

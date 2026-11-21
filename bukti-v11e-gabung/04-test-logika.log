@@ -1,0 +1,39 @@
+LOLOS clipCountFor(30) preset 30 detik -> 5
+LOLOS clipCountFor(60) preset 1 menit -> 11
+LOLOS clipCountFor(180) preset 3 menit -> 33
+LOLOS clipCountFor(300) preset 5 menit -> 55
+LOLOS clipCountFor(600) preset 10 menit -> 109
+LOLOS clipCountFor(90) durasi custom -> 16
+LOLOS clipCountFor(1200) 20 menit -> 218
+LOLOS clipCountFor(1800) 30 menit -> 327
+LOLOS clipCountFor(15) paling pendek -> 3
+LOLOS SCRIPT_CHUNK_SIZE -> 30
+LOLOS ranges(16) -> [{"start":1,"end":16}]
+LOLOS ranges(218) -> [{"start":1,"end":30},{"start":31,"end":60},{"start":61,"end":90},{"start":91,"end":120},{"start":121,"end":150},{"start":151,"end":180},{"start":181,"end":210},{"start":211,"end":218}]
+LOLOS ranges(327) -> 11
+LOLOS ranges(327) terakhir -> {"start":301,"end":327}
+LOLOS ranges(5) -> [{"start":1,"end":5}]
+LOLOS parse 90 -> {"sec":90}
+LOLOS parse 1800 -> {"sec":1800}
+LOLOS parse 15 -> {"sec":15}
+LOLOS parse " 90 " -> {"sec":90}
+LOLOS parse 90.5 dibulatkan -> {"sec":91}
+LOLOS parse 5 ditolak -> {"error":"Durasi paling pendek 15 detik."}
+LOLOS parse 1801 ditolak -> {"error":"Durasi paling panjang 1800 detik (30 menit)."}
+LOLOS parse 900 diterima -> {"sec":900}
+LOLOS parse abc ditolak -> {"error":"Tulis durasi dalam angka, misalnya 90."}
+LOLOS parse kosong ditolak -> {"error":"Tulis durasi dalam angka, misalnya 90."}
+LOLOS narasi 12 kata + titik = tidak meragukan -> false
+LOLOS narasi 12 kata + seru = tidak meragukan -> false
+LOLOS narasi 12 kata + tanya = tidak meragukan -> false
+LOLOS narasi 12 kata + elipsis = tidak meragukan -> false
+LOLOS narasi 12 kata tanpa tanda akhir = meragukan -> true
+LOLOS narasi 3 kata = meragukan -> true
+LOLOS narasi 9 kata + titik = meragukan -> true
+LOLOS narasi 10 kata + titik = tidak meragukan -> false
+LOLOS narasi kosong = meragukan -> true
+LOLOS narasi hanya spasi = meragukan -> true
+LOLOS tag vokal di ujung diabaikan -> false
+LOLOS tag vokal menutupi akhir tanpa titik = meragukan -> true
+LOLOS tag vokal bukan kata -> 3
+SEMUA LOLOS
