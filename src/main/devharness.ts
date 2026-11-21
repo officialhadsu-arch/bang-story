@@ -8,13 +8,14 @@ import { estimateWordTimings, WHISPER_TIMING } from '@shared/captions'
 import { anchorPoint } from '@shared/overlays'
 import { autoDroppedIndexes, DEFAULT_FILLERS } from '@shared/talkinghead'
 import { startExport } from './exporter'
+import { emit } from './events'
 import { setActiveAsset } from './generation'
 import { assetAbsPath, binPath, dataDir, manualWorkFolder, motionWorkFolder } from './paths'
 import { probeDurationMs, probeSize } from './services/audio'
 import { approveMotionBeat, motionBabakDir, prepareMotionWorkFolder, readMotionBabak, syncMotionBeatIds } from './services/motion'
 import { renderBabakRange, type RenderRangeResult } from './services/renderer'
 import { setSettings } from './settings'
-import { createProject, getBundle, insertAsset, listProjects, patchClip, replaceStory, saveSnapshot, touchProject, updateAssetMeta } from './repo'
+import { createProject, getBundle, insertAsset, listProjects, patchClip, replaceStory, saveSnapshot, setCharacterSheet, touchProject, updateAssetMeta } from './repo'
 import { recordCheck, setTestKey } from './secrets'
 import { importFootage } from './talkinghead'
 import type { ApiProvider, WordTiming } from '@shared/types'
@@ -444,13 +445,14 @@ export function attachDevHarness(win: BrowserWindow): void {
   const planPath = process.env.STUDIO_CAPTURE_PLAN
   if (!planPath) return
   let plan: {
-    main?: 'seed' | 'export' | 'key' | 'overlays' | 'speech' | 'videos' | 'importClipImages' | 'manualFixture' | 'motionFixture' | 'motionApprove' | 'motionSpike' | 'motionSpikeVert' | 'talkingHeadFixture'
+    main?: 'seed' | 'export' | 'key' | 'overlays' | 'speech' | 'videos' | 'importClipImages' | 'uploadSheet' | 'manualFixture' | 'motionFixture' | 'motionApprove' | 'motionSpike' | 'motionSpikeVert' | 'talkingHeadFixture'
     exportTo?: string
     /** For main "export": an existing project instead of the seeded demo. */
     projectId?: string
-    /** For main "importClipImages": the project to fill, found by title. */
+    /** For main "importClipImages" / "uploadSheet": the project to fill, found by title. */
     projectTitle?: string
     /** For main "importClipImages": local image files, one per clip without a picture. */
+    /** For main "uploadSheet": local image files, one per character without a sheet. */
     images?: string[]
     /** For main "key": hold a fake key for this provider in memory only
      * (setTestKey, never on disk) and mark its last check as passed or failed. */
@@ -512,6 +514,41 @@ export function attachDevHarness(win: BrowserWindow): void {
               height: size.height
             })
             await setActiveAsset(clip.id, asset.id)
+          }
+        }
+        if (step.main === 'uploadSheet' && step.projectTitle && step.images) {
+          // Test-only twin of the pickSheet IPC handler: same insertAsset
+          // (kind 'image', characterId set, provider 'manual') +
+          // setCharacterSheet + the same asset/character events, but the
+          // file comes from the plan instead of a native file dialog, which
+          // the harness cannot click. The dialog and the button are covered
+          // by screenshot and code inspection instead.
+          const target = listProjects().find((p) => p.title === step.projectTitle)
+          if (!target) throw new Error(`proyek tidak ditemukan: ${step.projectTitle}`)
+          for (const src of step.images) {
+            const b = getBundle(target.id)
+            const character = b.characters.find((c) => !c.sheetAssetId)
+            if (!character) break
+            const rel = `images/${randomUUID()}${extname(src).toLowerCase()}`
+            const abs = assetAbsPath(target.id, rel)
+            mkdirSync(dirname(abs), { recursive: true })
+            copyFileSync(src, abs)
+            const size = await probeSize(abs).catch(() => null)
+            if (!size) throw new Error(`gambar tidak bisa dibaca: ${src}`)
+            const asset = insertAsset({
+              projectId: target.id,
+              characterId: character.id,
+              kind: 'image',
+              provider: 'manual',
+              prompt: basename(src),
+              localPath: rel,
+              width: size.width,
+              height: size.height
+            })
+            setCharacterSheet(character.id, asset.id)
+            emit.asset(asset)
+            emit.character({ characterId: character.id, patch: { sheetAssetId: asset.id } })
+            touchProject(target.id)
           }
         }
         if (step.main === 'manualFixture' && demoId) {
