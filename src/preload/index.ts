@@ -25,6 +25,8 @@ const api: StudioApi = {
   },
   story: {
     script: call('story:script'),
+    pickScriptFile: call('story:pickScriptFile'),
+    importScript: call('story:importScript'),
     visuals: call('story:visuals'),
     musicPrompt: call('story:musicPrompt')
   },

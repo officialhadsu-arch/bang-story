@@ -1,9 +1,10 @@
 import { CAMERA_PRESETS, MOTION_STRENGTHS, TRANSITIONS } from '@shared/motion'
 import { LANGUAGES, clipCountFor } from '@shared/models'
 import { estimateNarrationMs, needsVisual } from '@shared/script'
+import { importDurationMs, parseScriptImport, type ScriptImportSummary } from '@shared/script-import'
 import { getStyle } from '@shared/styles'
 import type { CameraPresetId, Clip, MotionStrength, MusicPrompt, ProjectBundle, TransitionId } from '@shared/types'
-import { applyVisuals, charactersOf, clipsOf, getBundle, getProject, replaceScript, type SceneVisual } from './repo'
+import { applyVisuals, charactersOf, clipsOf, getBundle, getProject, replaceScript, setProjectDurationSec, type SceneVisual } from './repo'
 import { generateJson } from './services/llm'
 
 const CAMERA_IDS = CAMERA_PRESETS.map((c) => c.id)
@@ -89,6 +90,34 @@ export async function generateScript(projectId: string): Promise<ProjectBundle> 
     }))
   )
   return getBundle(projectId)
+}
+
+// ---------- typed text → script: the user's own script ----------
+
+/**
+ * Replaces the whole script with the user's own text, through the same
+ * replaceScript the generated script uses, so an imported script behaves
+ * exactly like a generated one. The dialog already previewed this text with
+ * the same parser, so the counts here must match the preview; the parse is
+ * repeated here because the main process never trusts the renderer. Nothing
+ * is written when the text holds no valid scene, so the old script survives
+ * a rejected import untouched. The project length then follows the imported
+ * narration instead of one of the five duration presets.
+ */
+export async function importScript(projectId: string, text: string): Promise<ScriptImportSummary & { bundle: ProjectBundle }> {
+  const project = getProject(projectId)
+  const parsed = parseScriptImport(text)
+  if (!parsed.scenes.length)
+    throw new Error('Naskah tidak bisa diimpor: tidak ada adegan yang bisa dibaca. Tulis tiap adegan diawali "## Judul Adegan", lalu "Alur:" dan "Narasi:". Naskah lamamu tetap utuh.')
+  const title = parsed.title ?? project.title
+  replaceScript(
+    projectId,
+    title,
+    parsed.scenes.map((c) => ({ title: c.title, story: c.story, narration: c.narration, durationMs: estimateNarrationMs(c.narration) }))
+  )
+  const durationSec = Math.max(10, Math.round(importDurationMs(parsed.scenes) / 1000))
+  setProjectDurationSec(projectId, durationSec)
+  return { bundle: getBundle(projectId), title, imported: parsed.scenes.length, skipped: parsed.skipped, durationSec }
 }
 
 // ---------- step 2 → 3: visuals for the reviewed script ----------

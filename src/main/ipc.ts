@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { copyFileSync, mkdirSync } from 'node:fs'
+import { copyFileSync, mkdirSync, readFileSync } from 'node:fs'
 import { basename, dirname, extname, join } from 'node:path'
 import { app, BrowserWindow, clipboard, dialog, ipcMain, shell } from 'electron'
 import type {
@@ -72,7 +72,7 @@ import {
   syncMotionBeatIds
 } from './services/motion'
 import { renderBabakFull } from './services/renderer'
-import { generateScript, generateVisuals, generateMusicPrompt } from './story'
+import { generateScript, generateVisuals, generateMusicPrompt, importScript } from './story'
 import { arrangeScenes, buildScenes, getFootage, importFootage, setDroppedWords, setFillers, testGroq, transcribeFootage } from './talkinghead'
 
 
@@ -111,6 +111,21 @@ export function registerIpc(): void {
   handle('projects:duplicate', (id: string) => duplicateProject(id))
 
   handle('story:script', (projectId: string) => generateScript(projectId))
+  handle('story:importScript', (projectId: string, text: string) => importScript(projectId, text))
+  // The user's own script file: the dialog reads the text and previews it
+  // before anything is written, so the native dialog only picks the file.
+  handle('story:pickScriptFile', async () => {
+    const win = BrowserWindow.getFocusedWindow()
+    const res = await dialog.showOpenDialog(win!, {
+      title: 'Pilih berkas naskah',
+      filters: [{ name: 'Teks', extensions: ['txt', 'md'] }],
+      properties: ['openFile']
+    })
+    if (res.canceled || !res.filePaths[0]) return null
+    const text = readFileSync(res.filePaths[0], 'utf8')
+    if (text.length > 200_000) throw new Error('Berkas naskah terlalu besar. Pakai berkas di bawah 200 ribu karakter.')
+    return { fileName: basename(res.filePaths[0]), text }
+  })
   handle('story:musicPrompt', (projectId: string) => generateMusicPrompt(projectId))
   handle('story:visuals', (projectId: string, mode: 'missing' | 'all') => generateVisuals(projectId, mode === 'all' ? 'all' : 'missing'))
 

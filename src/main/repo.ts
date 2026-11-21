@@ -544,6 +544,13 @@ export function replaceTalkingHeadClips(projectId: string, title: string, scenes
   })()
 }
 
+/** The target length follows the imported script, not one of the five presets. */
+export function setProjectDurationSec(projectId: string, durationSec: number): void {
+  getDb()
+    .prepare('UPDATE projects SET duration_sec = ?, updated_at = ? WHERE id = ?')
+    .run(Math.max(10, Math.round(durationSec)), Date.now(), projectId)
+}
+
 /**
  * Replaces all scenes with a freshly written script. Characters stay: the visual step reuses the ones
  * whose names come back, so their character sheets survive a rewrite.
