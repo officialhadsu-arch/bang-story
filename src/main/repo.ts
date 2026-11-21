@@ -561,6 +561,38 @@ export function replaceScript(projectId: string, title: string, scenes: ScriptSc
   })()
 }
 
+/**
+ * Appends scenes after the ones already saved (one chunk of a chunked script write). Scene keys keep
+ * growing from the highest key in use, so a manually deleted middle scene can never cause a clash.
+ */
+export function appendScenes(projectId: string, scenes: ScriptScene[]): void {
+  if (!scenes.length) return
+  const db = getDb()
+  db.transaction(() => {
+    const row = db
+      .prepare('SELECT COALESCE(MAX(sort), -1) AS maxSort, COALESCE(MAX(CAST(scene_key AS INTEGER)), 0) AS maxKey FROM clips WHERE project_id = ?')
+      .get(projectId) as Row
+    // Keys also stay ahead of the scene count, so a project whose keys were renumbered by hand still grows.
+    const existing = db.prepare('SELECT COUNT(*) AS n FROM clips WHERE project_id = ?').get(projectId) as Row
+    let sort = Number(row.maxSort) + 1
+    let key = Math.max(Number(row.maxKey), Number(existing.n))
+    const insert = db.prepare(
+      `INSERT INTO clips (id, project_id, sort, scene_key, visual_provider, title, story, narration, duration_ms, character_ids)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, '[]')`
+    )
+    scenes.forEach((c) => {
+      key++
+      insert.run(randomUUID(), projectId, sort++, formatSceneKey(key), 'auto', c.title, c.story, c.narration, c.durationMs)
+    })
+    db.prepare('UPDATE projects SET updated_at = ? WHERE id = ?').run(Date.now(), projectId)
+  })()
+}
+
+/** Removes one scene. Its media stays in the asset history, unattached — the same rule as a script rewrite. */
+export function deleteClip(id: string): void {
+  getDb().prepare('DELETE FROM clips WHERE id = ?').run(id)
+}
+
 export interface SceneVisual {
   clipId: string
   visualPrompt: string

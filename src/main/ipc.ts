@@ -72,7 +72,7 @@ import {
   syncMotionBeatIds
 } from './services/motion'
 import { renderBabakFull } from './services/renderer'
-import { generateScript, generateVisuals, generateMusicPrompt } from './story'
+import { generateScript, cancelScriptGeneration, continueScript, generateVisuals, generateMusicPrompt } from './story'
 import { arrangeScenes, buildScenes, getFootage, importFootage, setDroppedWords, setFillers, testGroq, transcribeFootage } from './talkinghead'
 
 
@@ -111,6 +111,8 @@ export function registerIpc(): void {
   handle('projects:duplicate', (id: string) => duplicateProject(id))
 
   handle('story:script', (projectId: string) => generateScript(projectId))
+  handle('story:continueScript', (projectId: string) => continueScript(projectId))
+  handle('story:cancelScript', (projectId: string) => cancelScriptGeneration(projectId))
   handle('story:musicPrompt', (projectId: string) => generateMusicPrompt(projectId))
   handle('story:visuals', (projectId: string, mode: 'missing' | 'all') => generateVisuals(projectId, mode === 'all' ? 'all' : 'missing'))
 
