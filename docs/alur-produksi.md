@@ -28,6 +28,42 @@ Ide cerita ──LLM──► Naskah (adegan + narasi) ──LLM──► Rencan
 
 Di langkah **Naskah** pengguna boleh mengubah, menambah, menghapus, dan mengurutkan adegan.
 
+## 1b. Impor naskah bawa sendiri (`importScript`, `src/main/story.ts`)
+
+Naskah tidak harus ditulis AI: pengguna boleh menempel naskah yang sudah ditulis sendiri, atau memilih berkas
+`.txt`/`.md`, dari tombol **Impor naskah** di langkah Naskah (juga di empty state saat naskah masih kosong).
+Parsernya fungsi murni di `src/shared/script-import.ts` (`parseScriptImport`), dipakai dialog untuk pratinjau
+**dan** proses utama untuk menulis — jadi pratinjau dan hasil impor tidak mungkin berbeda.
+
+Format (satu-satunya yang diterima):
+
+```
+# Judul Video (opsional, satu baris, satu tanda # — dipakai sebagai judul proyek)
+## 1. Judul Adegan Satu
+Alur: Apa yang terjadi di adegan ini.
+Narasi: Kalimat voice-over adegan ini.
+## 2. Judul Adegan Dua
+Alur: ...
+Narasi: ...
+```
+
+- Baris `##` memulai adegan baru; judulnya sisa baris itu, awalan nomor `1.`/`1)` dibuang (`## Judul` tanpa nomor
+  juga sah); judul adegan yang kosong diisi `Adegan N` otomatis.
+- Baris `Alur:` memulai isi alur, `Narasi:` memulai isi narasi (label tidak peduli huruf besar/kecil, spasi sesudah
+  titik dua boleh tidak ada); baris lanjutan menempel ke field yang sedang aktif.
+- Adegan tanpa label sama sekali dibaca seluruhnya sebagai narasi (alur boleh kosong).
+- Baris `# Judul` sebelum adegan pertama dipakai sebagai judul proyek; tanpa baris itu judul proyek tidak berubah.
+
+Alur impor: dialog menampilkan pratinjau hasil parse (jumlah adegan, total ±menit, judul-judul adegan, adegan kosong
+yang akan dilewati) — **tidak ada yang ditulis sebelum pratinjau**. Bila proyek sudah punya adegan, dialog
+konfirmasi dulu (`Ganti naskah yang ada?`); batal berarti naskah lama utuh. Penulisan memakai `replaceScript` yang
+sama dengan naskah hasil generate, jadi naskah impor berperilaku persis seperti naskah AI. Validasi fail-closed:
+teks tanpa adegan valid ditolak dan naskah lama utuh; adegan yang alur **dan** narasinya kosong dilewati dan
+dilaporkan nomornya (`Adegan 4 kosong, tidak dimasukkan`); ringkasan akhir `X adegan masuk, Y adegan dilewati`.
+Sesudah impor, `project.durationSec` mengikuti total estimasi narasi impor (dibulatkan, minimal 10 detik) — tidak
+dipaksa ke lima preset durasi. Mode tambah (menempel di bawah naskah lama) belum ada di v1: impor selalu mengganti
+seluruh naskah.
+
 ## 2. Naskah → rencana visual (`generateVisuals`)
 
 Skema JSON keluaran:
