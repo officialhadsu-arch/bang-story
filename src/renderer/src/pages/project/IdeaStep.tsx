@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { Bot, Play, Sparkles, Square } from 'lucide-react'
 import { getImageModel } from '@shared/higgsfield'
-import { DURATIONS, LANGUAGES, clipCountFor, llmName } from '@shared/models'
+import { DURATIONS, LANGUAGES, clipCountFor, llmName, parseCustomDuration } from '@shared/models'
 import { getStyle } from '@shared/styles'
 import type { KeyStatus, LlmProvider, TtsProvider, VoiceOption } from '@shared/types'
 import { Select } from '../../components/Select'
 import { StylePicker } from '../../components/StylePicker'
-import { Button, Chip, Field, Segmented, confirmDialog, cx } from '../../components/ui'
+import { Button, Chip, Field, Segmented, confirmDialog, cx, inputCls } from '../../components/ui'
 import { errorText } from '../../lib/format'
 import { geminiPreview } from '../../lib/voicePreviews'
 import { TTS_NAMES, ttsReadiness, usableTts } from '../../lib/keys'
@@ -109,6 +109,9 @@ export function IdeaStep() {
   const [writer, setWriter] = useState<{ provider: LlmProvider; model: string } | null>(null)
   const [keys, setKeys] = useState<KeyStatus[]>([])
   const [thEnabled, setThEnabled] = useState(false)
+  const [customText, setCustomText] = useState('')
+  const [customError, setCustomError] = useState<string | null>(null)
+  const [scriptProgress, setScriptProgress] = useState<string | null>(null)
 
   useEffect(() => {
     void window.api.settings.get().then((s) => {
@@ -117,6 +120,15 @@ export function IdeaStep() {
     })
     void window.api.settings.keys().then(setKeys)
   }, [])
+
+  // Keep the custom field in step with the project: a preset clears it, a
+  // custom value fills it. Typing never changes durationSec, so this does
+  // not fight the user while they type.
+  useEffect(() => {
+    if (!project) return
+    setCustomText(DURATIONS.some((d) => d.sec === project.durationSec) ? '' : String(project.durationSec))
+    setCustomError(null)
+  }, [project?.durationSec])
 
   // Before any narration exists, move to a narrator service that has a working key.
   const hasVoice = clips.some((c) => c.audioAssetId)
@@ -139,6 +151,23 @@ export function IdeaStep() {
   const perClip = Math.round(project.durationSec / clipCount)
   const model = getImageModel(project.imageModel)
 
+  // Live preview of the custom value while it is typed; only a committed
+  // value reaches the project, so a half-typed number never changes the clip count.
+  const customParsed = customText.trim() === '' ? null : parseCustomDuration(customText)
+  const customPreview = customParsed && 'sec' in customParsed ? clipCountFor(customParsed.sec) : null
+
+  // Invalid input shows a friendly message and leaves the old duration untouched.
+  const applyCustomDuration = (): void => {
+    const parsed = parseCustomDuration(customText)
+    if ('error' in parsed) {
+      setCustomError(parsed.error)
+      return
+    }
+    setCustomError(null)
+    updateProject({ durationSec: parsed.sec })
+    toast('success', `Durasi ${parsed.sec} detik, sekitar ${clipCountFor(parsed.sec)} klip.`)
+  }
+
   const compose = async (): Promise<void> => {
     if (!project.synopsis.trim()) {
       toast('error', 'Tulis ide cerita atau sinopsis dulu.')
@@ -153,14 +182,27 @@ export function IdeaStep() {
       if (!ok) return
     }
     setBusy(true)
+    // Progress arrives on an event while the long IPC call runs; it only ever shows this project's write.
+    const off = window.api.on.scriptProgress((e) => {
+      if (e.projectId === project.id) setScriptProgress(`Menulis adegan ${e.from}–${e.to} dari ${e.total}…`)
+    })
     try {
       await flush()
       const bundle = await window.api.story.script(project.id)
       load(bundle)
-      toast('success', `${bundle.clips.length} adegan siap. Baca dan rapikan naskahnya dulu.`)
+      if (bundle.clips.length < clipCount) toast('info', `Tersimpan ${bundle.clips.length} dari ${clipCount} adegan. Lanjutkan dari langkah Naskah.`)
+      else toast('success', `${bundle.clips.length} adegan siap. Baca dan rapikan naskahnya dulu.`)
     } catch (e) {
+      // A stopped write keeps the scenes it saved; reload so they show immediately.
+      try {
+        load(await window.api.projects.get(project.id))
+      } catch {
+        // Keep the old view when even the reload fails; the error toast below still shows.
+      }
       toast('error', errorText(e))
     } finally {
+      off()
+      setScriptProgress(null)
       setBusy(false)
     }
   }
@@ -230,6 +272,41 @@ export function IdeaStep() {
                     </Chip>
                   ))}
                 </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <label htmlFor="durasi-custom" className="text-[13px] font-medium text-ink-2">
+                    Atau durasi lain:
+                  </label>
+                  <div className="w-28">
+                    <input
+                      id="durasi-custom"
+                      inputMode="numeric"
+                      autoComplete="off"
+                      value={customText}
+                      onChange={(e) => {
+                        setCustomText(e.target.value)
+                        setCustomError(null)
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') applyCustomDuration()
+                      }}
+                      placeholder="mis. 90"
+                      aria-label="Durasi lain dalam detik"
+                      className={cx(inputCls, 'h-10 px-3 font-mono')}
+                    />
+                  </div>
+                  <span className="text-[13px] text-muted">detik</span>
+                  <Button variant="secondary" size="sm" onClick={applyCustomDuration}>
+                    Pakai
+                  </Button>
+                </div>
+                {customError ? (
+                  <span className="text-[13px] text-bad-ink">{customError}</span>
+                ) : (
+                  <span className="text-[13px] text-muted">
+                    15–1800 detik (30 menit)
+                    {customPreview !== null ? ` · sekitar ${customPreview} klip.` : ' · jumlah klip mengikuti durasi.'}
+                  </span>
+                )}
                 <span className="text-[13px] text-muted">
                   Sekitar {clipCount} klip, masing-masing kurang lebih {perClip} detik. Durasi akhir mengikuti panjang suara narasi.
                 </span>
@@ -359,9 +436,7 @@ export function IdeaStep() {
       ) : (
         <footer className="absolute inset-x-0 bottom-0 flex h-[84px] items-center gap-4 border-t border-line bg-surface px-14">
           <div className="flex flex-col gap-0.5">
-            <span className="text-[15px] font-semibold">
-              ± {clipCount} adegan · gambar {model.name}
-            </span>
+            <span className="text-[15px] font-semibold">{scriptProgress ?? `± ${clipCount} adegan · gambar ${model.name}`}</span>
             <span className="flex items-center gap-1.5 text-[13px] text-muted">
               <Bot className="size-3.5" />
               Disusun oleh {writer ? `${llmName(writer.provider)} · ` : ''}
@@ -375,6 +450,11 @@ export function IdeaStep() {
           {clips.length > 0 && !busy && (
             <Button size="lg" onClick={() => updateProject({ step: 2 })}>
               Lihat naskah
+            </Button>
+          )}
+          {busy && (
+            <Button size="lg" onClick={() => void window.api.story.cancelScript(project.id)}>
+              Batalkan
             </Button>
           )}
           <Button variant="primary" size="lg" className="h-[50px]" loading={busy} icon={!busy && <Sparkles className="size-[18px]" />} onClick={() => void compose()}>

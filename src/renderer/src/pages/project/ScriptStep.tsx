@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { ArrowDown, ArrowRight, ArrowUp, Bot, MoreHorizontal, Plus, RefreshCw, Sparkles, Trash2 } from 'lucide-react'
-import { DURATIONS, llmName } from '@shared/models'
+import { DURATIONS, clipCountFor, llmName } from '@shared/models'
 import { estimateNarrationMs, needsVisual, wordCount } from '@shared/script'
 import { VOICE_TAGS } from '@shared/speech'
 import type { Clip, LlmProvider } from '@shared/types'
@@ -167,6 +167,8 @@ export function ScriptStep() {
   const { project, clips, addClip, updateProject, flush, load } = useProject()
   const { toast, go } = useApp()
   const [busy, setBusy] = useState<'missing' | 'all' | null>(null)
+  const [scriptBusy, setScriptBusy] = useState(false)
+  const [scriptProgress, setScriptProgress] = useState<string | null>(null)
   const [writer, setWriter] = useState<{ provider: LlmProvider; model: string } | null>(null)
   const [focusId, setFocusId] = useState<string | null>(null)
 
@@ -189,6 +191,8 @@ export function ScriptStep() {
   const planned = clips.some((c) => c.visualPrompt.trim())
   const stale = clips.filter(needsVisual).length
   const target = DURATIONS.find((d) => d.sec === project.durationSec)?.label ?? `${project.durationSec} detik`
+  const targetCount = clipCountFor(project.durationSec)
+  const incomplete = clips.length > 0 && clips.length < targetCount
 
   const openSettings = async (): Promise<void> => {
     await flush()
@@ -214,6 +218,34 @@ export function ScriptStep() {
       toast('error', errorText(e))
     } finally {
       setBusy(null)
+    }
+  }
+
+  /** Finishes a script that stopped early; a doubtful last scene is dropped first, on the main side. */
+  const continueScript = async (): Promise<void> => {
+    setScriptBusy(true)
+    // Progress arrives on an event while the long IPC call runs; it only ever shows this project's write.
+    const off = window.api.on.scriptProgress((e) => {
+      if (e.projectId === project.id) setScriptProgress(`Menulis adegan ${e.from}–${e.to} dari ${e.total}…`)
+    })
+    try {
+      await flush()
+      const bundle = await window.api.story.continueScript(project.id)
+      load(bundle)
+      if (bundle.clips.length < targetCount) toast('info', `Tersimpan ${bundle.clips.length} dari ${targetCount} adegan.`)
+      else toast('success', `${bundle.clips.length} adegan siap. Baca dan rapikan naskahnya dulu.`)
+    } catch (e) {
+      // A stopped write keeps the scenes it saved; reload so they show immediately.
+      try {
+        load(await window.api.projects.get(project.id))
+      } catch {
+        // Keep the old view when even the reload fails; the error toast below still shows.
+      }
+      toast('error', errorText(e))
+    } finally {
+      off()
+      setScriptProgress(null)
+      setScriptBusy(false)
     }
   }
 
@@ -249,6 +281,28 @@ export function ScriptStep() {
             <span className="rounded-full border border-line-2 bg-surface px-3 py-1.5 text-ink-2">Target {target}</span>
             <span className="text-muted">Durasi akhir tiap adegan mengikuti panjang suara narasinya.</span>
           </div>
+
+          {incomplete && (
+            <div className="flex flex-wrap items-center gap-2 rounded-xl border border-line-2 bg-surface px-4 py-3 text-[13px]">
+              <span className="font-semibold">
+                Tersimpan {clips.length} dari {targetCount} adegan.
+              </span>
+              <span className="text-ink-2">Naskah berhenti sebelum lengkap — lanjutkan dari adegan terakhir yang tersimpan.</span>
+              <span className="flex-1" />
+              {scriptBusy ? (
+                <>
+                  <span className="text-ink-2">{scriptProgress ?? 'Melanjutkan naskah…'}</span>
+                  <Button size="sm" onClick={() => void window.api.story.cancelScript(project.id)}>
+                    Batalkan
+                  </Button>
+                </>
+              ) : (
+                <Button variant="primary" size="sm" disabled={!!busy} loading={scriptBusy} icon={<Sparkles className="size-4" />} onClick={() => void continueScript()}>
+                  Lanjutkan naskah
+                </Button>
+              )}
+            </div>
+          )}
 
           {project.synopsis.trim() && (
             <div className="flex items-start gap-3 rounded-xl bg-sand px-4 py-3 text-[13px] text-ink-2">
@@ -294,32 +348,32 @@ export function ScriptStep() {
           </span>
         </div>
         <div className="flex-1" />
-        <Button size="lg" disabled={!!busy} onClick={() => updateProject({ step: 1 })}>
+        <Button size="lg" disabled={!!busy || scriptBusy} onClick={() => updateProject({ step: 1 })}>
           Kembali ke ide
         </Button>
         {!planned ? (
-          <Button variant="primary" size="lg" className="h-[50px]" loading={busy === 'missing'} icon={!busy && <Sparkles className="size-[18px]" />} onClick={() => void makeVisuals('missing')}>
+          <Button variant="primary" size="lg" className="h-[50px]" disabled={scriptBusy} loading={busy === 'missing'} icon={!busy && <Sparkles className="size-[18px]" />} onClick={() => void makeVisuals('missing')}>
             Buat visual
           </Button>
         ) : stale > 0 ? (
           <>
-            <Button size="lg" disabled={!!busy} onClick={() => updateProject({ step: 3 })}>
+            <Button size="lg" disabled={!!busy || scriptBusy} onClick={() => updateProject({ step: 3 })}>
               Ke storyboard
             </Button>
-            <Button variant="primary" size="lg" className="h-[50px]" loading={busy === 'missing'} icon={!busy && <Sparkles className="size-[18px]" />} onClick={() => void makeVisuals('missing')}>
+            <Button variant="primary" size="lg" className="h-[50px]" disabled={scriptBusy} loading={busy === 'missing'} icon={!busy && <Sparkles className="size-[18px]" />} onClick={() => void makeVisuals('missing')}>
               Perbarui visual ({stale} adegan)
             </Button>
           </>
         ) : (
           <>
-            <Button size="lg" disabled={!!busy} loading={busy === 'all'} icon={busy !== 'all' && <RefreshCw className="size-[17px]" />} onClick={() => void makeVisuals('all')}>
+            <Button size="lg" disabled={!!busy || scriptBusy} loading={busy === 'all'} icon={busy !== 'all' && <RefreshCw className="size-[17px]" />} onClick={() => void makeVisuals('all')}>
               Susun ulang visual
             </Button>
             <Button
               variant="primary"
               size="lg"
               className="h-[50px]"
-              disabled={!!busy}
+              disabled={!!busy || scriptBusy}
               onClick={() => updateProject({ step: 3, status: project.status === 'draft' || project.status === 'script' ? 'storyboard' : project.status })}
             >
               Lanjut ke storyboard
