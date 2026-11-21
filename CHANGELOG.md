@@ -40,6 +40,12 @@ Cara menaikkan versi ada di [docs/pengembangan.md](docs/pengembangan.md#versi-da
   tiap permintaan; tanpanya generate gagal HTTP 401 (terbukti di uji live PC, 20 Nov 2026). Kolom baru "Kunci API
   server" di Pengaturan › Google Flow, tersimpan terenkripsi; kosong berarti permintaan tanpa header seperti
   sebelumnya. Pesan galat 401 kini membedakan kunci belum diisi vs kunci tersimpan yang ditolak.
+- **Unggah lembar karakter (0.3+)** — modal Lembar karakter kini punya tombol "Unggah lembar" di sebelah
+  "Buat lembar karakter": gambar karakter yang sudah dimiliki (PNG/JPG/WebP) bisa dipakai sebagai lembar
+  referensi, tanpa harus digenerate dulu. Berkas diperiksa bisa dibaca dengan dimensi nyata sebelum disimpan;
+  lembar yang diunggah bekerja identik dengan lembar hasil generate untuk semua generate berikutnya.
+  Mengganti lembar meminta konfirmasi dulu; gambar adegan yang sudah jadi tidak berubah. Semua pesan galat
+  di jalur ini berbahasa Indonesia sederhana (apa yang terjadi + apa yang harus dilakukan).
 - **Motion (Fase 4, 0.4+)**: adegan motion sebagai provider visual tingkat 3 — agent coding (Claude/Kiro/
   Antigravity) menulis babak HTML+GSAP di `motion-work/`, pengguna menyetujui tiap beat di langkah Rancangan,
   aplikasi merender MP4 di jendela tersembunyi (D-22, diputus spike 4.0). Sakelar induk mati bawaan, preset

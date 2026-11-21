@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { RefreshCw, Sparkles, Trash2, UserPlus } from 'lucide-react'
+import { RefreshCw, Sparkles, Trash2, Upload, UserPlus } from 'lucide-react'
 import { Button, Field, Modal, Progress, confirmDialog, cx, inputCls } from '../../components/ui'
 import { errorText } from '../../lib/format'
 import { useApp } from '../../store/app'
@@ -99,6 +99,32 @@ function EditCharacter({ characterId, onClose }: { characterId: string | null; o
     }
   }
 
+  const upload = async (): Promise<void> => {
+    // Replacing a sheet is deliberate: the old sheet stays in the project,
+    // but the upload becomes the reference for every generation after this.
+    if (sheet) {
+      const ok = await confirmDialog({
+        title: `Ganti lembar karakter ${c.name}?`,
+        body: 'Gambar yang kamu pilih jadi lembar baru untuk generate berikutnya. Gambar adegan yang sudah jadi tidak berubah, dan lembar lama tetap tersimpan di proyek.',
+        confirm: 'Unggah pengganti',
+        cancel: 'Batal'
+      })
+      if (!ok) return
+    }
+    try {
+      await flush()
+    } catch {
+      toast('error', 'Perubahan pemeran belum tersimpan. Coba lagi; kalau masih gagal, tutup KenStory lalu buka lagi.')
+      return
+    }
+    try {
+      const asset = await window.api.assets.pickSheet(c.projectId, c.id)
+      if (asset) toast('success', 'Lembar karakter diunggah')
+    } catch (e) {
+      toast('error', errorText(e))
+    }
+  }
+
   const remove = async (): Promise<void> => {
     const ok = await confirmDialog({
       title: `Hapus pemeran ${c.name}?`,
@@ -119,9 +145,14 @@ function EditCharacter({ characterId, onClose }: { characterId: string | null; o
         ) : running ? null : (
           <div className="flex size-full flex-col items-center justify-center gap-3 text-ink-2">
             <span className="text-sm">Belum ada lembar karakter</span>
-            <Button variant="accent" icon={<Sparkles className="size-4" />} disabled={running} onClick={() => void generate()}>
-              Buat lembar karakter
-            </Button>
+            <div className="flex items-center gap-2.5">
+              <Button variant="accent" icon={<Sparkles className="size-4" />} disabled={running} onClick={() => void generate()}>
+                Buat lembar karakter
+              </Button>
+              <Button icon={<Upload className="size-4" />} disabled={running} onClick={() => void upload()}>
+                Unggah lembar
+              </Button>
+            </div>
           </div>
         )}
         {running && (
@@ -157,9 +188,14 @@ function EditCharacter({ characterId, onClose }: { characterId: string | null; o
         </Button>
         <div className="flex-1" />
         {sheet && (
-          <Button icon={<RefreshCw className="size-4" />} loading={running} onClick={() => void generate()}>
-            Buat ulang lembar
-          </Button>
+          <>
+            <Button icon={<Upload className="size-4" />} disabled={running} onClick={() => void upload()}>
+              Unggah lembar
+            </Button>
+            <Button icon={<RefreshCw className="size-4" />} loading={running} onClick={() => void generate()}>
+              Buat ulang lembar
+            </Button>
+          </>
         )}
         <Button variant="ink" onClick={onClose}>
           Selesai

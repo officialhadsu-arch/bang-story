@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { copyFileSync, mkdirSync } from 'node:fs'
+import { copyFileSync, mkdirSync, unlinkSync } from 'node:fs'
 import { basename, dirname, extname, join } from 'node:path'
 import { app, BrowserWindow, clipboard, dialog, ipcMain, shell } from 'electron'
 import type {
@@ -45,11 +45,14 @@ import {
   duplicateProject,
   getAsset,
   getBundle,
+  getCharacter,
   getProject,
   insertAsset,
   listProjects,
   removeProject,
   saveSnapshot,
+  setCharacterSheet,
+  touchProject,
   updateAssetMeta
 } from './repo'
 import { clearSecret, getSecret, keyStatuses, recordCheck, revealSecret, setSecret } from './secrets'
@@ -103,6 +106,27 @@ async function testProvider(provider: ApiProvider, key?: string): Promise<KeyTes
 
 function defaultExportFolder(): string {
   return getSettings().exportFolder ?? join(app.getPath('videos'), 'KenStory')
+}
+
+// Plain-Indonesian messages for every 'assets:pickSheet' failure: what
+// happened + what to do next. Technical errors (Node/SQLite codes) are
+// classified here so the user never sees a raw message; the original error
+// is written to the log at the throw site instead.
+function friendlyPickSheetError(e: unknown): string {
+  if (e instanceof Error) {
+    if (e.message === 'Pemeran tidak ditemukan' || e.message === 'Pemeran tidak ada di proyek ini') return e.message
+    if (
+      e.message === 'Format gambar ini tidak didukung. Pilih gambar PNG, JPG, atau WebP.' ||
+      e.message.startsWith('Gambar ini tidak bisa dibaca.')
+    )
+      return e.message
+    const code = (e as NodeJS.ErrnoException).code ?? ''
+    if (code.startsWith('SQLITE'))
+      return 'Lembar tidak bisa disimpan ke proyek. Coba lagi; kalau masih gagal, tutup KenStory lalu buka lagi.'
+    if (code === 'ENOENT' || code === 'EACCES' || code === 'EPERM')
+      return 'Gambar tidak bisa disalin ke proyek. Pastikan berkasnya masih ada dan folder proyek bisa ditulis, lalu coba lagi.'
+  }
+  return 'Lembar tidak bisa diunggah. Coba lagi dengan gambar lain; kalau masih gagal, tutup KenStory lalu buka lagi.'
 }
 
 export function registerIpc(): void {
@@ -330,6 +354,62 @@ export function registerIpc(): void {
     })
     await setActiveAsset(clipId, asset.id)
     return asset
+  })
+
+  // 0.3 (unggah lembar): a local image file for a character sheet, stored like a
+  // generated sheet and linked to the character at once. Follows pickClipImage's
+  // shape (dialog filter, copy to images/, probeSize fail-closed, insertAsset)
+  // and the GA sheet registration (provider 'manual', setCharacterSheet).
+  // The file's generating model is unknown, so model stays null — GA recorded
+  // 'nano-banana' only because those sheets were Nano Banana generations.
+  // The probe runs before any database write; a file that fails it is deleted
+  // again, so a bad upload leaves nothing behind.
+  // Every failure throws a plain-Indonesian message (what happened + what to
+  // do next); the technical error is only written to the log, never shown.
+  handle('assets:pickSheet', async (projectId: string, characterId: string) => {
+    const win = BrowserWindow.getFocusedWindow()
+    const res = await dialog.showOpenDialog(win!, {
+      title: 'Pilih lembar karakter',
+      filters: [{ name: 'Gambar', extensions: ['png', 'jpg', 'jpeg', 'webp'] }],
+      properties: ['openFile']
+    })
+    if (res.canceled || !res.filePaths[0]) return null
+    try {
+      const c = getCharacter(characterId)
+      if (c.projectId !== projectId) throw new Error('Pemeran tidak ada di proyek ini')
+      const src = res.filePaths[0]
+      const ext = extname(src).toLowerCase()
+      if (ext !== '.png' && ext !== '.jpg' && ext !== '.jpeg' && ext !== '.webp') {
+        throw new Error('Format gambar ini tidak didukung. Pilih gambar PNG, JPG, atau WebP.')
+      }
+      const rel = `images/${randomUUID()}${ext}`
+      const abs = assetAbsPath(projectId, rel)
+      mkdirSync(dirname(abs), { recursive: true })
+      copyFileSync(src, abs)
+      const size = await probeSize(abs).catch(() => null)
+      if (!size) {
+        unlinkSync(abs)
+        throw new Error('Gambar ini tidak bisa dibaca. Mungkin berkasnya rusak, coba gambar lain atau simpan ulang sebagai PNG atau JPG.')
+      }
+      const asset = insertAsset({
+        projectId,
+        characterId,
+        kind: 'image',
+        provider: 'manual',
+        prompt: basename(src),
+        localPath: rel,
+        width: size.width,
+        height: size.height
+      })
+      setCharacterSheet(characterId, asset.id)
+      emit.asset(asset)
+      emit.character({ characterId, patch: { sheetAssetId: asset.id } })
+      touchProject(projectId)
+      return asset
+    } catch (e) {
+      console.error('[pickSheet] gagal mengunggah lembar karakter', e)
+      throw new Error(friendlyPickSheetError(e))
+    }
   })
 
   handle('settings:get', () => getSettings())
