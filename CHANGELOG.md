@@ -8,6 +8,17 @@ Cara menaikkan versi ada di [docs/pengembangan.md](docs/pengembangan.md#versi-da
 
 ## [Belum dirilis]
 
+- **Generate berurutan (gambar, 0.3)** — tombol baru di header Storyboard, di antara "Rekam ulang suara narasi" dan
+  "Generate N gambar": gambar dibuat satu adegan demi satu adegan sesuai urutan storyboard, dengan jeda acak 0–20
+  detik antar-adegan (bukan sebelum adegan pertama), hitung mundur "Adegan berikut dalam X detik", dan tombol
+  Batalkan (berhenti sesudah job yang sedang jalan selesai). Tiap adegan dicoba maks 3× (1 + 2 retry); bila tetap
+  gagal, adegan ditandai gagal dan batch lanjut. Pengaman gerbang G3: gagal dengan 401 / 429 / UNUSUAL_ACTIVITY /
+  reCAPTCHA menghentikan seluruh batch segera tanpa retry. Adegan manual/extension dilewati (job-nya menunggu berkas
+  dan tidak pernah selesai). Antrean in-memory, tanpa migrasi DB dan tanpa setelan baru; mode batch lama tidak
+  berubah; konfirmasi biaya NexaBot/kie.ai dipakai kedua tombol. Jeda adalah ritme yang lebih mirip manusia mengikuti
+  pola KenFlow v3.6.6 — bukan jaminan lolos dari kontrol risiko Google. Mesin di `src/main/sequential.ts` (murni,
+  bisa diuji) + wiring di `generation.ts` + IPC `generate:sequentialImages` / `cancelSequential` /
+  `sequentialStatus` + event `event:sequential`.
 - Rebrand aplikasi menjadi **KenStory** (fork dari bangtutorial/bang-story tetap berlisensi MIT, lihat NOTICE.md).
 - **Flow2API: kunci API server (Bearer)** — server Flow2API versi sekarang menuntut `Authorization: Bearer <kunci>` di
   tiap permintaan; tanpanya generate gagal HTTP 401 (terbukti di uji live PC, 20 Nov 2026). Kolom baru "Kunci API

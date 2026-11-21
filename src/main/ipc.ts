@@ -20,6 +20,7 @@ import type { SceneDef } from '@shared/talkinghead'
 import { startExport } from './exporter'
 import {
   applyMotionPreset,
+  cancelSequentialImages,
   estimateCredits,
   forgetEstimates,
   generateCharacterSheet,
@@ -29,7 +30,9 @@ import {
   generateMissingImages,
   generateMissingVideos,
   generateMissingTts,
-  setActiveAsset
+  sequentialStatus,
+  setActiveAsset,
+  startSequentialImages
 } from './generation'
 import { cancelJob } from './jobs'
 import { generateNarration, syncCaptions } from './narration'
@@ -119,6 +122,9 @@ export function registerIpc(): void {
   handle('generate:clipTts', (clipId: string) => generateClipTts(clipId))
   handle('generate:characterSheet', (characterId: string) => generateCharacterSheet(characterId))
   handle('generate:missingImages', (projectId: string) => generateMissingImages(projectId))
+  handle('generate:sequentialImages', (projectId: string) => startSequentialImages(projectId))
+  handle('generate:cancelSequential', (projectId: string) => cancelSequentialImages(projectId))
+  handle('generate:sequentialStatus', (projectId: string) => sequentialStatus(projectId))
   handle('generate:missingVideos', (projectId: string) => generateMissingVideos(projectId))
   handle('generate:missingTts', (projectId: string) => generateMissingTts(projectId))
   handle('generate:narration', (projectId: string, mode: 'missing' | 'all') => generateNarration(projectId, mode === 'all' ? 'all' : 'missing'))

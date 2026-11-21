@@ -168,6 +168,35 @@ v2.1 sudah tidak berlaku.
   ke pesan galat.
 - Penyambungan (`generation.ts`): model `nexabot:` bercabang ke antrean `nexabot` (limit 1) dengan penyedia `nexabot`.
   `requireNexa` gagal keras bila sakelar mati atau kunci belum diisi — tanpa fallback diam-diam ke provider lain
+## Generate berurutan (`main/sequential.ts`, `main/generation.ts`)
+
+Mode batch gambar satu adegan demi satu adegan, mengikuti pola antrean KenFlow v3.6.6 (serial 1, jeda acak 0–20 dtk
+antar-prompt dari prompt ke-2, tick 1 detik yang bisa dibatalkan, retry maks 2× lalu lanjut) — lihat
+`../fase0-0.2a/kenflow-v36-study/LAPORAN-STUDI-ANTREAN-KENFLOW.md`. Jeda adalah ritme yang lebih mirip manusia,
+**bukan** jaminan lolos dari kontrol risiko Google; itu ditulis apa adanya di panduan dan di tooltip tombol.
+
+- Mesin (`runSequentialImages` di `main/sequential.ts`) murni dan tanpa dependensi Electron/DB/provider: semua efek
+  samping masuk lewat `deps` (`generateOne`, `waitJob`, `delay`, `random`, `emit`, `isCanceled`) supaya aturan
+  pacing, retry, dan gate-stop bisa diuji di Node polos (`../fase0-0.2a/test-sequential-service.mjs`, 38 butir).
+  Konstanta di kode, bukan settings, tanpa migrasi DB: jeda acak 0–20 dtk (`SEQUENTIAL_DELAY_MIN_MS/MAX_MS`),
+  maks 3 percobaan per adegan (`SEQUENTIAL_MAX_ATTEMPTS`), poll status job 500 ms, tick jeda 1 dtk.
+- Antrean serial 1 sesuai urutan storyboard; jeda hanya antar-adegan (bukan sebelum adegan pertama), sebagai tidur
+  yang bisa dibatalkan dalam tick 1 detik dengan hitung mundur per detik. Batalkan berhenti sesudah job yang sedang
+  jalan selesai (job-nya sendiri tidak dibatalkan) dan tidak memulai adegan berikut.
+- Retry maks 2× per adegan; bila tetap gagal, adegan ditandai gagal dan batch lanjut ke adegan berikut. Pengaman
+  gerbang G3 (`isGateError`): satu job gagal dengan 401 / 429 / UNUSUAL_ACTIVITY / pesan mengandung "reCAPTCHA" atau
+  "unusual activity" → seluruh batch berhenti segera tanpa retry, dengan pesan berbahasa Indonesia.
+- Adegan manual/extension dilewati (job-nya menunggu berkas dari pengguna sehingga tidak pernah selesai dan akan
+  mengganjal antrean selamanya); jumlahnya dilaporkan di pesan akhir. Adegan motion juga dilewati (tidak memakai
+  gambar). Mode batch lama ("Generate N gambar") tidak diubah. Konfirmasi biaya NexaBot/kie.ai dipakai bersama oleh
+  kedua tombol (`confirmImageCost` di `StoryboardStep.tsx`).
+- Wiring (`startSequentialImages` / `cancelSequentialImages` / `sequentialStatus` di `main/generation.ts`): run
+  in-memory per proyek (restart mengakhirinya; job gambar per adegan tetap tersimpan seperti job biasa). IPC baru
+  mengikuti aturan 3 tempat (`generate:sequentialImages`, `generate:cancelSequential`, `generate:sequentialStatus`;
+  event `event:sequential` dengan tipe `SequentialProgress` di `shared/types.ts`). Tombol "Generate berurutan" di
+  header Storyboard, di antara "Rekam ulang suara narasi" dan "Generate N gambar", dengan strip progres di bawah
+  header (adegan ke-n dari total, hitung mundur jeda, tombol Batalkan/Tutup).
+
   (D3-03). `estimateCredits` mengembalikan harga katalog tetap tanpa panggilan server. `resumeJobs` melanjutkan polling
   video yang sudah disubmit sesudah restart; gambar tidak punya remote id sehingga gagal seperti biasa. `cancelJob`
   memberitahu server NexaBot agar berhenti (tagihan tidak jalan terus).
