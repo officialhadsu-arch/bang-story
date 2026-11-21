@@ -2,6 +2,7 @@ import type { ManualScanResult, ManualWatchEvent, ManualWorkFolder, VisualProvid
 import type { BeatsJson, MotionBabakStatus, MotionWorkFolderResult, RenderBabakResult } from './motion-contract'
 import type { MotionTemplate } from './motion-templates'
 import type { ArrangeResult, SceneDef } from './talkinghead'
+import type { ScriptImportSummary } from './script-import'
 import type {
   ApiProvider,
   AspectRatio,
@@ -46,6 +47,10 @@ export interface StudioApi {
     continueScript(projectId: string): Promise<ProjectBundle>
     /** Stops a running script write between chunks; scenes already saved stay saved. */
     cancelScript(projectId: string): Promise<void>
+    /** Reads a .txt/.md script file the user picked; null when they cancel the dialog. */
+    pickScriptFile(): Promise<{ fileName: string; text: string } | null>
+    /** Replaces the whole script with the user's own text (same parser the dialog previewed). */
+    importScript(projectId: string, text: string): Promise<ScriptImportSummary & { bundle: ProjectBundle }>
     /** Script → one image plan per scene; "missing" skips scenes whose plan still matches their story. */
     visuals(projectId: string, mode: 'missing' | 'all'): Promise<ProjectBundle>
     /** A background-music prompt that fits the finished script, for use in Suno or another music AI. */

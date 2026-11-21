@@ -15,6 +15,7 @@ import { probeDurationMs, probeSize } from './services/audio'
 import { approveMotionBeat, motionBabakDir, prepareMotionWorkFolder, readMotionBabak, syncMotionBeatIds } from './services/motion'
 import { renderBabakRange, type RenderRangeResult } from './services/renderer'
 import { setSettings } from './settings'
+import { importScript } from './story'
 import { createProject, getBundle, insertAsset, listProjects, patchClip, replaceStory, saveSnapshot, setCharacterSheet, touchProject, updateAssetMeta } from './repo'
 import { recordCheck, setTestKey } from './secrets'
 import { importFootage } from './talkinghead'
@@ -445,7 +446,7 @@ export function attachDevHarness(win: BrowserWindow): void {
   const planPath = process.env.STUDIO_CAPTURE_PLAN
   if (!planPath) return
   let plan: {
-    main?: 'seed' | 'export' | 'key' | 'overlays' | 'speech' | 'videos' | 'importClipImages' | 'uploadSheet' | 'manualFixture' | 'motionFixture' | 'motionApprove' | 'motionSpike' | 'motionSpikeVert' | 'talkingHeadFixture' | 'mockLlm'
+    main?: 'seed' | 'export' | 'key' | 'overlays' | 'speech' | 'videos' | 'importClipImages' | 'uploadSheet' | 'importScriptFile' | 'manualFixture' | 'motionFixture' | 'motionApprove' | 'motionSpike' | 'motionSpikeVert' | 'talkingHeadFixture' | 'mockLlm'
     exportTo?: string
     /** For main "mockLlm": a control body for the mock LLM server (POST /__control). */
     control?: Record<string, unknown>
@@ -455,6 +456,8 @@ export function attachDevHarness(win: BrowserWindow): void {
     projectId?: string
     /** For main "importClipImages" / "uploadSheet": the project to fill, found by title. */
     projectTitle?: string
+    /** For main "importScriptFile": the .txt/.md file to import into that project. */
+    file?: string
     /** For main "importClipImages": local image files, one per clip without a picture. */
     /** For main "uploadSheet": local image files, one per character without a sheet. */
     images?: string[]
@@ -554,6 +557,19 @@ export function attachDevHarness(win: BrowserWindow): void {
             emit.character({ characterId: character.id, patch: { sheetAssetId: asset.id } })
             touchProject(target.id)
           }
+        }
+        if (step.main === 'importScriptFile' && step.projectTitle && step.file) {
+          // Test-only twin of the pickScriptFile IPC handler: the file comes
+          // from the plan instead of a native file dialog, which the harness
+          // cannot click. The dialog and the button are covered by screenshot
+          // and code inspection instead. The parse + replace path is the real
+          // importScript the dialog's confirm button calls.
+          const target = listProjects().find((p) => p.title === step.projectTitle)
+          if (!target) throw new Error(`proyek tidak ditemukan: ${step.projectTitle}`)
+          const res = await importScript(target.id, readFileSync(step.file, 'utf8'))
+          const line = `[harness] importScriptFile ${target.id} imported=${res.imported} skipped=${JSON.stringify(res.skipped)} durationSec=${res.durationSec} title=${res.title}`
+          console.log(line)
+          if (log) appendFileSync(log, `${line}\n`)
         }
         if (step.main === 'manualFixture' && demoId) {
           // Test-only: result files in the demo project's work folder, as if the user (or an

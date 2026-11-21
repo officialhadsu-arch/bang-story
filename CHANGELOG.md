@@ -45,6 +45,12 @@ Cara menaikkan versi ada di [docs/pengembangan.md](docs/pengembangan.md#versi-da
   ("Menulis adegan 31–60 dari 218…") dengan tombol Batalkan. Durasi video bisa diisi bebas 15–1800
   detik lewat kolom "Atau durasi lain" di langkah Ide; lima preset tetap sama (30 detik→5, 1 menit→11,
   3 menit→33, 5 menit→55, 10 menit→109 adegan). Rumus adegan tidak berubah (1 adegan per ~5,5 detik).
+- **Impor naskah bawa sendiri** — tombol "Impor naskah" di langkah Naskah (header dan empty state): tempel teks
+  atau pilih berkas `.txt`/`.md`, pratinjau hasil parse (jumlah adegan, total ±menit, judul adegan), lalu ganti
+  seluruh naskah. Format: `# Judul Video` (opsional) + `## Judul Adegan` + `Alur:`/`Narasi:` per adegan; adegan
+  tanpa label dibaca sebagai narasi; adegan kosong dilewati dan dilaporkan nomornya; teks tanpa adegan valid
+  ditolak dan naskah lama utuh. Durasi proyek mengikuti total estimasi narasi impor (min. 10 detik), bukan preset.
+  Penulisan memakai `replaceScript` yang sama dengan naskah hasil generate. Mode tambah belum ada (v1 hanya ganti).
 - Rebrand aplikasi menjadi **KenStory** (fork dari bangtutorial/bang-story tetap berlisensi MIT, lihat NOTICE.md).
 - **Flow2API: kunci API server (Bearer)** — server Flow2API versi sekarang menuntut `Authorization: Bearer <kunci>` di
   tiap permintaan; tanpanya generate gagal HTTP 401 (terbukti di uji live PC, 20 Nov 2026). Kolom baru "Kunci API

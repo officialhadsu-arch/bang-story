@@ -1,14 +1,16 @@
 import { useEffect, useState } from 'react'
-import { ArrowDown, ArrowRight, ArrowUp, Bot, MoreHorizontal, Plus, RefreshCw, Sparkles, Trash2 } from 'lucide-react'
+import { ArrowDown, ArrowRight, ArrowUp, Bot, MoreHorizontal, Plus, RefreshCw, Sparkles, Trash2, Upload } from 'lucide-react'
 import { DURATIONS, clipCountFor, llmName } from '@shared/models'
 import { estimateNarrationMs, needsVisual, wordCount } from '@shared/script'
+import { type ScriptImportSummary } from '@shared/script-import'
 import { VOICE_TAGS } from '@shared/speech'
-import type { Clip, LlmProvider } from '@shared/types'
+import type { Clip, LlmProvider, ProjectBundle } from '@shared/types'
 import { AutoTextarea } from '../../components/AutoTextarea'
 import { Badge, Button, IconButton, Menu, confirmDialog, cx, inputCls } from '../../components/ui'
 import { clipNumber, errorText, mmss } from '../../lib/format'
 import { useApp } from '../../store/app'
 import { useProject } from '../../store/project'
+import { ScriptImportDialog } from './ScriptImportDialog'
 
 /** A thin gap between scenes that offers to insert one there. */
 function InsertGap({ onInsert }: { onInsert: () => void }) {
@@ -171,6 +173,7 @@ export function ScriptStep() {
   const [scriptProgress, setScriptProgress] = useState<string | null>(null)
   const [writer, setWriter] = useState<{ provider: LlmProvider; model: string } | null>(null)
   const [focusId, setFocusId] = useState<string | null>(null)
+  const [importOpen, setImportOpen] = useState(false)
 
   useEffect(() => {
     void window.api.settings.get().then((s) => setWriter({ provider: s.llmProvider, model: s.llmModels[s.llmProvider] }))
@@ -249,17 +252,40 @@ export function ScriptStep() {
     }
   }
 
+  // The pending autosave must land first: replaceScript deletes the old
+  // clips in the database, and a late snapshot would resurrect them.
+  const doImport = async (text: string): Promise<ScriptImportSummary & { bundle: ProjectBundle }> => {
+    await flush()
+    return window.api.story.importScript(project.id, text)
+  }
+
+  const importDialog = importOpen ? (
+    <ScriptImportDialog
+      hasScenes={clips.length > 0}
+      onImport={doImport}
+      onDone={(res) => {
+        load(res.bundle)
+        setImportOpen(false)
+      }}
+      onClose={() => setImportOpen(false)}
+    />
+  ) : null
+
   if (!clips.length)
     return (
       <div className="flex h-full flex-col items-center justify-center gap-4 text-center">
         <h2 className="font-display text-3xl font-bold">Naskah masih kosong</h2>
-        <p className="max-w-md text-ink-2">Tulis idenya di langkah Ide cerita lalu klik Susun naskah, atau tulis adegannya sendiri.</p>
+        <p className="max-w-md text-ink-2">Tulis idenya di langkah Ide cerita lalu klik Susun naskah, tulis adegannya sendiri, atau impor naskah yang sudah kamu tulis.</p>
         <div className="flex gap-2.5">
           <Button onClick={() => updateProject({ step: 1 })}>Ke Ide cerita</Button>
+          <Button icon={<Upload className="size-4" />} onClick={() => setImportOpen(true)}>
+            Impor naskah
+          </Button>
           <Button variant="primary" icon={<Plus className="size-4" />} onClick={() => insert(null)}>
             Tulis adegan pertama
           </Button>
         </div>
+        {importDialog}
       </div>
     )
 
@@ -280,6 +306,9 @@ export function ScriptStep() {
             <span className="rounded-full border border-line-2 bg-surface px-3 py-1.5">± {mmss(totalMs)} narasi</span>
             <span className="rounded-full border border-line-2 bg-surface px-3 py-1.5 text-ink-2">Target {target}</span>
             <span className="text-muted">Durasi akhir tiap adegan mengikuti panjang suara narasinya.</span>
+            <Button size="sm" icon={<Upload className="size-4" />} onClick={() => setImportOpen(true)}>
+              Impor naskah
+            </Button>
           </div>
 
           {incomplete && (
@@ -382,6 +411,7 @@ export function ScriptStep() {
           </>
         )}
       </footer>
+      {importDialog}
     </div>
   )
 }
