@@ -14,6 +14,7 @@ import { probeDurationMs, probeSize } from './services/audio'
 import { approveMotionBeat, motionBabakDir, prepareMotionWorkFolder, readMotionBabak, syncMotionBeatIds } from './services/motion'
 import { renderBabakRange, type RenderRangeResult } from './services/renderer'
 import { setSettings } from './settings'
+import { importScript } from './story'
 import { createProject, getBundle, insertAsset, listProjects, patchClip, replaceStory, saveSnapshot, touchProject, updateAssetMeta } from './repo'
 import { recordCheck, setTestKey } from './secrets'
 import { importFootage } from './talkinghead'
@@ -444,12 +445,14 @@ export function attachDevHarness(win: BrowserWindow): void {
   const planPath = process.env.STUDIO_CAPTURE_PLAN
   if (!planPath) return
   let plan: {
-    main?: 'seed' | 'export' | 'key' | 'overlays' | 'speech' | 'videos' | 'importClipImages' | 'manualFixture' | 'motionFixture' | 'motionApprove' | 'motionSpike' | 'motionSpikeVert' | 'talkingHeadFixture'
+    main?: 'seed' | 'export' | 'key' | 'overlays' | 'speech' | 'videos' | 'importClipImages' | 'importScriptFile' | 'manualFixture' | 'motionFixture' | 'motionApprove' | 'motionSpike' | 'motionSpikeVert' | 'talkingHeadFixture'
     exportTo?: string
     /** For main "export": an existing project instead of the seeded demo. */
     projectId?: string
     /** For main "importClipImages": the project to fill, found by title. */
     projectTitle?: string
+    /** For main "importScriptFile": the .txt/.md file to import into that project. */
+    file?: string
     /** For main "importClipImages": local image files, one per clip without a picture. */
     images?: string[]
     /** For main "key": hold a fake key for this provider in memory only
@@ -513,6 +516,19 @@ export function attachDevHarness(win: BrowserWindow): void {
             })
             await setActiveAsset(clip.id, asset.id)
           }
+        }
+        if (step.main === 'importScriptFile' && step.projectTitle && step.file) {
+          // Test-only twin of the pickScriptFile IPC handler: the file comes
+          // from the plan instead of a native file dialog, which the harness
+          // cannot click. The dialog and the button are covered by screenshot
+          // and code inspection instead. The parse + replace path is the real
+          // importScript the dialog's confirm button calls.
+          const target = listProjects().find((p) => p.title === step.projectTitle)
+          if (!target) throw new Error(`proyek tidak ditemukan: ${step.projectTitle}`)
+          const res = await importScript(target.id, readFileSync(step.file, 'utf8'))
+          const line = `[harness] importScriptFile ${target.id} imported=${res.imported} skipped=${JSON.stringify(res.skipped)} durationSec=${res.durationSec} title=${res.title}`
+          console.log(line)
+          if (log) appendFileSync(log, `${line}\n`)
         }
         if (step.main === 'manualFixture' && demoId) {
           // Test-only: result files in the demo project's work folder, as if the user (or an
