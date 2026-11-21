@@ -152,9 +152,28 @@ python main.py`}</Cmd>
         buka manajemen Token dan isi formulirnya (token ST, cookie Google, dan akun login).
       </P>
       <P>
-        Periksa di halaman admin bahwa Token berstatus aktif. Server memperbarui cookie secara otomatis; bila login kedaluwarsa, sambungkan
-        ulang dengan cara yang sama. Saldo kredit bisa dilihat di halaman admin (VideoFX Credits) — catat angkanya sebelum dan sesudah uji
-        pertama supaya pemakaianmu tercatat.
+        <strong className="text-ink">Memasang ekstensinya:</strong> unduh ZIP dari repositori Flow2API-Token-Updater, ekstrak ke folder,
+        lalu di Chrome buka <Code>chrome://extensions</Code>, nyalakan <strong className="text-ink">Developer mode</strong> (pojok kanan
+        atas), klik <strong className="text-ink">Load unpacked</strong>, dan pilih folder hasil ekstrak itu.{' '}
+        <strong className="text-ink">Jangan tertukar:</strong> folder <Code>extension/</Code> di dalam folder server Flow2API adalah
+        ekstensi CAPTCHA, <strong className="text-ink">bukan</strong> Token-Updater — memasang folder itu tidak menyambungkan akunmu.
+      </P>
+      <P>
+        <strong className="text-ink">Menyambungkan tokennya:</strong> di halaman admin server, buka{' '}
+        <strong className="text-ink">System Settings › Extension Connection Settings</strong>, klik{' '}
+        <strong className="text-ink">Random</strong> untuk membuat token koneksi, lalu <strong className="text-ink">Copy</strong> dan{' '}
+        <strong className="text-ink">Save settings</strong>. Tempel token itu ke kolom di popup ekstensi Token-Updater —{' '}
+        <strong className="text-ink">jebakan yang sering terjadi:</strong> kolom yang tampak sudah terisi bisa jadi hanya teks contoh
+        berwarna abu-abu (placeholder), bukan isi sungguhan. Ketik ulang sampai teksnya berubah hitam pekat, baru klik{' '}
+        <strong className="text-ink">Simpan</strong> (tombol biru). Dialog izin Chrome akan muncul — klik{' '}
+        <strong className="text-ink">Allow</strong> — lalu klik <strong className="text-ink">Tes sekarang</strong>.
+      </P>
+      <P>
+        <strong className="text-ink">Berhasil bila:</strong> di halaman admin, Token Management menampilkan{' '}
+        <strong className="text-ink">Total 1, Active 1</strong>, beserta angka Credits. Token Management yang masih kosong (Total 0) di
+        awal itu normal — artinya akun belum tersambung, bukan servernya rusak. Periksa di halaman admin bahwa Token berstatus aktif. Server
+        memperbarui cookie secara otomatis; bila login kedaluwarsa, sambungkan ulang dengan cara yang sama. Saldo kredit bisa dilihat di
+        halaman admin (VideoFX Credits) — catat angkanya sebelum dan sesudah uji pertama supaya pemakaianmu tercatat.
       </P>
 
       <H2>Langkah 3: Menghubungkan KenStory</H2>
@@ -180,6 +199,45 @@ python main.py`}</Cmd>
           </>
         ]}
       />
+
+      <H2>Metode CAPTCHA: ganti dari YesCaptcha yang berbayar</H2>
+      <P>
+        Bawaan server, metode CAPTCHA-nya adalah <strong className="text-ink">YesCaptcha — layanan berbayar yang kuncinya kosong</strong>,
+        jadi generate akan gagal di langkah verifikasi. Ganti ke metode gratis di halaman admin server, bagian pengaturan CAPTCHA:{' '}
+        <strong className="text-ink">Built-in browser</strong> atau <strong className="text-ink">Flow2API Team</strong> (keduanya
+        bawaan server, tanpa kunci, tanpa pendaftaran).{' '}
+        <strong className="text-ink">Sesudah mengganti dropdown, klik Save settings</strong> — mengubah pilihannya saja belum menyimpan.
+        Bila generate gagal dengan pesan <Code>Failed to obtain reCAPTCHA token</Code>, itu artinya browser bawaan server gagal
+        menghasilkan token: ganti metodenya ke Flow2API Team (built-in), lalu Generate ulang.
+      </P>
+
+      <H2>Kunci API server: cara mengisi yang benar</H2>
+      <P>
+        Server Flow2API versi sekarang menuntut kunci di tiap permintaan (<Code>Authorization: Bearer</Code>). Nilainya diambil dari halaman
+        admin server: <strong className="text-ink">System Settings › API Key Settings › Current API key</strong> — salin dari sana ke kolom{' '}
+        <strong className="text-ink">Kunci API server</strong> di <strong className="text-ink">Pengaturan › Google Flow</strong> di KenStory.
+      </P>
+      <P>
+        <strong className="text-ink">Mengetik saja belum menyimpan.</strong> Sesudah mengetik, klik{' '}
+        <strong className="text-ink">Simpan</strong> (atau tekan Enter) sampai muncul toast sukses dan kolomnya berubah jadi titik-titik.
+        Bila kolom masih menampilkan teks biasa, kuncinya belum tersimpan dan generate akan tetap gagal 401. Tulisan hijau{' '}
+        <strong className="text-ink">Terhubung ke Flow2API</strong> di Pengaturan hanya mengecek servernya jalan — bukan kuncinya.
+      </P>
+      <P>
+        <strong className="text-ink">Arti pesan 401</strong> (KenStory membedakan keduanya sejak v1.1d):{' '}
+        <em>“Server ini meminta kunci API — isi Kunci API server…”</em> berarti kolom kunci di KenStory masih kosong;{' '}
+        <em>“Kunci API server yang tersimpan ditolak…”</em> berarti kunci yang diketik tidak cocok dengan yang di server — salin ulang dari
+        halaman admin, dan pastikan kunci di server tidak baru diganti.
+      </P>
+
+      <H2>Jendela login Google yang menutup sendiri</H2>
+      <P>
+        Saat sesi login Google kedaluwarsa, server membuka <strong className="text-ink">jendela browsernya sendiri</strong> untuk login
+        ulang — bukan Chrome kamu, profilnya terpisah. Jendela itu bisa menutup sendiri sebelum kamu sempat mengetik, terutama di laptop RAM
+        4 GB (browser bawaan server mati atau dimatikan server). <strong className="text-ink">Jalan pintas:</strong> login{' '}
+        <Code>flow.google.com</Code> di Chrome kamu sendiri seperti biasa, lalu lakukan satu generate manual di sana — ekstensi
+        Token-Updater akan menyinkronkan token segar ke server secara otomatis, tanpa perlu jendela login server itu.
+      </P>
 
       <H2>Cara kerja teknis</H2>
       <P>
@@ -282,6 +340,13 @@ python main.py`}</Cmd>
         head={['Gejala', 'Kemungkinan penyebab & perbaikan']}
         rows={[
           ['Uji Koneksi gagal: tidak dapat terhubung', 'Server belum jalan. Jalankan python main.py (atau docker-compose up -d) dan pastikan http://localhost:8000 bisa dibuka di browser. Periksa alamat server di Pengaturan.'],
+          ['Token Management masih Total 0', 'Normal di awal — akun belum tersambung. Pasang ekstensi Token-Updater (Load unpacked dari folder hasil ekstrak ZIP-nya, bukan folder extension/ di dalam server), lalu sambungkan token dari System Settings › Extension Connection Settings › Random › Copy › Save settings. Di popup ekstensi, ketik ulang token sampai teksnya hitam pekat (teks abu-abu hanya contoh), klik Simpan, Allow di dialog Chrome, lalu Tes sekarang. Berhasil bila Total 1, Active 1.'],
+          ['Kolom di popup addon tampak terisi tapi Tes gagal', 'Itu teks contoh abu-abu (placeholder), bukan isi. Hapus dan ketik ulang token sampai hitam pekat, baru Simpan.'],
+          ['Jendela login Google menutup sendiri sebelum sempat mengetik', 'Itu jendela browser bawaan server, bukan Chromemu — bisa mati sendiri, terutama di RAM 4 GB. Jalan pintas: login flow.google.com di Chrome kamu sendiri dan generate manual sekali; Token-Updater menyinkronkan token segar ke server otomatis.'],
+          ['Generate gagal: Failed to obtain reCAPTCHA token', 'Browser bawaan server gagal menghasilkan token reCAPTCHA. Ganti metode CAPTCHA di admin server ke Flow2API Team (built-in), klik Save settings, lalu Generate ulang.'],
+          ['Generate gagal: UNUSUAL_ACTIVITY', 'Kontrol risiko Google, bukan salah ketik dan bukan salah kunci. Berhenti — jangan Generate berulang, karena percobaan langsung sesudah penolakan hampir pasti ditolak lagi. Istirahatkan akun, cek akun lewat generate manual di flow.google.com, dan sementara pakai jalur Manual. Untuk batch, pakai tombol Generate berurutan di Storyboard (satu adegan demi satu adegan, jeda acak 0–20 detik), bukan batch besar sekaligus.'],
+          ['Generate gagal: HTTP 401 (kunci API server)', 'Dua arti yang berbeda: "Server ini meminta kunci API — isi Kunci API server…" berarti kolom kunci di KenStory masih kosong; "Kunci API server yang tersimpan ditolak…" berarti kunci yang diketik tidak cocok dengan yang di server. Isi dari System Settings › API Key Settings › Current API key, lalu klik Simpan sampai kolom jadi titik-titik. Tulisan hijau "Terhubung ke Flow2API" hanya mengecek servernya jalan, bukan kuncinya.'],
+          ['Metode CAPTCHA masih YesCaptcha', 'YesCaptcha itu berbayar dan kuncinya kosong. Ganti ke Built-in browser atau Flow2API Team (gratis, bawaan server) di admin, lalu klik Save settings — mengganti dropdown saja belum menyimpan.'],
           ['Uji Koneksi: status HTTP bukan 200', 'Server jalan tapi endpoint /health atau /v1/models mengembalikan galat. Lihat log terminal server; mulai ulang server bila perlu.'],
           ['Generate gagal: Flow2API belum dinyalakan', 'Sakelar Google Flow di Pengaturan masih mati. Baca peringatan, centang persetujuan, nyalakan.'],
           ['Generate gagal: masalah reCAPTCHA', 'Flow meminta verifikasi manusia dan server tidak bisa melewatinya sendiri. Periksa log server untuk metode captcha yang dipilih. Jalur gratis: setel mode captcha server ke browser atau personal (browser berkepala di server). Layanan captcha berbayar TIDAK dipakai KenStory.'],
@@ -300,7 +365,9 @@ python main.py`}</Cmd>
         reCAPTCHA. Google bisa mendeteksi otomatisasi ini, membatasi (galat 429), atau membatasi/menonaktifkan akses akun. Akun ini sama
         dengan akun kerja harianmu, jadi kredit, Gemini, dan layanan Google lain yang terikat ke akun itu ikut terdampak. Praktik amannya:
         jangan menjalankan batch besar di akun kerja utama tanpa jeda, catat saldo sebelum dan sesudah sesi, dan hentikan pemakaian bila
-        muncul pembatasan.
+        muncul pembatasan. Untuk batch, pakai tombol <strong className="text-ink">Generate berurutan</strong> di Storyboard — satu adegan
+        demi satu adegan dengan jeda acak 0–20 detik antar-adegan, retry maks 2× per adegan, dan berhenti total bila muncul 401 / 429 /
+        UNUSUAL_ACTIVITY / reCAPTCHA. Jeda itu ritme yang lebih mirip manusia, bukan jaminan akun tidak dibatasi.
       </P>
       <P>
         Pilihan akun untuk Flow2API (D-19) masih terbuka dan diputuskan di Fase 2: (a) tetap memakai akun utama dengan peringatan tertulis
@@ -323,13 +390,16 @@ python main.py`}</Cmd>
       </P>
 
       <H2>Uji live 1 klip (G3)</H2>
-      <P>Uji minimal untuk membuktikan ujung-ke-ujungnya bekerja, sebelum memakai Flow2API untuk proyek sungguhan:</P>
+      <P>Uji minimal untuk membuktikan ujung-ke-ujungnya bekerja, sebelum memakai Flow2API untuk proyek sungguhan. Urutan yang benar:</P>
       <Steps
         items={[
+          <>Isi <strong className="text-ink">Kunci API server</strong> dulu (dari System Settings › API Key Settings › Current API key) dan klik Simpan sampai kolom jadi titik-titik.</>,
+          <>Klik <strong className="text-ink">Uji Koneksi</strong> di Pengaturan › Google Flow dan pastikan berhasil.</>,
           <>Catat saldo VideoFX Credits di halaman admin server.</>,
           <>Di proyek apa pun, pilih model gambar Nano Banana 2.1 (Flash) dan buat 1 gambar klip. Pastikan gambarnya muncul di klip.</>,
           <>Pilih model video Veo 3.1 Fast dan buat 1 video dari gambar itu. Pastikan videonya bisa diputar di Editor.</>,
           <>Catat lagi saldo di halaman admin — selisihnya adalah kredit yang terpakai untuk uji ini.</>,
+          <>Baru sesudah 1 gambar + 1 video berhasil, pakai batch — untuk banyak adegan, pakai tombol <strong className="text-ink">Generate berurutan</strong> di Storyboard, bukan generate sekaligus.</>,
           <>Bila salah satu langkah gagal, catat pesan galat persisnya dan lihat tabel pemecahan masalah di atas.</>
         ]}
       />

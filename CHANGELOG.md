@@ -19,6 +19,17 @@ Cara menaikkan versi ada di [docs/pengembangan.md](docs/pengembangan.md#versi-da
   pola KenFlow v3.6.6 — bukan jaminan lolos dari kontrol risiko Google. Mesin di `src/main/sequential.ts` (murni,
   bisa diuji) + wiring di `generation.ts` + IPC `generate:sequentialImages` / `cancelSequential` /
   `sequentialStatus` + event `event:sequential`.
+- **Panduan Flow2API diperjelas** (dalam aplikasi, Pengaturan › Panduan Flow2API, dan `docs/layanan-ai.md`):
+  pemasangan ekstensi Token-Updater langkah-demi-langkah (ZIP → ekstrak → `chrome://extensions` → Developer mode →
+  Load unpacked; folder `extension/` di dalam server adalah ekstensi CAPTCHA, bukan Token-Updater), jebakan
+  placeholder abu-abu di popup addon (ketik ulang sampai hitam pekat), langkah sambung token (Random → Copy → Save
+  settings → Simpan → Allow → Tes sekarang; berhasil = Total 1, Active 1 + Credits), metode CAPTCHA bawaan YesCaptcha
+  itu berbayar dan kuncinya kosong (ganti ke Built-in browser atau Flow2API Team, lalu klik Save settings), cara isi
+  Kunci API server yang benar (klik Simpan sampai kolom jadi titik-titik; tulisan hijau "Terhubung" hanya mengecek
+  servernya jalan) dan arti dua pesan 401, jendela login Google yang bisa menutup sendiri (jalan pintas: login
+  flow.google.com di Chrome sendiri), `Failed to obtain reCAPTCHA token`, dan UNUSUAL_ACTIVITY (berhenti, jangan
+  Generate berulang, pakai jalur Manual / Generate berurutan). Urutan uji minimal: isi kunci → Uji Koneksi →
+  1 gambar + 1 video dulu, baru batch.
 - Rebrand aplikasi menjadi **KenStory** (fork dari bangtutorial/bang-story tetap berlisensi MIT, lihat NOTICE.md).
 - **Flow2API: kunci API server (Bearer)** — server Flow2API versi sekarang menuntut `Authorization: Bearer <kunci>` di
   tiap permintaan; tanpanya generate gagal HTTP 401 (terbukti di uji live PC, 20 Nov 2026). Kolom baru "Kunci API

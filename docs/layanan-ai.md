@@ -141,6 +141,30 @@ dari klien Flow2API De-Story (`flow2api.rs`) — pola saja, bukan salinan kode.
   `flow2api:testConnection`; kosong berarti permintaan tanpa header (server lama tanpa kunci). Kunci terlihat di
   halaman admin server (System Settings › API Key Settings). IPC `flow2api:testConnection` memeriksa `GET /health`,
   cadangan `GET /v1/models`.
+- Penyambungan akun (pengalaman 19–21 Nov 2026, lengkap di Panduan Flow2API dalam aplikasi): Token Management kosong
+  (Total 0) di awal itu normal. Pasang **Flow2API-Token-Updater** dari repositori GitHub-nya (unduh ZIP → ekstrak →
+  `chrome://extensions` → Developer mode → Load unpacked → pilih folder hasil ekstrak); folder `extension/` di dalam
+  folder server adalah ekstensi CAPTCHA, **bukan** Token-Updater — jangan tertukar. Token koneksi dibuat di admin:
+  System Settings › Extension Connection Settings › Random › Copy › Save settings, lalu ditempel di popup addon.
+  Jebakan: kolom popup yang tampak terisi bisa jadi hanya placeholder abu-abu — ketik ulang sampai teksnya hitam pekat,
+  klik Simpan (tombol biru) → Allow di dialog Chrome → Tes sekarang. Berhasil bila Token Management menampilkan
+  Total 1, Active 1, beserta Credits.
+- Metode CAPTCHA (admin server): bawaan **YesCaptcha itu berbayar dan kuncinya kosong** — ganti ke metode gratis
+  (Built-in browser atau Flow2API Team) dan **klik Save settings** sesudah mengganti dropdown (mengubah saja belum
+  menyimpan). `Failed to obtain reCAPTCHA token` berarti browser bawaan server gagal menghasilkan token — ganti ke
+  Flow2API Team (built-in) lalu Generate ulang.
+- Kunci API server: mengetik saja **belum menyimpan** — klik Simpan (atau Enter) sampai ada toast sukses dan kolom
+  berubah jadi titik-titik. Tulisan hijau "Terhubung ke Flow2API" hanya mengecek servernya jalan, bukan kuncinya.
+  Pesan 401 dibedakan (sejak v1.1d): "Server ini meminta kunci API — isi Kunci API server…" = kolom kunci masih
+  kosong; "Kunci API server yang tersimpan ditolak…" = kunci yang diketik tidak cocok dengan yang di server.
+- Jendela login Google: saat sesi kedaluwarsa, server membuka jendela browsernya sendiri (profil terpisah, bukan
+  Chrome pengguna) dan jendela itu bisa menutup sendiri sebelum sempat mengetik (terutama di RAM 4 GB). Jalan pintas:
+  login `flow.google.com` di Chrome sendiri dan generate manual sekali — Token-Updater menyinkronkan token segar
+  otomatis.
+- **UNUSUAL_ACTIVITY** adalah kontrol risiko Google, bukan salah ketik: berhenti, jangan Generate berulang,
+  istirahatkan akun, cek akun lewat generate manual di `flow.google.com`, sementara pakai jalur Manual. Jangan batch
+  besar sekaligus — pakai mode "Generate berurutan" (di bawah).
+- Urutan uji minimal yang benar: isi kunci → Uji Koneksi → Generate 1 gambar + 1 video dulu, baru batch.
 - Tier 1 tidak memakai layanan captcha berbayar. Tutorial lengkap berbahasa Indonesia ada di dalam aplikasi (Pengaturan › Panduan Flow2API,
   `FlowGuideSection.tsx`) dan pemetaannya di `docs/flow2api-pemetaan-destory.md`.
 
