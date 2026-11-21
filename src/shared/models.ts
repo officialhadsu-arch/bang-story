@@ -135,7 +135,36 @@ export const DURATIONS: { sec: number; label: string }[] = [
   { sec: 600, label: '10 menit' }
 ]
 
+/**
+ * Scenes are written in chunks of this size: one LLM call per chunk. Thirty keeps each call well
+ * inside the output limit (30 scenes x ~18 words) while a 30-minute video still finishes in 11 calls.
+ * The 120 cap used to be on the total; it now applies per call, so long videos just take more calls.
+ */
+export const SCRIPT_CHUNK_SIZE = 30
+
 /** Roughly one clip every ~5.5 seconds of narration. */
 export function clipCountFor(durationSec: number): number {
-  return Math.max(3, Math.min(120, Math.round(durationSec / 5.5)))
+  return Math.max(3, Math.round(durationSec / 5.5))
+}
+
+/** 1-based inclusive scene ranges for writing `total` scenes in chunks of `chunkSize`. */
+export function scriptChunkRanges(total: number, chunkSize: number = SCRIPT_CHUNK_SIZE): { start: number; end: number }[] {
+  const ranges: { start: number; end: number }[] = []
+  for (let start = 1; start <= total; start += chunkSize) ranges.push({ start, end: Math.min(total, start + chunkSize - 1) })
+  return ranges
+}
+
+// A custom target only makes sense while the scene formula still grows: below 15 seconds the story
+// has no room for a hook, a middle and an ending; above 30 minutes the script alone would need more
+// than 11 LLM calls and the video production behind it multiplies just as fast.
+export const CUSTOM_DURATION_MIN_SEC = 15
+export const CUSTOM_DURATION_MAX_SEC = 1800
+
+/** Validates a custom duration typed as text. Returns the seconds to apply, or a friendly message. */
+export function parseCustomDuration(text: string): { sec: number } | { error: string } {
+  const value = Number(text.trim())
+  if (text.trim() === '' || !Number.isFinite(value)) return { error: 'Tulis durasi dalam angka, misalnya 90.' }
+  if (value < CUSTOM_DURATION_MIN_SEC) return { error: `Durasi paling pendek ${CUSTOM_DURATION_MIN_SEC} detik.` }
+  if (value > CUSTOM_DURATION_MAX_SEC) return { error: `Durasi paling panjang ${CUSTOM_DURATION_MAX_SEC} detik (30 menit).` }
+  return { sec: Math.round(value) }
 }

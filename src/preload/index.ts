@@ -25,6 +25,8 @@ const api: StudioApi = {
   },
   story: {
     script: call('story:script'),
+    continueScript: call('story:continueScript'),
+    cancelScript: call('story:cancelScript'),
     visuals: call('story:visuals'),
     musicPrompt: call('story:musicPrompt')
   },
@@ -135,7 +137,8 @@ const api: StudioApi = {
     character: listen(EVENTS.character),
     asset: listen(EVENTS.asset),
     manual: listen(EVENTS.manual),
-    sequential: listen(EVENTS.sequential)
+    sequential: listen(EVENTS.sequential),
+    scriptProgress: listen(EVENTS.scriptProgress)
   }
 }
 

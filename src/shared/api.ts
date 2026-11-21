@@ -24,6 +24,7 @@ import type {
   ProjectBundle,
   ProjectSnapshot,
   ProjectSummary,
+  ScriptProgressEvent,
   TtsProvider,
   VoiceOption
 } from './types'
@@ -41,6 +42,10 @@ export interface StudioApi {
   story: {
     /** Idea → scene-by-scene script (story and voice-over). */
     script(projectId: string): Promise<ProjectBundle>
+    /** Continues a script that stopped early, after dropping a doubtful last scene if there is one. */
+    continueScript(projectId: string): Promise<ProjectBundle>
+    /** Stops a running script write between chunks; scenes already saved stay saved. */
+    cancelScript(projectId: string): Promise<void>
     /** Script → one image plan per scene; "missing" skips scenes whose plan still matches their story. */
     visuals(projectId: string, mode: 'missing' | 'all'): Promise<ProjectBundle>
     /** A background-music prompt that fits the finished script, for use in Suno or another music AI. */
@@ -206,6 +211,8 @@ export interface StudioApi {
     manual(cb: (e: ManualWatchEvent) => void): () => void
     /** Progress of a "Generate berurutan" run: scene n of total, pause countdown, end state. */
     sequential(cb: (p: SequentialProgress) => void): () => void
+    /** Which scenes a chunked script write is working on right now. */
+    scriptProgress(cb: (e: ScriptProgressEvent) => void): () => void
   }
 }
 
@@ -216,5 +223,6 @@ export const EVENTS = {
   asset: 'event:asset',
   whisper: 'event:whisper',
   manual: 'event:manual',
-  sequential: 'event:sequential'
+  sequential: 'event:sequential',
+  scriptProgress: 'event:script-progress'
 } as const

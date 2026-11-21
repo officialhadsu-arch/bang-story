@@ -155,3 +155,38 @@ dengan pesan Indonesia. Batas tier gratis Groq 25 MB per berkas ditegakkan di kl
 chunking). Model ditetapkan ke `whisper-large-v3` (yang diminta Bos); bila Groq menghapusnya, gagal-tertutup
 dengan pesan jelas — tidak ada pergantian model diam-diam ke turbo. Lihat `docs/groq-transkrip-pemetaan.md`
 (keputusan G6-01–G6-10) dan `docs/layanan-ai.md` (bagian Transkrip Groq).
+
+### Naskah ditulis per bagian 30 adegan, bukan sekali panggil (0.3 Tier 1)
+Satu panggilan LLM untuk seluruh naskah mentok di batas keluaran model (dulu 120 adegan, dan jawaban
+terpotong di tengah adegan diterima diam-diam karena hanya diperiksa kotaknya tidak kosong). Sekarang
+`generateScript` menulis per bagian (`SCRIPT_CHUNK_SIZE = 30`, `shared/models.ts`): tiap bagian langsung
+disimpan (`appendScenes`) begitu sampai, jadi gagal atau batal di tengah jalan tidak menghilangkan yang
+sudah jadi. Tiap panggilan lanjutan membawa adegan yang sudah ada sebagai konteks (judul + narasi) supaya
+alur nyambung; hook kuat hanya di adegan 1 dan penutup/ajakan subscribe hanya di adegan terakhir (nomor
+adegan terakhir selalu disampaikan ke model). Rumus adegan tidak berubah: 1 adegan per ~5,5 detik, narasi
+10–18 kata; batas 120 pindah dari total menjadi per panggilan (20 menit → 218 adegan → 8 panggilan;
+30 menit → 327 → 11 panggilan). Jeda 2 detik antar-panggilan memberi ruang ke rate limit (11 panggilan
+≈ 20 detik tambahan); tiap bagian dicoba ulang maks 2×, kecuali 429/503 yang langsung berhenti dengan
+pesan ramah. Pembatalan hanya berlaku antar-bagian (flag in-memory; panggilan yang sedang berjalan tetap
+selesai dulu karena jalur Gemini mengabaikan AbortSignal dan timeout 4 menit membatasinya).
+
+### "Lanjutkan naskah" membuang adegan terakhir yang meragukan
+Naskah yang berhenti di tengah jalan dilanjutkan dari adegan terakhir yang tersimpan (`continueScript`),
+bukan ditulis ulang. Adegan terakhir dianggap meragukan bila narasinya kosong, kurang dari 10 kata, atau —
+sesudah spasi akhir dan tag vokal `<...>` di ujung dibuang — tidak diakhiri tanda baca akhir kalimat
+(`. ! ? …`); adegan itu dihapus dulu (`isDoubtfulScene` di `shared/script.ts`) supaya lanjutan tidak
+berdiri di atas kalimat yang terpotong. Aturan ini hanya memeriksa adegan terakhir, tidak pernah
+menghapus suntingan pengguna di tengah naskah.
+
+### Durasi custom 15–1800 detik (0.3 Tier 1)
+Selain lima preset, durasi video bisa diisi bebas lewat kolom "Atau durasi lain" di langkah Ide
+(`parseCustomDuration` di `shared/models.ts`). Batas atas 1800 detik (30 menit) karena di sanalah naskah
+per bagian masih masuk akal (327 adegan, 11 panggilan); batas bawah 15 detik karena cerita butuh ruang
+untuk hook, tengah, dan penutup. Nilai di luar batas atau bukan angka ditolak dengan pesan Bahasa
+Indonesia sederhana dan durasi lama tidak berubah.
+
+### Progres naskah lewat event, bukan job
+Penulisan naskah memakai event `scriptProgress` (`event:script-progress`), bukan sistem job: progresnya
+sementara (tidak perlu baris job di database dan antrean), dan pembatalannya memang hanya flag in-memory
+yang dicek antar-bagian. Job tetap dipakai untuk pekerjaan beraset (gambar, video, suara, ekspor) yang
+butuh antrean, remote id, dan status tersimpan.

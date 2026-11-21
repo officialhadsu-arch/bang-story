@@ -1,7 +1,7 @@
 import { BrowserWindow } from 'electron'
 import { EVENTS } from '@shared/api'
 import type { ManualWatchEvent } from '@shared/manual'
-import type { Asset, CharacterPatchEvent, ClipPatchEvent, Job, SequentialProgress, WhisperStatus } from '@shared/types'
+import type { Asset, CharacterPatchEvent, ClipPatchEvent, Job, ScriptProgressEvent, SequentialProgress, WhisperStatus } from '@shared/types'
 
 function send(channel: string, payload: unknown): void {
   for (const w of BrowserWindow.getAllWindows()) {
@@ -16,5 +16,6 @@ export const emit = {
   asset: (asset: Asset): void => send(EVENTS.asset, asset),
   whisper: (status: WhisperStatus): void => send(EVENTS.whisper, status),
   manual: (e: ManualWatchEvent): void => send(EVENTS.manual, e),
-  sequential: (p: SequentialProgress): void => send(EVENTS.sequential, p)
+  sequential: (p: SequentialProgress): void => send(EVENTS.sequential, p),
+  scriptProgress: (e: ScriptProgressEvent): void => send(EVENTS.scriptProgress, e)
 }

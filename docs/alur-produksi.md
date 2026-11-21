@@ -19,7 +19,22 @@ Ide cerita ──LLM──► Naskah (adegan + narasi) ──LLM──► Rencan
 ## 1. Ide → naskah (`generateScript`, `src/main/story.ts`)
 
 - Masukan: sinopsis, target durasi, bahasa.
-- Jumlah adegan: `clipCountFor(durasi)` = sekitar satu adegan per 5,5 detik (minimal 3).
+- Jumlah adegan: `clipCountFor(durasi)` = sekitar satu adegan per 5,5 detik (minimal 3). Lima preset
+  (30 detik, 1, 3, 5, 10 menit) atau durasi bebas 15–1800 detik (30 menit) dari kolom "Atau durasi
+  lain" di langkah Ide (`parseCustomDuration` di `shared/models.ts`). Nilai di luar batas ditolak
+  dengan pesan ramah dan durasi lama tetap dipakai.
+- Naskah ditulis per bagian 30 adegan (`SCRIPT_CHUNK_SIZE`, `scriptChunkRanges`): tiap bagian langsung
+  disimpan begitu sampai (`appendScenes`), jadi gagal atau batal di tengah jalan tidak menghilangkan
+  yang sudah jadi. Tiap panggilan lanjutan membawa adegan yang sudah ada sebagai konteks (judul +
+  narasi); hook kuat hanya di adegan 1, penutup/ajakan subscribe hanya di adegan terakhir. Jeda
+  2 detik antar-panggilan; tiap bagian dicoba ulang maks 2×, kecuali 429/503 yang langsung berhenti.
+  Progres ("Menulis adegan 31–60 dari 218…") sampai ke UI lewat event `scriptProgress`; tombol
+  Batalkan menghentikan penulisan antar-bagian (panggilan yang sedang berjalan tetap selesai dulu).
+- Naskah yang berhenti di tengah jalan dilanjutkan dengan tombol "Lanjutkan naskah" di langkah Naskah
+  (`continueScript`): lanjut dari adegan terakhir yang tersimpan; bila adegan terakhir meragukan
+  (narasi kosong, kurang dari 10 kata, atau tidak diakhiri tanda baca akhir kalimat sesudah tag vokal
+  di ujung dibuang — `isDoubtfulScene` di `shared/script.ts`), adegan itu dibuang dulu. Selama
+  adegan tersimpan kurang dari target, langkah Naskah menampilkan "Tersimpan X dari Y adegan".
 - Skema JSON keluaran: `{ title, scenes: [{ title, story, narration }] }`.
 - Narasi 10–18 kata per adegan dan boleh memakai satu dua tag ekspresi berbahasa Inggris (`<short pause>`,
   `<long pause>`, `<chuckles>`, `<sigh>`, `<gasp>`, `<whispers>`). Daftar tag: `VOICE_TAGS` di `shared/speech.ts`.

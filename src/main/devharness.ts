@@ -445,8 +445,12 @@ export function attachDevHarness(win: BrowserWindow): void {
   const planPath = process.env.STUDIO_CAPTURE_PLAN
   if (!planPath) return
   let plan: {
-    main?: 'seed' | 'export' | 'key' | 'overlays' | 'speech' | 'videos' | 'importClipImages' | 'uploadSheet' | 'manualFixture' | 'motionFixture' | 'motionApprove' | 'motionSpike' | 'motionSpikeVert' | 'talkingHeadFixture'
+    main?: 'seed' | 'export' | 'key' | 'overlays' | 'speech' | 'videos' | 'importClipImages' | 'uploadSheet' | 'manualFixture' | 'motionFixture' | 'motionApprove' | 'motionSpike' | 'motionSpikeVert' | 'talkingHeadFixture' | 'mockLlm'
     exportTo?: string
+    /** For main "mockLlm": a control body for the mock LLM server (POST /__control). */
+    control?: Record<string, unknown>
+    /** For main "mockLlm": log the mock server's request counts under this label. */
+    statsLabel?: string
     /** For main "export": an existing project instead of the seeded demo. */
     projectId?: string
     /** For main "importClipImages" / "uploadSheet": the project to fill, found by title. */
@@ -572,6 +576,23 @@ export function attachDevHarness(win: BrowserWindow): void {
         if (step.main === 'motionSpike' && demoId) await runMotionSpike(demoId, log)
         if (step.main === 'motionSpikeVert' && demoId) await runMotionSpikeVert(demoId, log)
         if (step.main === 'talkingHeadFixture') await talkingHeadFixture()
+        if (step.main === 'mockLlm') {
+          // Harness-only: the renderer page's CSP (connect-src 'self' studio: ws:) blocks
+          // fetch() to the mock server, so control and stats go through the main process.
+          const base = 'http://127.0.0.1:18777'
+          if (step.control) {
+            const r = await fetch(`${base}/__control`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(step.control)
+            })
+            console.log(`[mock-llm] control ${JSON.stringify(step.control)} -> ${r.status}`)
+          }
+          if (step.statsLabel) {
+            const stats = (await (await fetch(`${base}/__stats`)).json()) as { requests: number; failed: number; ranges: string[] }
+            console.log(`[mock-llm] ${step.statsLabel} requests=${stats.requests} failed=${stats.failed} ranges=${JSON.stringify(stats.ranges)}`)
+          }
+        }
         if (step.main === 'key' && step.provider) {
           // Test-only key, kept in memory by setTestKey: it never touches
           // disk, so this step works where setSecret() must refuse (D-07).

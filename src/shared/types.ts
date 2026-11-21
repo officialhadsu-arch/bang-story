@@ -446,3 +446,18 @@ export interface CharacterPatchEvent {
   characterId: string
   patch: Partial<Character>
 }
+
+/** Progress of a chunked script write: which scenes are being written right now. */
+export interface ScriptProgressEvent {
+  projectId: string
+  /** First scene number of the chunk being written (1-based). */
+  from: number
+  /** Last scene number of the chunk being written (1-based). */
+  to: number
+  /** Total scenes the script needs. */
+  total: number
+  /** Chunk number, starting at 1. */
+  chunk: number
+  /** Total chunks. */
+  chunks: number
+}
