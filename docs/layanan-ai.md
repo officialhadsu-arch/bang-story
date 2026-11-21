@@ -260,6 +260,18 @@ UNIQUE per proyek, backfill dari `sort`) yang dipakai untuk mencocokkan berkas h
   Salin prompt gambar + status jalur manual. Tutorial lengkap berbahasa Indonesia ada di dalam aplikasi
   (Pengaturan › Panduan Manual & Ekstensi, `ManualGuideSection.tsx`) dan pemetaannya di
   `docs/manual-fadli-pemetaan.md`. Uji live 1 klip adalah gerbang PC (belum diuji di VM, seperti G3 tier 1).
+- Lembar karakter dari berkas sendiri (0.3+): modal Lembar karakter (`CharacterModal.tsx`) punya tombol
+  "Unggah lembar" di sebelah "Buat lembar karakter". IPC `assets:pickSheet` (3 tempat: `main/ipc.ts`,
+  `shared/api.ts`, preload) membuka dialog berkas (PNG/JPG/WebP), menyalin ke `images/<uuid>.<ext>`,
+  memeriksa gambar bisa di-decode dengan dimensi nyata (`probeSize`) SEBELUM ada tulisan database —
+  berkas yang gagal diperiksa dihapus lagi dan tidak ada yang tertulis. Lalu `insertAsset` (kind `image`,
+  provider `manual`, `characterId` terisi, `model` kosong karena model pembuatnya tidak diketahui) +
+  `setCharacterSheet`, persis seperti pendaftaran lembar Golden Age lewat database. Lembar yang diunggah
+  bekerja identik dengan lembar hasil generate (hanya `sheetAssetId`, tanpa pengecualian downstream):
+  dikirim sebagai referensi gambar di tiap generate gambar adegan berikutnya. Mengganti lembar yang sudah
+  ada meminta konfirmasi dulu; lembar lama tetap tersimpan di proyek dan gambar klip yang sudah jadi tidak
+  berubah. Semua kegagalan menampilkan pesan Bahasa Indonesia sederhana (apa yang terjadi + apa yang harus
+  dilakukan); pesan teknis hanya dicatat di log.
 
 ## Motion (`services/motion.ts`, `services/renderer.ts`, `shared/motion-contract.ts`, `shared/motion-templates.ts`)
 
