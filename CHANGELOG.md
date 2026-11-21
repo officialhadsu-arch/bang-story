@@ -30,6 +30,11 @@ Cara menaikkan versi ada di [docs/pengembangan.md](docs/pengembangan.md#versi-da
   flow.google.com di Chrome sendiri), `Failed to obtain reCAPTCHA token`, dan UNUSUAL_ACTIVITY (berhenti, jangan
   Generate berulang, pakai jalur Manual / Generate berurutan). Urutan uji minimal: isi kunci → Uji Koneksi →
   1 gambar + 1 video dulu, baru batch.
+- **Dua tombol salin prompt Manual (Storyboard)** — "Salin Semua Prompt" menjadi "Salin Prompt Teks to Image" (satu
+  `Gambar:` per adegan, `prompts.txt` + `manual.json`), dan tombol baru di sebelahnya "Salin Prompt Image to Video"
+  (satu `Video:` per adegan dari field `videoPrompt` yang sama, `prompts-video.txt` + `manual.json`). Kedua daftar
+  sengaja terpisah — tiap langkah kerja butuh satu daftar saja. `manual.json` tetap memuat kedua field; pemindai
+  mengabaikan `prompts-video.txt` seperti `prompts.txt`.
 - Rebrand aplikasi menjadi **KenStory** (fork dari bangtutorial/bang-story tetap berlisensi MIT, lihat NOTICE.md).
 - **Flow2API: kunci API server (Bearer)** — server Flow2API versi sekarang menuntut `Authorization: Bearer <kunci>` di
   tiap permintaan; tanpanya generate gagal HTTP 401 (terbukti di uji live PC, 20 Nov 2026). Kolom baru "Kunci API

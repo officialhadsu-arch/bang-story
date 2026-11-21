@@ -78,6 +78,8 @@ export interface StudioApi {
   manual: {
     /** Writes prompts.txt + manual.json into the project's work folder and returns the numbered prompt text. */
     prepareWorkFolder(projectId: string): Promise<ManualWorkFolder>
+    /** Writes prompts-video.txt (one `Video:` per scene) + manual.json, and returns the numbered video-prompt text. */
+    prepareVideoWorkFolder(projectId: string): Promise<ManualWorkFolder>
     /** Pairs result files in the work folder with their scenes; files with no scene come back as unmatched. */
     scanWorkFolder(projectId: string): Promise<ManualScanResult>
     /** Attaches one work-folder file to the scene the user picked. */

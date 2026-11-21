@@ -168,30 +168,6 @@ dari klien Flow2API De-Story (`flow2api.rs`) — pola saja, bukan salinan kode.
 - Tier 1 tidak memakai layanan captcha berbayar. Tutorial lengkap berbahasa Indonesia ada di dalam aplikasi (Pengaturan › Panduan Flow2API,
   `FlowGuideSection.tsx`) dan pemetaannya di `docs/flow2api-pemetaan-destory.md`.
 
-## NexaBot (`services/nexabot.ts`, `shared/nexabot.ts`)
-
-Tier 3 (0.3+): gambar dan video berbayar murah lewat REST API NexaBot (`api.nexabot.id`) dengan kunci pengguna
-sendiri (BYOK, terenkripsi seperti kunci lain). Tarif terverifikasi dari beranda nexabot.id (12 Nov 2026): 1 kredit =
-Rp1.000; Nano Banana Pro Rp150, GPT Image 2.5 Rp100, Omni Flash 1.2 Rp300 per generate. Angka Rp400/video dari konsep
-v2.1 sudah tidak berlaku.
-
-- Katalog model di `shared/nexabot.ts`: 2 model gambar, 1 model video, semuanya berawalan `nexabot:`. `getImageModel`/
-  `getVideoModel` jatuh ke katalog ini bila id berawalan `nexabot:`. Harga katalog dipakai estimasi biaya tanpa
-  panggilan server (`nexaPriceIdr`, `idrLabel`).
-- **Bentuk API adalah asumsi berlabel (D3-01)** — dokumentasi resmi tidak ditemukan di publik. Semua asumsi tinggal di
-  satu modul transport: `POST /v1/images/generations` `{model, prompt, aspect_ratio, images: [data URI]}` →
-  `{data: [{url | b64_json}]}`; `POST /v1/videos/generations` `{model, prompt, image: data URI, duration}` →
-  `{id, status}`; `GET /v1/videos/{id}` → `{status: queued|processing|completed|failed, video: {url}}`;
-  `POST /v1/videos/{id}/cancel`; probe `GET /v1/models`; auth `Authorization: Bearer <kunci>`. Daftar periksa pertama
-  uji live PC. Durasi video katalog `[15]` mengikuti dua produk yang memakai API ini (PAWARNA, tokogame.ai.id);
-  beranda alat web menyebut sampai 10 detik — uji live yang menentukan.
-- Alur: gambar satu POST lalu hasilnya diunduh (atau didekode dari `b64_json`); video submit → simpan remote id →
-  polling backoff 2 dtk → 10 dtk, timeout 20 menit, lalu unduh. Timeout: gambar 300 dtk, video 600 dtk, unduh 180 dtk,
-  probe 8 dtk. Referensi dan frame pertama dikirim sebagai data URI (bukan URL publik). Pesan galat ramah Bahasa
-  Indonesia (401 kunci tidak valid; 402/403 kredit tidak cukup; 429 batas rate; 5xx server); kunci tidak pernah bocor
-  ke pesan galat.
-- Penyambungan (`generation.ts`): model `nexabot:` bercabang ke antrean `nexabot` (limit 1) dengan penyedia `nexabot`.
-  `requireNexa` gagal keras bila sakelar mati atau kunci belum diisi — tanpa fallback diam-diam ke provider lain
 ## Generate berurutan (`main/sequential.ts`, `main/generation.ts`)
 
 Mode batch gambar satu adegan demi satu adegan, mengikuti pola antrean KenFlow v3.6.6 (serial 1, jeda acak 0–20 dtk
@@ -221,6 +197,30 @@ antar-prompt dari prompt ke-2, tick 1 detik yang bisa dibatalkan, retry maks 2×
   header Storyboard, di antara "Rekam ulang suara narasi" dan "Generate N gambar", dengan strip progres di bawah
   header (adegan ke-n dari total, hitung mundur jeda, tombol Batalkan/Tutup).
 
+## NexaBot (`services/nexabot.ts`, `shared/nexabot.ts`)
+
+Tier 3 (0.3+): gambar dan video berbayar murah lewat REST API NexaBot (`api.nexabot.id`) dengan kunci pengguna
+sendiri (BYOK, terenkripsi seperti kunci lain). Tarif terverifikasi dari beranda nexabot.id (12 Nov 2026): 1 kredit =
+Rp1.000; Nano Banana Pro Rp150, GPT Image 2.5 Rp100, Omni Flash 1.2 Rp300 per generate. Angka Rp400/video dari konsep
+v2.1 sudah tidak berlaku.
+
+- Katalog model di `shared/nexabot.ts`: 2 model gambar, 1 model video, semuanya berawalan `nexabot:`. `getImageModel`/
+  `getVideoModel` jatuh ke katalog ini bila id berawalan `nexabot:`. Harga katalog dipakai estimasi biaya tanpa
+  panggilan server (`nexaPriceIdr`, `idrLabel`).
+- **Bentuk API adalah asumsi berlabel (D3-01)** — dokumentasi resmi tidak ditemukan di publik. Semua asumsi tinggal di
+  satu modul transport: `POST /v1/images/generations` `{model, prompt, aspect_ratio, images: [data URI]}` →
+  `{data: [{url | b64_json}]}`; `POST /v1/videos/generations` `{model, prompt, image: data URI, duration}` →
+  `{id, status}`; `GET /v1/videos/{id}` → `{status: queued|processing|completed|failed, video: {url}}`;
+  `POST /v1/videos/{id}/cancel`; probe `GET /v1/models`; auth `Authorization: Bearer <kunci>`. Daftar periksa pertama
+  uji live PC. Durasi video katalog `[15]` mengikuti dua produk yang memakai API ini (PAWARNA, tokogame.ai.id);
+  beranda alat web menyebut sampai 10 detik — uji live yang menentukan.
+- Alur: gambar satu POST lalu hasilnya diunduh (atau didekode dari `b64_json`); video submit → simpan remote id →
+  polling backoff 2 dtk → 10 dtk, timeout 20 menit, lalu unduh. Timeout: gambar 300 dtk, video 600 dtk, unduh 180 dtk,
+  probe 8 dtk. Referensi dan frame pertama dikirim sebagai data URI (bukan URL publik). Pesan galat ramah Bahasa
+  Indonesia (401 kunci tidak valid; 402/403 kredit tidak cukup; 429 batas rate; 5xx server); kunci tidak pernah bocor
+  ke pesan galat.
+- Penyambungan (`generation.ts`): model `nexabot:` bercabang ke antrean `nexabot` (limit 1) dengan penyedia `nexabot`.
+  `requireNexa` gagal keras bila sakelar mati atau kunci belum diisi — tanpa fallback diam-diam ke provider lain
   (D3-03). `estimateCredits` mengembalikan harga katalog tetap tanpa panggilan server. `resumeJobs` melanjutkan polling
   video yang sudah disubmit sesudah restart; gambar tidak punya remote id sehingga gagal seperti biasa. `cancelJob`
   memberitahu server NexaBot agar berhenti (tagihan tidak jalan terus).
@@ -297,8 +297,10 @@ UNIQUE per proyek, backfill dari `sort`) yang dipakai untuk mencocokkan berkas h
   lewat `startManualJob`; `resumeJobs` melewatkan job manual (tetap menunggu, bukan gagal); `setActiveAsset`
   menuntaskan job manual yang menunggu. `estimateCredits` mengembalikan null untuk manual/extension.
 - Folder kerja (`services/manual.ts`): `<folder aset proyek>/manual/`. `manual:prepareWorkFolder` menulis
-  `prompts.txt` (prompt bernomor adegan, untuk manusia) + `manual.json` (manifest mesin: sceneKey, clipId, judul,
-  kind, prompt, videoPrompt, aspek, durasi). `manual:scanWorkFolder` memasangkan berkas `<sceneKey>[-akhiran].<ext>`
+  `prompts.txt` (satu `Gambar:` per adegan, untuk manusia) + `manual.json` (manifest mesin: sceneKey, clipId, judul,
+  kind, prompt, videoPrompt, aspek, durasi); `manual:prepareVideoWorkFolder` menulis `prompts-video.txt` (satu
+  `Video:` per adegan, dari field `videoPrompt` yang sama di tiap baris manifest) + `manual.json` lagi. Kedua daftar
+  sengaja terpisah — tiap langkah kerja butuh satu daftar saja. `manual:scanWorkFolder` memasangkan berkas `<sceneKey>[-akhiran].<ext>`
   (awalan `scene-`/`clip-` diabaikan; PNG/JPG/WebP, MP4/MOV/WebM) — disalin ke `images/`/`videos/`, `insertAsset`
   provider `manual`/`extension` sesuai provider adegan, `patchClip`, job manual selesai; berkas tak cocok masuk
   daftar "belum terpasang" dan dipasangkan lewat `manual:importFile`. Pindai dua kali tidak menduplikasi.
@@ -308,7 +310,7 @@ UNIQUE per proyek, backfill dari `sort`) yang dipakai untuk mencocokkan berkas h
   di checkout server Flow2API (`<folder server>/extension/`, Flow2API Captcha Worker, manifest v3); yang ditangkapnya
   hanya token reCAPTCHA Enterprise dari Chrome pengguna, bukan hasil generate. Metode CAPTCHA (`browser` gratis,
   `extension` gratis, berbayar butuh kunci, `flow2api_team`) adalah setelan panel admin server, bukan KenStory.
-- UI: Storyboard (`StoryboardStep.tsx`) — Salin Semua Prompt, Impor Gambar/Video, Pindai Folder Kerja, pemilih jalur
+- UI: Storyboard (`StoryboardStep.tsx`) — Salin Prompt Teks to Image, Salin Prompt Image to Video, Impor Gambar/Video, Pindai Folder Kerja, pemilih jalur
   per adegan, lencana jalur + status "Menunggu hasil", panel folder kerja + daftar belum terpasang; Inspector —
   Salin prompt gambar + status jalur manual. Tutorial lengkap berbahasa Indonesia ada di dalam aplikasi
   (Pengaturan › Panduan Manual & Ekstensi, `ManualGuideSection.tsx`) dan pemetaannya di

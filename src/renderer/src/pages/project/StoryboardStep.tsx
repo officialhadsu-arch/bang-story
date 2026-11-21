@@ -298,7 +298,7 @@ function ClipPanel({ clip, index, total, motionEnabled }: { clip: Clip; index: n
           />
           <p className="text-xs leading-relaxed text-muted">
             {clip.visualProvider === 'manual'
-              ? 'Manual: tombol Generate membuat job yang menunggu. Salin Semua Prompt, generate di mana pun, lalu Pindai Folder Kerja.'
+              ? 'Manual: tombol Generate membuat job yang menunggu. Salin Prompt Teks to Image untuk gambar, Salin Prompt Image to Video untuk video, generate di mana pun, lalu Pindai Folder Kerja.'
               : clip.visualProvider === 'extension'
                 ? 'Ekstensi: prompt yang sama, tapi generate lewat Google Flow di browser (ekstensi/agen). Hasilnya jatuh ke folder kerja, lalu Pindai.'
                 : clip.visualProvider === 'auto'
@@ -808,7 +808,23 @@ export function StoryboardStep() {
       await window.api.app.copyText(r.text)
       setWorkFolder(r.workFolder)
       setFolderHint(false)
-      toast('success', `${r.fileCount} prompt adegan disalin. Hasil generate nanti masuk ke folder kerja.`)
+      toast('success', `${r.fileCount} prompt gambar adegan disalin. Hasil generate nanti masuk ke folder kerja.`)
+    } catch (e) {
+      toast('error', errorText(e))
+    }
+  }
+
+  // The video twin of copyAllPrompts: one `Video:` per scene, for pasting scene by
+  // scene into an image-to-video tool (e.g. KenFlow). The two lists stay separate —
+  // each job needs one list only.
+  const copyVideoPrompts = async (): Promise<void> => {
+    try {
+      await flush()
+      const r = await window.api.manual.prepareVideoWorkFolder(project.id)
+      await window.api.app.copyText(r.text)
+      setWorkFolder(r.workFolder)
+      setFolderHint(false)
+      toast('success', `${r.fileCount} prompt video adegan disalin. Tempel ke mode image-to-video, lalu simpan hasilnya ke folder kerja.`)
     } catch (e) {
       toast('error', errorText(e))
     }
@@ -931,6 +947,15 @@ export function StoryboardStep() {
                 : 'Rekam ulang suara narasi'}
         </Button>
         <Button
+          icon={<ListOrdered className="size-[17px]" />}
+          loading={seqActive}
+          disabled={!stats.needImg || seqActive}
+          title="Satu adegan demi satu adegan, dengan jeda acak 0–20 detik antar-adegan — ritme yang lebih mirip manusia untuk Google Flow. Jeda ini bukan jaminan akun tidak dibatasi."
+          onClick={() => void makeSequentialImages()}
+        >
+          {seqActive ? `Adegan ${seq!.current} dari ${seq!.total}` : 'Generate berurutan'}
+        </Button>
+        <Button
           className="border-[1.5px] border-ink font-semibold"
           icon={<ImageIcon className="size-[17px]" />}
           disabled={!stats.needImg}
@@ -945,15 +970,6 @@ export function StoryboardStep() {
                 : kieImg
                   ? idrLabel(credits * stats.needImg * KIE_CREDIT_IDR)
                   : `${Math.round(credits * stats.needImg * 10) / 10} kr`}
-        <Button
-          icon={<ListOrdered className="size-[17px]" />}
-          loading={seqActive}
-          disabled={!stats.needImg || seqActive}
-          title="Satu adegan demi satu adegan, dengan jeda acak 0–20 detik antar-adegan — ritme yang lebih mirip manusia untuk Google Flow. Jeda ini bukan jaminan akun tidak dibatasi."
-          onClick={() => void makeSequentialImages()}
-        >
-          {seqActive ? `Adegan ${seq!.current} dari ${seq!.total}` : 'Generate berurutan'}
-        </Button>
             </span>
           )}
         </Button>
@@ -1038,10 +1054,18 @@ export function StoryboardStep() {
             <Button
               size="sm"
               icon={<Copy className="size-4" />}
-              title="Tulis prompts.txt + manual.json ke folder kerja dan salin semua prompt bernomor adegan"
+              title="Tulis prompts.txt + manual.json ke folder kerja dan salin prompt gambar bernomor adegan (satu Gambar: per adegan)"
               onClick={() => void copyAllPrompts()}
             >
-              Salin Semua Prompt
+              Salin Prompt Teks to Image
+            </Button>
+            <Button
+              size="sm"
+              icon={<Copy className="size-4" />}
+              title="Tulis prompts-video.txt + manual.json ke folder kerja dan salin prompt video bernomor adegan (satu Video: per adegan) — untuk ditempel ke mode image-to-video"
+              onClick={() => void copyVideoPrompts()}
+            >
+              Salin Prompt Image to Video
             </Button>
             <Button size="sm" icon={<ImagePlus className="size-4" />} title="Pilih berkas gambar untuk adegan yang dipilih" onClick={() => void importImage()}>
               Impor Gambar
