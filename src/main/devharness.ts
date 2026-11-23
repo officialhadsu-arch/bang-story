@@ -12,6 +12,7 @@ import { setActiveAsset } from './generation'
 import { assetAbsPath, binPath, dataDir, manualWorkFolder, motionWorkFolder } from './paths'
 import { probeDurationMs, probeSize } from './services/audio'
 import { approveMotionBeat, motionBabakDir, prepareMotionWorkFolder, readMotionBabak, syncMotionBeatIds } from './services/motion'
+import { applyBulkImport } from './services/manual'
 import { renderBabakRange, type RenderRangeResult } from './services/renderer'
 import { setSettings } from './settings'
 import { createProject, getBundle, insertAsset, listProjects, patchClip, replaceStory, saveSnapshot, touchProject, updateAssetMeta } from './repo'
@@ -444,7 +445,7 @@ export function attachDevHarness(win: BrowserWindow): void {
   const planPath = process.env.STUDIO_CAPTURE_PLAN
   if (!planPath) return
   let plan: {
-    main?: 'seed' | 'export' | 'key' | 'overlays' | 'speech' | 'videos' | 'importClipImages' | 'manualFixture' | 'motionFixture' | 'motionApprove' | 'motionSpike' | 'motionSpikeVert' | 'talkingHeadFixture'
+    main?: 'seed' | 'export' | 'key' | 'overlays' | 'speech' | 'videos' | 'importClipImages' | 'importBulkImages' | 'importBulkVideos' | 'clearClipVisuals' | 'manualFixture' | 'motionFixture' | 'motionApprove' | 'motionSpike' | 'motionSpikeVert' | 'talkingHeadFixture'
     exportTo?: string
     /** For main "export": an existing project instead of the seeded demo. */
     projectId?: string
@@ -452,6 +453,8 @@ export function attachDevHarness(win: BrowserWindow): void {
     projectTitle?: string
     /** For main "importClipImages": local image files, one per clip without a picture. */
     images?: string[]
+    /** For main "importBulkImages"/"importBulkVideos": the folder to install, in order. */
+    folder?: string
     /** For main "key": hold a fake key for this provider in memory only
      * (setTestKey, never on disk) and mark its last check as passed or failed. */
     provider?: ApiProvider
@@ -513,6 +516,30 @@ export function attachDevHarness(win: BrowserWindow): void {
             })
             await setActiveAsset(clip.id, asset.id)
           }
+        }
+        if ((step.main === 'importBulkImages' || step.main === 'importBulkVideos') && step.projectTitle && step.folder) {
+          // Test-only twin of the bulk-import IPC handler: the same applyBulkImport the
+          // dialog calls, but the folder comes from the plan instead of a native folder
+          // dialog, which the harness cannot click. The dialog itself is covered by
+          // screenshot and code inspection instead.
+          const kind = step.main === 'importBulkImages' ? 'image' : 'video'
+          const target = listProjects().find((p) => p.title === step.projectTitle)
+          if (!target) throw new Error(`proyek tidak ditemukan: ${step.projectTitle}`)
+          const r = await applyBulkImport(target.id, step.folder, kind)
+          const tag = kind === 'image' ? 'BULK-IMG' : 'BULK-VID'
+          for (const inst of r.installed) console.log(`[harness] ${tag} ${inst.file} -> ${inst.sceneKey}`)
+          for (const s of r.skipped) console.log(`[harness] BULK-SKIP ${s.file}: ${s.reason}`)
+          console.log(
+            `[harness] BULK-SUMMARY installed=${r.installed.length} skipped=${r.skipped.length} excess=${r.excess.length} emptyLeft=${r.emptyLeft} excessFiles=${JSON.stringify(r.excess)}`
+          )
+        }
+        if (step.main === 'clearClipVisuals' && step.projectTitle) {
+          // Test-only reset between bulk-import cases: unlinks every picture/video
+          // (asset links are owned by main and a renderer save cannot clear them).
+          const target = listProjects().find((p) => p.title === step.projectTitle)
+          if (!target) throw new Error(`proyek tidak ditemukan: ${step.projectTitle}`)
+          for (const c of getBundle(target.id).clips) patchClip(c.id, { imageAssetId: null, videoAssetId: null, motionType: 'camera' })
+          console.log(`[harness] BULK-CLEAR ${step.projectTitle}`)
         }
         if (step.main === 'manualFixture' && demoId) {
           // Test-only: result files in the demo project's work folder, as if the user (or an
