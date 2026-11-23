@@ -8,6 +8,7 @@ Cara menaikkan versi ada di [docs/pengembangan.md](docs/pengembangan.md#versi-da
 
 ## [Belum dirilis]
 
+- **Impor massal (Tier 1, 0.3)** — tombol header Impor Gambar/Video di Storyboard kini memasang satu folder hasil generate sekaligus: pilih folder mana pun, lihat pratinjau (berkas apa ke adegan mana, berurutan), lalu Pasang ke adegan yang belum punya visual. Urutan alami: angka sebagai angka (1, 2, 10), huruf abjad tanpa bedakan besar/kecil. Adegan yang sudah punya visual dilewati; berkas berlebih dilaporkan; berkas rusak/tidak didukung dilewati dengan alasannya. Tombol 1-per-1 pindah ke tiap adegan: tombol Impor di kartu adegan (belum ada gambar → gambar; ada gambar belum ada video → video; keduanya ada → ganti gambar) dan Impor gambar/video di panel klip. Pindai Folder Kerja tidak berubah.
 - Rebrand aplikasi menjadi **KenStory** (fork dari bangtutorial/bang-story tetap berlisensi MIT, lihat NOTICE.md).
 - **Flow2API: kunci API server (Bearer)** — server Flow2API versi sekarang menuntut `Authorization: Bearer <kunci>` di
   tiap permintaan; tanpanya generate gagal HTTP 401 (terbukti di uji live PC, 20 Nov 2026). Kolom baru "Kunci API
