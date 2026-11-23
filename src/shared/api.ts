@@ -1,4 +1,5 @@
 import type { ManualScanResult, ManualWatchEvent, ManualWorkFolder, VisualProvider, WorkFileKind } from './manual'
+import type { BulkImportPreview, BulkImportResult } from './bulk-import'
 import type { BeatsJson, MotionBabakStatus, MotionWorkFolderResult, RenderBabakResult } from './motion-contract'
 import type { MotionTemplate } from './motion-templates'
 import type { ArrangeResult, SceneDef } from './talkinghead'
@@ -131,6 +132,10 @@ export interface StudioApi {
     pickClipImage(projectId: string, clipId: string): Promise<Asset | null>
     /** A local video file to use as this clip's video (also links it to the clip). */
     pickClipVideo(projectId: string, clipId: string): Promise<Asset | null>
+    /** Opens a folder picker and plans a bulk import: which files go to which empty scenes. Null when the user cancels. */
+    previewBulkImport(projectId: string, kind: WorkFileKind): Promise<BulkImportPreview | null>
+    /** Installs a folder's files in order onto the scenes that still need this kind of visual. */
+    applyBulkImport(projectId: string, folder: string, kind: WorkFileKind): Promise<BulkImportResult>
   }
   settings: {
     get(): Promise<AppSettings>
