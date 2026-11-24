@@ -8,6 +8,11 @@ Cara menaikkan versi ada di [docs/pengembangan.md](docs/pengembangan.md#versi-da
 
 ## [Belum dirilis]
 
+- **Merge ke main (24 Nov 2026)** — tiga branch fitur yang tertunda kini di main: `v1.1e-gabung` (pacing
+  berurutan + Unggah lembar + naskah per bagian + impor naskah), `0.3-tier1-impor-massal` (impor massal
+  gambar/video + tombol 1-per-1 per adegan), dan `0.3-tier1-kenflow-mode` (tombol Salin untuk KenFlow +
+  pemindai nama unduhan KenFlow). Semua bentrok diselesaikan dengan kedua sisi dipertahankan; regresi ekspor
+  byte-identik dengan baseline. Bukti verifikasi di laporan gabung.
 - **Gabung 4 branch Tier 1 untuk paket uji v1.1e** — pacing berurutan + tombol Unggah lembar + naskah per bagian
   (lanjutkan + durasi custom sampai 30 menit) + impor naskah bawa sendiri, digabung di branch `v1.1e-gabung`
   (tanpa merge ke main). Semua bentrok diselesaikan dengan kedua sisi dipertahankan; tidak ada perubahan perilaku
