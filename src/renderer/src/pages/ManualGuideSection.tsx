@@ -213,8 +213,8 @@ export function ManualGuideSection({ baseUrl }: { baseUrl: string }) {
         rows={[
           ['03.png', 'Terpasang ke adegan 03 sebagai gambar'],
           ['03-v2.mp4', 'Terpasang ke adegan 03 sebagai video (akhiran -v2 bebas, untuk revisi)'],
-          ['000_gajah-di-istan_a.png', 'Terpasang ke adegan 01 sebagai gambar (nama unduhan KenFlow: nomor 0-based + 1)'],
-          ['001_gajah-di-istan_a.mp4', 'Terpasang ke adegan 02 sebagai video (nama unduhan KenFlow)'],
+          ['000_gajah-di-istana_a.png', 'Terpasang ke adegan 01 sebagai gambar (nama unduhan KenFlow: nomor 0-based + 1)'],
+          ['001_gajah-di-istana_a.mp4', 'Terpasang ke adegan 02 sebagai video (nama unduhan KenFlow)'],
           ['scene-03.png', 'Terpasang ke adegan 03 (awalan scene- diabaikan)'],
           ['clip-12.mp4', 'Terpasang ke adegan 12 sebagai video'],
           ['gajah-mada.png', 'Tidak terpasang — tidak diawali nomor adegan; masuk daftar belum terpasang'],
