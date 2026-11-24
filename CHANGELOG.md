@@ -8,6 +8,11 @@ Cara menaikkan versi ada di [docs/pengembangan.md](docs/pengembangan.md#versi-da
 
 ## [Belum dirilis]
 
+- **Mode KenFlow (jalur Manual Tier 2)** — dua tombol baru di Storyboard, di samping "Salin Semua Prompt": "Salin untuk KenFlow (Gambar)"
+  dan "Salin untuk KenFlow (Video)". Masing-masing menyalin teks bersih (satu paragraf per adegan, tanpa label, tokoh berlembar disebut
+  `@Nama` di baris pertama) dan menulis `kenflow-gambar.txt` / `kenflow-video.txt` ke folder kerja. Tombol video nonaktif bila belum ada
+  adegan video. Pemindai kini mengenali nama unduhan KenFlow (`000_…_a.png` → adegan 01, `001_…` → adegan 02); nama lama (`03.png`,
+  `scene-03.mp4`) tetap jalan seperti sebelumnya. Rute lengkapnya ada di panduan Manual (bagian KenFlow).
 - Rebrand aplikasi menjadi **KenStory** (fork dari bangtutorial/bang-story tetap berlisensi MIT, lihat NOTICE.md).
 - **Flow2API: kunci API server (Bearer)** — server Flow2API versi sekarang menuntut `Authorization: Bearer <kunci>` di
   tiap permintaan; tanpanya generate gagal HTTP 401 (terbukti di uji live PC, 20 Nov 2026). Kolom baru "Kunci API

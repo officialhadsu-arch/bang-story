@@ -59,7 +59,7 @@ import * as hf from './services/higgsfield'
 import * as kie from './services/kieai'
 import * as llm from './services/llm'
 import * as nexa from './services/nexabot'
-import { importManualFile, prepareWorkFolder, scanWorkFolder } from './services/manual'
+import { importManualFile, kenflowTexts, prepareWorkFolder, scanWorkFolder } from './services/manual'
 import {
   approveMotionBeat,
   motionBabaksOf,
@@ -141,6 +141,7 @@ export function registerIpc(): void {
 
   // Tier 2 (0.3+): the manual / extension work folder.
   handle('manual:prepareWorkFolder', (projectId: string) => prepareWorkFolder(projectId))
+  handle('manual:kenflowTexts', (projectId: string) => kenflowTexts(projectId))
   handle('manual:scanWorkFolder', (projectId: string) => scanWorkFolder(projectId))
   handle('manual:importFile', (projectId: string, fileName: string, clipId: string, kind: WorkFileKind) => importManualFile(projectId, fileName, clipId, kind))
   handle('manual:openWorkFolder', async (projectId: string) => {

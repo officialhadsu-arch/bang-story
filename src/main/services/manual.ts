@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { copyFileSync, existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs'
 import { basename, dirname, extname, join } from 'node:path'
-import { buildWorkFolderContent, matchWorkFile, type ManualScanResult, type ManualWorkFolder, type WorkFileKind } from '@shared/manual'
+import { buildKenflowTexts, buildWorkFolderContent, matchWorkFile, type KenflowTexts, type ManualScanResult, type ManualWorkFolder, type WorkFileKind } from '@shared/manual'
 import type { Asset, Clip } from '@shared/types'
 import { getDb } from '../db'
 import { emit } from '../events'
@@ -35,6 +35,21 @@ export function prepareWorkFolder(projectId: string): ManualWorkFolder {
   writeFileSync(join(dir, 'manual.json'), `${JSON.stringify(manifest, null, 2)}\n`, 'utf8')
   startManualWatch(projectId)
   return { text, manifest, workFolder: dir, fileCount: manifest.clips.length }
+}
+
+/**
+ * Writes `kenflow-gambar.txt` (one paragraph per scene) and `kenflow-video.txt` (video scenes
+ * only) into the project's work folder, mirroring prompts.txt, and returns the texts for the
+ * renderer to copy. The video file is written even when empty, so the folder always shows both.
+ */
+export function kenflowTexts(projectId: string): KenflowTexts {
+  const project = getProject(projectId)
+  const texts = buildKenflowTexts(project, clipsOf(projectId), charactersOf(projectId))
+  const dir = workFolder(projectId)
+  writeFileSync(join(dir, 'kenflow-gambar.txt'), texts.imageText ? `${texts.imageText}\n` : '', 'utf8')
+  writeFileSync(join(dir, 'kenflow-video.txt'), texts.videoText ? `${texts.videoText}\n` : '', 'utf8')
+  startManualWatch(projectId)
+  return { ...texts, workFolder: dir }
 }
 
 /** Marks every waiting manual job for this clip and kind as done, with the asset that finished it. */
@@ -112,7 +127,7 @@ export async function scanWorkFolder(projectId: string): Promise<ManualScanResul
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     if (!entry.isFile()) continue
     const file = entry.name
-    if (file === 'prompts.txt' || file === 'manual.json') continue
+    if (file === 'prompts.txt' || file === 'manual.json' || file === 'kenflow-gambar.txt' || file === 'kenflow-video.txt') continue
     const match = matchWorkFile(file)
     const clip = match ? clips.find((c) => c.sceneKey === match.sceneKey) : undefined
     if (!match || !clip) {

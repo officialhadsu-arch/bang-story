@@ -1,4 +1,4 @@
-import type { ManualScanResult, ManualWatchEvent, ManualWorkFolder, VisualProvider, WorkFileKind } from './manual'
+import type { KenflowTexts, ManualScanResult, ManualWatchEvent, ManualWorkFolder, VisualProvider, WorkFileKind } from './manual'
 import type { BeatsJson, MotionBabakStatus, MotionWorkFolderResult, RenderBabakResult } from './motion-contract'
 import type { MotionTemplate } from './motion-templates'
 import type { ArrangeResult, SceneDef } from './talkinghead'
@@ -65,6 +65,8 @@ export interface StudioApi {
   manual: {
     /** Writes prompts.txt + manual.json into the project's work folder and returns the numbered prompt text. */
     prepareWorkFolder(projectId: string): Promise<ManualWorkFolder>
+    /** Writes kenflow-gambar.txt + kenflow-video.txt into the project's work folder and returns the clean KenFlow texts. */
+    kenflowTexts(projectId: string): Promise<KenflowTexts>
     /** Pairs result files in the work folder with their scenes; files with no scene come back as unmatched. */
     scanWorkFolder(projectId: string): Promise<ManualScanResult>
     /** Attaches one work-folder file to the scene the user picked. */

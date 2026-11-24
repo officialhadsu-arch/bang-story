@@ -23,7 +23,7 @@ import {
 } from 'lucide-react'
 import { effectiveResolution, fitDuration, getImageModel, getVideoModel } from '@shared/higgsfield'
 import { KIE_CREDIT_IDR, KIE_CREDIT_USD, isKieModelId, kieaiUsd, kiePriceIdr } from '@shared/kieai'
-import { VISUAL_PROVIDERS, kindOfWorkFileExtension, type ManualScanUnmatched } from '@shared/manual'
+import { VISUAL_PROVIDERS, buildKenflowTexts, kindOfWorkFileExtension, type ManualScanUnmatched } from '@shared/manual'
 import { idrLabel, isNexaModelId, nexaPriceIdr } from '@shared/nexabot'
 import { CAMERA_PRESETS, MOTION_STRENGTHS, cameraAt, cameraCss } from '@shared/motion'
 import { needsVisual } from '@shared/script'
@@ -757,6 +757,35 @@ export function StoryboardStep() {
     }
   }
 
+  // KenFlow (0.3): one clean paragraph per scene, so a paste into KenFlow Text to Image /
+  // Image to Video becomes one prompt per scene. The counts come from the same shared builder
+  // the IPC uses, so the Video button is disabled exactly when there is no video scene.
+  const kenflowCounts = useMemo(() => buildKenflowTexts(project, clips, characters), [project, clips, characters])
+
+  const copyKenflow = async (kind: 'image' | 'video'): Promise<void> => {
+    try {
+      await flush()
+      const r = await window.api.manual.kenflowTexts(project.id)
+      const text = kind === 'image' ? r.imageText : r.videoText
+      const count = kind === 'image' ? r.imageCount : r.videoCount
+      if (!count) {
+        toast('error', 'Belum ada adegan video, jadi tidak ada prompt video untuk disalin. Ubah dulu satu adegan menjadi video.')
+        return
+      }
+      await window.api.app.copyText(text)
+      setWorkFolder(r.workFolder)
+      setFolderHint(false)
+      toast(
+        'success',
+        kind === 'image'
+          ? `${count} prompt gambar disalin untuk KenFlow. Tempel ke KenFlow Text to Image, satu paragraf per adegan.`
+          : `${count} prompt video disalin untuk KenFlow. Tempel ke KenFlow Image to Video, satu paragraf per adegan.`
+      )
+    } catch (e) {
+      toast('error', errorText(e))
+    }
+  }
+
   const scanWorkFolder = async (): Promise<void> => {
     try {
       await flush()
@@ -948,6 +977,27 @@ export function StoryboardStep() {
               onClick={() => void copyAllPrompts()}
             >
               Salin Semua Prompt
+            </Button>
+            <Button
+              size="sm"
+              icon={<Copy className="size-4" />}
+              title="Tulis kenflow-gambar.txt ke folder kerja dan salin satu paragraf bersih per adegan untuk KenFlow Text to Image"
+              onClick={() => void copyKenflow('image')}
+            >
+              Salin untuk KenFlow (Gambar)
+            </Button>
+            <Button
+              size="sm"
+              icon={<Copy className="size-4" />}
+              disabled={kenflowCounts.videoCount === 0}
+              title={
+                kenflowCounts.videoCount === 0
+                  ? 'Belum ada adegan video — ubah dulu satu adegan menjadi video supaya ada prompt video untuk disalin'
+                  : 'Tulis kenflow-video.txt ke folder kerja dan salin satu paragraf bersih per adegan video untuk KenFlow Image to Video'
+              }
+              onClick={() => void copyKenflow('video')}
+            >
+              Salin untuk KenFlow (Video)
             </Button>
             <Button size="sm" icon={<ImagePlus className="size-4" />} title="Pilih berkas gambar untuk adegan yang dipilih" onClick={() => void importImage()}>
               Impor Gambar

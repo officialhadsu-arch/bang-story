@@ -43,6 +43,7 @@ const api: StudioApi = {
   },
   manual: {
     prepareWorkFolder: call('manual:prepareWorkFolder'),
+    kenflowTexts: call('manual:kenflowTexts'),
     scanWorkFolder: call('manual:scanWorkFolder'),
     importFile: call('manual:importFile'),
     openWorkFolder: call('manual:openWorkFolder')
