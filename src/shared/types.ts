@@ -253,6 +253,34 @@ export interface Job {
   updatedAt: number
 }
 
+/**
+ * Live state of one "Generate berurutan" run (0.3, images only). The run lives
+ * in main-process memory only — no DB rows, no settings — so a restart simply
+ * ends it; the per-scene image jobs themselves survive like any other job.
+ */
+export type SequentialStatus = 'running' | 'waiting' | 'done' | 'canceled' | 'stopped'
+
+export interface SequentialProgress {
+  projectId: string
+  status: SequentialStatus
+  /** 1-based scene being generated or waited on; 0 before the first scene. */
+  current: number
+  total: number
+  clipId: string | null
+  sceneKey: string | null
+  /** Attempt for the current scene: 1 first try, up to 3 (1 + 2 retries). */
+  attempt: number
+  /** Seconds left in the between-scenes pause; null while a scene generates. */
+  waitSecondsLeft: number | null
+  done: number
+  failed: number
+  failedSceneKeys: string[]
+  /** Scenes skipped because their provider is manual/extension (they wait for a file, so they can never finish a sequential run). */
+  skipped: number
+  /** Human-readable end state (gate stop, cancel, summary); null while running. */
+  message: string | null
+}
+
 export interface ProjectBundle {
   project: Project
   characters: Character[]
@@ -417,4 +445,19 @@ export interface ClipPatchEvent {
 export interface CharacterPatchEvent {
   characterId: string
   patch: Partial<Character>
+}
+
+/** Progress of a chunked script write: which scenes are being written right now. */
+export interface ScriptProgressEvent {
+  projectId: string
+  /** First scene number of the chunk being written (1-based). */
+  from: number
+  /** Last scene number of the chunk being written (1-based). */
+  to: number
+  /** Total scenes the script needs. */
+  total: number
+  /** Chunk number, starting at 1. */
+  chunk: number
+  /** Total chunks. */
+  chunks: number
 }

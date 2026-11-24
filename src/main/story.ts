@@ -1,10 +1,13 @@
 import { CAMERA_PRESETS, MOTION_STRENGTHS, TRANSITIONS } from '@shared/motion'
-import { LANGUAGES, clipCountFor } from '@shared/models'
-import { estimateNarrationMs, needsVisual } from '@shared/script'
+import { LANGUAGES, SCRIPT_CHUNK_SIZE, clipCountFor, scriptChunkRanges } from '@shared/models'
+import { estimateNarrationMs, isDoubtfulScene, needsVisual } from '@shared/script'
+import { importDurationMs, parseScriptImport, type ScriptImportSummary } from '@shared/script-import'
 import { getStyle } from '@shared/styles'
-import type { CameraPresetId, Clip, MotionStrength, MusicPrompt, ProjectBundle, TransitionId } from '@shared/types'
-import { applyVisuals, charactersOf, clipsOf, getBundle, getProject, replaceScript, type SceneVisual } from './repo'
-import { generateJson } from './services/llm'
+import type { CameraPresetId, Clip, MotionStrength, MusicPrompt, Project, ProjectBundle, TransitionId } from '@shared/types'
+import { applyVisuals, appendScenes, charactersOf, clipsOf, deleteClip, getBundle, getProject, replaceScript, setProjectDurationSec, type SceneVisual } from './repo'
+import { emit } from './events'
+import { sleep } from './services/http'
+import { generateJson, LlmError } from './services/llm'
 
 const CAMERA_IDS = CAMERA_PRESETS.map((c) => c.id)
 const STRENGTH_IDS = MOTION_STRENGTHS.map((m) => m.id)
@@ -17,6 +20,36 @@ function languageOf(code: string): string {
 }
 
 // ---------- step 1 → 2: the script ----------
+
+/** Pause between chunk calls: room for the rate limit, without slowing a long script much (11 calls ≈ 20 s extra). */
+const CHUNK_DELAY_MS = 2000
+/** Attempts per chunk: the first try plus two retries. A chunk that still fails stops the whole write. */
+const CHUNK_ATTEMPTS = 3
+
+/**
+ * Cancel flags, one per project, checked between chunks only. A call already in flight runs to the
+ * end (the Gemini path ignores AbortSignal and the 4-minute timeout bounds it), exactly like the
+ * pacing cancel: stopping never throws away scenes that are already saved.
+ */
+const scriptCancel = new Set<string>()
+
+/** Stops a running script write after the chunk in flight finishes; saved scenes stay saved. */
+export function cancelScriptGeneration(projectId: string): void {
+  scriptCancel.add(projectId)
+}
+
+/** Rate limits and overloaded servers only get worse when hammered: those errors stop the write instead of retrying. */
+function isRateLimit(e: unknown): boolean {
+  if (e instanceof LlmError) return e.status === 429 || e.status === 503
+  // Gemini maps its own 429 to this friendly line (services/gemini.ts).
+  return /terlalu banyak permintaan|kuota .* habis/i.test((e as Error)?.message ?? '')
+}
+
+/** What the user hears when a script write stops early: the reason, plus how to finish it. */
+function stoppedMessage(saved: number, total: number, reason: string): string {
+  if (saved <= 0) return reason
+  return `${reason} ${saved} dari ${total} adegan sudah tersimpan — klik "Lanjutkan naskah" untuk melanjutkannya.`
+}
 
 /** JSON Schema written to satisfy OpenAI strict mode (every property required, no extra keys) and Gemini. */
 const SCRIPT_SCHEMA = {
@@ -57,38 +90,148 @@ interface ScriptPlan {
 export async function generateScript(projectId: string): Promise<ProjectBundle> {
   const project = getProject(projectId)
   if (!project.synopsis.trim()) throw new Error('Tulis ide cerita atau sinopsis dulu.')
-  const lang = languageOf(project.language)
-  const count = clipCountFor(project.durationSec)
+  scriptCancel.delete(projectId)
+  await writeScriptChunks(project, 1, true)
+  return getBundle(projectId)
+}
 
-  const system = [
-    'You are a scriptwriter for faceless YouTube storytelling and explainer videos.',
-    'You turn an idea into a sequence of short scenes. Each scene has one line of voice-over.',
-    'The first scene is a strong hook. The story has a clear beginning, rising tension and a satisfying ending. The last scene can invite viewers to subscribe.',
-    'Keep facts accurate for history and science topics, and always call each character by the same name.',
-    'The narration is voiced by an expressive text-to-speech model. Where it helps the delivery, add a few English vocal tags in angle brackets inside the narration, such as <short pause>, <long pause>, <chuckles>, <sigh>, <gasp> or <whispers>. Use them sparingly, at most one or two per scene, and never other markup.',
-    `Write everything in ${lang}, except the vocal tags, which stay in English.`
-  ].join(' ')
-  const prompt = [
-    `Idea / synopsis:\n${project.synopsis}`,
-    `Target video length: about ${project.durationSec} seconds.`,
-    `Write exactly ${count} scenes.`
-  ].join('\n\n')
+/**
+ * Continues a script that stopped early. With no scenes it is a full write; otherwise it resumes after
+ * the last saved scene, after dropping that scene when its narration looks cut off mid-sentence.
+ */
+export async function continueScript(projectId: string): Promise<ProjectBundle> {
+  const project = getProject(projectId)
+  let clips = clipsOf(projectId)
+  if (!clips.length) return generateScript(projectId)
+  scriptCancel.delete(projectId)
+  const total = clipCountFor(project.durationSec)
+  const last = clips[clips.length - 1]
+  if (isDoubtfulScene(last.narration)) {
+    // A truncated reply leaves a broken last line; drop it so the continuation starts clean.
+    deleteClip(last.id)
+    clips = clipsOf(projectId)
+  }
+  if (clips.length >= total) return getBundle(projectId)
+  await writeScriptChunks(project, clips.length + 1, false)
+  return getBundle(projectId)
+}
 
-  const plan = await generateJson<ScriptPlan>({ system, prompt, schema: SCRIPT_SCHEMA, name: 'script' })
-  const scenes = (plan.scenes ?? []).filter((c) => str(c.narration) || str(c.story))
-  if (!scenes.length) throw new Error('Model tidak menghasilkan adegan. Coba lagi atau pilih model lain di Pengaturan.')
-
-  replaceScript(
-    projectId,
-    str(plan.title) || project.title,
-    scenes.map((c, i) => ({
-      title: str(c.title) || `Adegan ${i + 1}`,
+/**
+ * Writes scenes `startScene..total` in chunks of SCRIPT_CHUNK_SIZE, saving each chunk as soon as it
+ * arrives so a failure or a cancel never loses finished work. The first chunk replaces the whole
+ * script when `replaceFirst` is set; later chunks append. Returns how many scenes are saved.
+ */
+async function writeScriptChunks(project: Project, startScene: number, replaceFirst: boolean): Promise<number> {
+  const total = clipCountFor(project.durationSec)
+  const chunks = scriptChunkRanges(total - startScene + 1).length
+  let saved = startScene - 1
+  let chunk = 0
+  while (saved < total) {
+    chunk++
+    const from = saved + 1
+    const to = Math.min(total, from + SCRIPT_CHUNK_SIZE - 1)
+    if (scriptCancel.has(project.id)) {
+      scriptCancel.delete(project.id)
+      throw new Error(stoppedMessage(saved, total, 'Penulisan naskah dibatalkan.'))
+    }
+    if (chunk > 1) {
+      await sleep(CHUNK_DELAY_MS)
+      if (scriptCancel.has(project.id)) {
+        scriptCancel.delete(project.id)
+        throw new Error(stoppedMessage(saved, total, 'Penulisan naskah dibatalkan.'))
+      }
+    }
+    emit.scriptProgress({ projectId: project.id, from, to, total, chunk, chunks })
+    let plan: ScriptPlan
+    try {
+      plan = await writeChunk(project, from, to, total)
+    } catch (e) {
+      throw new Error(stoppedMessage(saved, total, (e as Error)?.message ?? String(e)))
+    }
+    // Keep exactly the scenes this chunk asked for, even if the model sent more.
+    const scenes = (plan.scenes ?? [])
+      .filter((c) => str(c.narration) || str(c.story))
+      .slice(0, to - from + 1)
+    if (!scenes.length) throw new Error(stoppedMessage(saved, total, 'Model tidak menghasilkan adegan. Coba lagi atau pilih model lain di Pengaturan.'))
+    const mapped = scenes.map((c, i) => ({
+      title: str(c.title) || `Adegan ${from + i}`,
       story: str(c.story),
       narration: str(c.narration),
       durationMs: estimateNarrationMs(str(c.narration))
     }))
+    if (replaceFirst && chunk === 1) replaceScript(project.id, str(plan.title) || project.title, mapped)
+    else appendScenes(project.id, mapped)
+    saved += scenes.length
+  }
+  return saved
+}
+
+/** One chunk of the script: the scenes already saved ride along as context, so the story stays connected. */
+async function writeChunk(project: Project, from: number, to: number, total: number): Promise<ScriptPlan> {
+  const lang = languageOf(project.language)
+  const system = [
+    'You are a scriptwriter for faceless YouTube storytelling and explainer videos.',
+    'You turn an idea into a sequence of short scenes. Each scene has one line of voice-over.',
+    `This story has exactly ${total} scenes.`,
+    from === 1
+      ? 'The first scene is a strong hook.'
+      : 'The story continues from the scenes already written; do not repeat the hook and do not restart the story.',
+    to === total
+      ? 'The last scene gives the story a satisfying ending and can invite viewers to subscribe.'
+      : `Do not end the story in this part; it continues after scene ${to}.`,
+    'Keep facts accurate for history and science topics, and always call each character by the same name.',
+    'The narration is voiced by an expressive text-to-speech model. Where it helps the delivery, add a few English vocal tags in angle brackets inside the narration, such as <short pause>, <long pause>, <chuckles>, <sigh>, <gasp> or <whispers>. Use them sparingly, at most one or two per scene, and never other markup.',
+    `Write everything in ${lang}, except the vocal tags, which stay in English.`
+  ].join(' ')
+  const saved = clipsOf(project.id)
+  const context = saved.map((c, i) => `${i + 1}. ${c.title || `Adegan ${i + 1}`}: ${(c.narration || c.story || '').replace(/\s+/g, ' ').slice(0, 200)}`).join('\n')
+  const prompt = [
+    `Idea / synopsis:\n${project.synopsis}`,
+    `Target video length: about ${project.durationSec} seconds.`,
+    context ? `Scenes written so far (title and narration):\n${context}` : '',
+    `Write scenes ${from} to ${to} — exactly ${to - from + 1} scenes, numbered ${from} to ${to}.`
+  ]
+    .filter(Boolean)
+    .join('\n\n')
+
+  let lastError: unknown
+  for (let attempt = 1; attempt <= CHUNK_ATTEMPTS; attempt++) {
+    try {
+      return await generateJson<ScriptPlan>({ system, prompt, schema: SCRIPT_SCHEMA, name: 'script' })
+    } catch (e) {
+      lastError = e
+      if (isRateLimit(e) || attempt === CHUNK_ATTEMPTS) throw e
+    }
+  }
+  throw lastError
+}
+
+// ---------- typed text → script: the user's own script ----------
+
+/**
+ * Replaces the whole script with the user's own text, through the same
+ * replaceScript the generated script uses, so an imported script behaves
+ * exactly like a generated one. The dialog already previewed this text with
+ * the same parser, so the counts here must match the preview; the parse is
+ * repeated here because the main process never trusts the renderer. Nothing
+ * is written when the text holds no valid scene, so the old script survives
+ * a rejected import untouched. The project length then follows the imported
+ * narration instead of one of the five duration presets.
+ */
+export async function importScript(projectId: string, text: string): Promise<ScriptImportSummary & { bundle: ProjectBundle }> {
+  const project = getProject(projectId)
+  const parsed = parseScriptImport(text)
+  if (!parsed.scenes.length)
+    throw new Error('Naskah tidak bisa diimpor: tidak ada adegan yang bisa dibaca. Tulis tiap adegan diawali "## Judul Adegan", lalu "Alur:" dan "Narasi:". Naskah lamamu tetap utuh.')
+  const title = parsed.title ?? project.title
+  replaceScript(
+    projectId,
+    title,
+    parsed.scenes.map((c) => ({ title: c.title, story: c.story, narration: c.narration, durationMs: estimateNarrationMs(c.narration) }))
   )
-  return getBundle(projectId)
+  const durationSec = Math.max(10, Math.round(importDurationMs(parsed.scenes) / 1000))
+  setProjectDurationSec(projectId, durationSec)
+  return { bundle: getBundle(projectId), title, imported: parsed.scenes.length, skipped: parsed.skipped, durationSec }
 }
 
 // ---------- step 2 → 3: visuals for the reviewed script ----------

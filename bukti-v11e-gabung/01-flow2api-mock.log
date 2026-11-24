@@ -1,0 +1,48 @@
+PASS catalog has 3 image + 4 video models
+PASS isFlowModelId(flow:x)
+PASS isFlowModelId(kling:x) false
+PASS isFlowModelId(null) false
+PASS canonical omni-1.1 -> 1.2
+PASS canonical nano-banana-2 -> flash-image
+PASS canonical passthrough
+PASS image name landscape
+PASS image name portrait
+PASS veo name 4s
+PASS veo name 6s portrait
+PASS omni name 8s
+PASS omni seconds 7 -> 6
+PASS getImageModel resolves flow model
+PASS getImageModel unknown flow falls back to first flow model
+PASS getVideoModel resolves flow model
+PASS extract direct url
+PASS extract data uri
+PASS extract markdown image
+PASS parse plain JSON
+PASS parse SSE
+PASS testConnection ok
+PASS testConnection dead port fails
+PASS generateImage returns fixture png bytes
+PASS generateImage contentType png
+PASS generateImage remoteUrl null (data uri)
+PASS generateVideo returns fixture mp4 bytes
+PASS generateVideo contentType mp4
+PASS generateVideo remoteUrl set
+PASS generateImage with apiKey returns png
+PASS generateImage with apiKey sends Bearer
+PASS generateImage without apiKey returns png
+PASS generateImage without apiKey sends no Authorization
+PASS generateVideo with apiKey returns mp4
+PASS generateVideo with apiKey sends Bearer
+PASS testConnection fallback ok with apiKey
+PASS testConnection fallback sends Bearer
+PASS testConnection fallback ok without apiKey
+PASS testConnection fallback sends no Authorization
+PASS generateImage reCAPTCHA error is friendly -> Pembuatan media gagal: server Flow2API melaporkan masalah reCAPTCHA. Penyebabnya belum diketahui; periksa log Flow2API u
+PASS generateImage HTTP 401 explains the missing server key -> Server Flow2API menolak permintaan (HTTP 401): kunci API server tidak valid. Server ini meminta kunci API — isi Kunci AP
+PASS generateImage HTTP 401 with a key says the saved key was rejected -> Server Flow2API menolak permintaan (HTTP 401): kunci API server tidak valid. Kunci API server yang tersimpan ditolak — p
+PASS generateImage HTTP 401 message is fully Indonesian
+PASS generateImage HTTP 500 with error body quotes the error -> Flow2API gagal membuat media: upstream exploded
+PASS generateImage HTTP 500 with content body reports the status -> Flow2API mengembalikan galat (HTTP 500): https://example.com/x.png
+PASS generateImage to dead server is friendly -> Tidak dapat terhubung ke server Flow2API di http://127.0.0.1:9. Pastikan servernya jalan, lalu coba lagi.
+
+46 passed, 0 failed

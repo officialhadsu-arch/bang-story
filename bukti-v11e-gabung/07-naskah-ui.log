@@ -1,0 +1,36 @@
+[debug] [vite] connecting...
+[debug] [vite] connected.
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[info] UI-SETUP ok
+[info] UI-PARTIAL gagal seperti diharapkan, pesan: Error invoking remote method 'story:script': Error: Server endpoint custom sedang bermasalah (500). Coba lagi nanti atau pilih model lain. 60 dari 218 adegan sudah tersimpan — klik "Lanjutkan naskah" untuk melanjutkannya.
+[info] UI-PARTIAL tersimpan=60 (mau 60) judul-disetelah-generate
+[info] UI-RELOAD
+[debug] [vite] connecting...
+[debug] [vite] connected.
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[info] UI-PULIH pUI=8ffe195e-8d7a-4986-9dfc-4fd367572b07
+[info] UI-KARTU klik=true
+[info] UI-IDEA h1=Naskah klikLihatNaskah=false
+[info] UI-NASKAH h1=Naskah status60=true tombolLanjutkan=true
+[info] UI-LANJUTKAN klik=true
+[info] UI-LANJUTKAN-SELESAI adegan=218 (mau 218) statusHilang=false klikKembali=true
+[info] UI-DURASI input=ada isi1800=true klikPakai=true
+[info] UI-DURASI-1800 durationSec=1800 (mau 1800) teks=["Sekitar 327 klip, masing-masing kurang lebih 6 detik. Durasi akhir mengikuti panjang suara narasi."]
+[info] UI-DURASI-1801 isi=true klik=true
+[info] UI-DURASI-1801-DITOLAK durationSec=1800 (tetap 1800) teks=["Durasi paling panjang 1800 detik (30 menit)."]
+[info] UI-DURASI-5 isi=true klik=true
+[info] UI-DURASI-5-DITOLAK durationSec=1800 (tetap 1800) teks=["Durasi paling pendek 15 detik."]
+[info] UI-PRESET-10 klik=true
+[info] UI-PRESET-10 durationSec=600 (mau 600)
+[info] UI-BATAL proyek dibuat
+[info] UI-BATAL reload
+[debug] [vite] connecting...
+[debug] [vite] connected.
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[info] UI-PULIH pBatal=a866c71b-1130-475c-8bdc-235a9af0ceef
+[info] UI-BATAL kartu klik=true
+[info] UI-BATAL klik Susun naskah=true
+[info] UI-BATAL progresTerlihat=true tombolBatalkan=true progres=undefined klikBatal=true
+[info] UI-BATAL tersimpan=60 (mau 30, 60, atau 90 — di bawah 218) h1=Naskah (mau Naskah: load membawa step=2)
+[info] UI-BATAL-STATUS statusTerlihat=true tombolLanjutkan=true
+[info] UJI-UI-SELESAI

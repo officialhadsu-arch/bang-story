@@ -1,14 +1,16 @@
 import { useEffect, useState } from 'react'
-import { ArrowDown, ArrowRight, ArrowUp, Bot, MoreHorizontal, Plus, RefreshCw, Sparkles, Trash2 } from 'lucide-react'
-import { DURATIONS, llmName } from '@shared/models'
+import { ArrowDown, ArrowRight, ArrowUp, Bot, MoreHorizontal, Plus, RefreshCw, Sparkles, Trash2, Upload } from 'lucide-react'
+import { DURATIONS, clipCountFor, llmName } from '@shared/models'
 import { estimateNarrationMs, needsVisual, wordCount } from '@shared/script'
+import { type ScriptImportSummary } from '@shared/script-import'
 import { VOICE_TAGS } from '@shared/speech'
-import type { Clip, LlmProvider } from '@shared/types'
+import type { Clip, LlmProvider, ProjectBundle } from '@shared/types'
 import { AutoTextarea } from '../../components/AutoTextarea'
 import { Badge, Button, IconButton, Menu, confirmDialog, cx, inputCls } from '../../components/ui'
 import { clipNumber, errorText, mmss } from '../../lib/format'
 import { useApp } from '../../store/app'
 import { useProject } from '../../store/project'
+import { ScriptImportDialog } from './ScriptImportDialog'
 
 /** A thin gap between scenes that offers to insert one there. */
 function InsertGap({ onInsert }: { onInsert: () => void }) {
@@ -167,8 +169,11 @@ export function ScriptStep() {
   const { project, clips, addClip, updateProject, flush, load } = useProject()
   const { toast, go } = useApp()
   const [busy, setBusy] = useState<'missing' | 'all' | null>(null)
+  const [scriptBusy, setScriptBusy] = useState(false)
+  const [scriptProgress, setScriptProgress] = useState<string | null>(null)
   const [writer, setWriter] = useState<{ provider: LlmProvider; model: string } | null>(null)
   const [focusId, setFocusId] = useState<string | null>(null)
+  const [importOpen, setImportOpen] = useState(false)
 
   useEffect(() => {
     void window.api.settings.get().then((s) => setWriter({ provider: s.llmProvider, model: s.llmModels[s.llmProvider] }))
@@ -189,6 +194,8 @@ export function ScriptStep() {
   const planned = clips.some((c) => c.visualPrompt.trim())
   const stale = clips.filter(needsVisual).length
   const target = DURATIONS.find((d) => d.sec === project.durationSec)?.label ?? `${project.durationSec} detik`
+  const targetCount = clipCountFor(project.durationSec)
+  const incomplete = clips.length > 0 && clips.length < targetCount
 
   const openSettings = async (): Promise<void> => {
     await flush()
@@ -217,17 +224,68 @@ export function ScriptStep() {
     }
   }
 
+  /** Finishes a script that stopped early; a doubtful last scene is dropped first, on the main side. */
+  const continueScript = async (): Promise<void> => {
+    setScriptBusy(true)
+    // Progress arrives on an event while the long IPC call runs; it only ever shows this project's write.
+    const off = window.api.on.scriptProgress((e) => {
+      if (e.projectId === project.id) setScriptProgress(`Menulis adegan ${e.from}–${e.to} dari ${e.total}…`)
+    })
+    try {
+      await flush()
+      const bundle = await window.api.story.continueScript(project.id)
+      load(bundle)
+      if (bundle.clips.length < targetCount) toast('info', `Tersimpan ${bundle.clips.length} dari ${targetCount} adegan.`)
+      else toast('success', `${bundle.clips.length} adegan siap. Baca dan rapikan naskahnya dulu.`)
+    } catch (e) {
+      // A stopped write keeps the scenes it saved; reload so they show immediately.
+      try {
+        load(await window.api.projects.get(project.id))
+      } catch {
+        // Keep the old view when even the reload fails; the error toast below still shows.
+      }
+      toast('error', errorText(e))
+    } finally {
+      off()
+      setScriptProgress(null)
+      setScriptBusy(false)
+    }
+  }
+
+  // The pending autosave must land first: replaceScript deletes the old
+  // clips in the database, and a late snapshot would resurrect them.
+  const doImport = async (text: string): Promise<ScriptImportSummary & { bundle: ProjectBundle }> => {
+    await flush()
+    return window.api.story.importScript(project.id, text)
+  }
+
+  const importDialog = importOpen ? (
+    <ScriptImportDialog
+      hasScenes={clips.length > 0}
+      onImport={doImport}
+      onDone={(res) => {
+        load(res.bundle)
+        setImportOpen(false)
+      }}
+      onClose={() => setImportOpen(false)}
+    />
+  ) : null
+
   if (!clips.length)
     return (
       <div className="flex h-full flex-col items-center justify-center gap-4 text-center">
         <h2 className="font-display text-3xl font-bold">Naskah masih kosong</h2>
-        <p className="max-w-md text-ink-2">Tulis idenya di langkah Ide cerita lalu klik Susun naskah, atau tulis adegannya sendiri.</p>
+        <p className="max-w-md text-ink-2">Tulis idenya di langkah Ide cerita lalu klik Susun naskah, tulis adegannya sendiri, atau impor naskah yang sudah kamu tulis.</p>
         <div className="flex gap-2.5">
           <Button onClick={() => updateProject({ step: 1 })}>Ke Ide cerita</Button>
+          <Button icon={<Upload className="size-4" />} onClick={() => setImportOpen(true)}>
+            Impor naskah
+          </Button>
           <Button variant="primary" icon={<Plus className="size-4" />} onClick={() => insert(null)}>
             Tulis adegan pertama
           </Button>
         </div>
+        {importDialog}
       </div>
     )
 
@@ -248,7 +306,32 @@ export function ScriptStep() {
             <span className="rounded-full border border-line-2 bg-surface px-3 py-1.5">± {mmss(totalMs)} narasi</span>
             <span className="rounded-full border border-line-2 bg-surface px-3 py-1.5 text-ink-2">Target {target}</span>
             <span className="text-muted">Durasi akhir tiap adegan mengikuti panjang suara narasinya.</span>
+            <Button size="sm" icon={<Upload className="size-4" />} onClick={() => setImportOpen(true)}>
+              Impor naskah
+            </Button>
           </div>
+
+          {incomplete && (
+            <div className="flex flex-wrap items-center gap-2 rounded-xl border border-line-2 bg-surface px-4 py-3 text-[13px]">
+              <span className="font-semibold">
+                Tersimpan {clips.length} dari {targetCount} adegan.
+              </span>
+              <span className="text-ink-2">Naskah berhenti sebelum lengkap — lanjutkan dari adegan terakhir yang tersimpan.</span>
+              <span className="flex-1" />
+              {scriptBusy ? (
+                <>
+                  <span className="text-ink-2">{scriptProgress ?? 'Melanjutkan naskah…'}</span>
+                  <Button size="sm" onClick={() => void window.api.story.cancelScript(project.id)}>
+                    Batalkan
+                  </Button>
+                </>
+              ) : (
+                <Button variant="primary" size="sm" disabled={!!busy} loading={scriptBusy} icon={<Sparkles className="size-4" />} onClick={() => void continueScript()}>
+                  Lanjutkan naskah
+                </Button>
+              )}
+            </div>
+          )}
 
           {project.synopsis.trim() && (
             <div className="flex items-start gap-3 rounded-xl bg-sand px-4 py-3 text-[13px] text-ink-2">
@@ -294,32 +377,32 @@ export function ScriptStep() {
           </span>
         </div>
         <div className="flex-1" />
-        <Button size="lg" disabled={!!busy} onClick={() => updateProject({ step: 1 })}>
+        <Button size="lg" disabled={!!busy || scriptBusy} onClick={() => updateProject({ step: 1 })}>
           Kembali ke ide
         </Button>
         {!planned ? (
-          <Button variant="primary" size="lg" className="h-[50px]" loading={busy === 'missing'} icon={!busy && <Sparkles className="size-[18px]" />} onClick={() => void makeVisuals('missing')}>
+          <Button variant="primary" size="lg" className="h-[50px]" disabled={scriptBusy} loading={busy === 'missing'} icon={!busy && <Sparkles className="size-[18px]" />} onClick={() => void makeVisuals('missing')}>
             Buat visual
           </Button>
         ) : stale > 0 ? (
           <>
-            <Button size="lg" disabled={!!busy} onClick={() => updateProject({ step: 3 })}>
+            <Button size="lg" disabled={!!busy || scriptBusy} onClick={() => updateProject({ step: 3 })}>
               Ke storyboard
             </Button>
-            <Button variant="primary" size="lg" className="h-[50px]" loading={busy === 'missing'} icon={!busy && <Sparkles className="size-[18px]" />} onClick={() => void makeVisuals('missing')}>
+            <Button variant="primary" size="lg" className="h-[50px]" disabled={scriptBusy} loading={busy === 'missing'} icon={!busy && <Sparkles className="size-[18px]" />} onClick={() => void makeVisuals('missing')}>
               Perbarui visual ({stale} adegan)
             </Button>
           </>
         ) : (
           <>
-            <Button size="lg" disabled={!!busy} loading={busy === 'all'} icon={busy !== 'all' && <RefreshCw className="size-[17px]" />} onClick={() => void makeVisuals('all')}>
+            <Button size="lg" disabled={!!busy || scriptBusy} loading={busy === 'all'} icon={busy !== 'all' && <RefreshCw className="size-[17px]" />} onClick={() => void makeVisuals('all')}>
               Susun ulang visual
             </Button>
             <Button
               variant="primary"
               size="lg"
               className="h-[50px]"
-              disabled={!!busy}
+              disabled={!!busy || scriptBusy}
               onClick={() => updateProject({ step: 3, status: project.status === 'draft' || project.status === 'script' ? 'storyboard' : project.status })}
             >
               Lanjut ke storyboard
@@ -328,6 +411,7 @@ export function ScriptStep() {
           </>
         )}
       </footer>
+      {importDialog}
     </div>
   )
 }

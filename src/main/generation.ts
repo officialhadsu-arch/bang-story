@@ -10,7 +10,7 @@ import { clipPrompt, videoPromptForClip } from '@shared/prompts'
 import { stripVoiceTags } from '@shared/speech'
 import { getImageModel, getVideoModel, fitDuration, imageBody, maxRefs, promptLimit, videoBody, type HfModel } from '@shared/higgsfield'
 import { getStyle } from '@shared/styles'
-import type { AspectRatio, Asset, Character, Clip, CreditEstimate, Job, Project, WordTiming } from '@shared/types'
+import type { AspectRatio, Asset, Character, Clip, CreditEstimate, Job, Project, SequentialProgress, WordTiming } from '@shared/types'
 import { getDb } from './db'
 import { emit } from './events'
 import { runJob, type TaskCtx } from './jobs'
@@ -35,6 +35,7 @@ import {
   updateJob
 } from './repo'
 import { dropCache, getSettings, readCache, setSettings, writeCache } from './settings'
+import { cancellableDelay, runSequentialImages, SEQUENTIAL_JOB_POLL_MS, type SequentialScene } from './sequential'
 import { getSecret } from './secrets'
 import { probeDurationMs, probeSize } from './services/audio'
 import * as eleven from './services/elevenlabs'
@@ -925,6 +926,102 @@ export function generateMissingImages(projectId: string): Job[] {
     if (clip.visualProvider !== 'motion' && !clip.imageAssetId) jobs.push(generateClipImage(clip.id))
   }
   return jobs
+}
+
+// ---------- sequential image generation ("Generate berurutan", 0.3) ----------
+
+/**
+ * One run per project, in memory only: a restart ends the run, and the
+ * per-scene image jobs themselves survive like any other job. Starting while
+ * a run is active returns the running state instead of starting a second run.
+ */
+interface SequentialRun {
+  canceled: boolean
+  last: SequentialProgress
+}
+
+const sequentialRuns = new Map<string, SequentialRun>()
+
+export function startSequentialImages(projectId: string): SequentialProgress {
+  const existing = sequentialRuns.get(projectId)
+  if (existing && (existing.last.status === 'running' || existing.last.status === 'waiting')) return existing.last
+  getProject(projectId)
+  const scenes: SequentialScene[] = []
+  let skipped = 0
+  for (const clip of clipsOf(projectId)) {
+    if (clip.imageAssetId || clip.visualProvider === 'motion') continue
+    // A manual/extension scene waits for a file the user brings in, so its job
+    // can never finish — it would stall the queue forever. Skip it, and say so.
+    if (clip.visualProvider === 'manual' || clip.visualProvider === 'extension') {
+      skipped++
+      continue
+    }
+    scenes.push({ clipId: clip.id, sceneKey: clip.sceneKey })
+  }
+  if (scenes.length === 0)
+    throw new Error(
+      skipped > 0
+        ? 'Semua adegan yang belum punya gambar adalah adegan manual — buat gambarnya lewat folder kerja.'
+        : 'Tidak ada adegan yang butuh gambar.'
+    )
+  const run: SequentialRun = {
+    canceled: false,
+    last: {
+      projectId,
+      status: 'running',
+      current: 0,
+      total: scenes.length,
+      clipId: null,
+      sceneKey: null,
+      attempt: 1,
+      waitSecondsLeft: null,
+      done: 0,
+      failed: 0,
+      failedSceneKeys: [],
+      skipped,
+      message: null
+    }
+  }
+  sequentialRuns.set(projectId, run)
+  void runSequentialImages(projectId, scenes, skipped, {
+    generateOne: (clipId) => generateClipImage(clipId),
+    waitJob: async (jobId) => {
+      for (;;) {
+        const job = getJob(jobId)
+        if (!job) return { status: 'failed', error: 'Job tidak ditemukan.' }
+        if (job.status === 'done') return { status: 'done', error: null }
+        if (job.status === 'failed') return { status: 'failed', error: job.error }
+        if (job.status === 'canceled') return { status: 'canceled', error: null }
+        await sleep(SEQUENTIAL_JOB_POLL_MS)
+      }
+    },
+    delay: (ms, onTick) => cancellableDelay(ms, () => run.canceled, onTick, (m) => sleep(m)),
+    random: () => Math.random(),
+    emit: (p) => {
+      run.last = p
+      emit.sequential(p)
+    },
+    isCanceled: () => run.canceled
+  }).catch((e) => {
+    // The engine only throws on a bug in the wiring itself; never leave the run hanging.
+    const message = `Generate berurutan berhenti karena galat internal: ${(e as Error)?.message ?? String(e)}`
+    run.last = { ...run.last, status: 'stopped', message }
+    emit.sequential(run.last)
+    console.error('[sequential]', e)
+  })
+  return run.last
+}
+
+/** Stops after the scene that is currently generating (or during the pause); the running job itself is left alone. */
+export function cancelSequentialImages(projectId: string): SequentialProgress | null {
+  const run = sequentialRuns.get(projectId)
+  if (!run) return null
+  run.canceled = true
+  return run.last
+}
+
+export function sequentialStatus(projectId: string): SequentialProgress | null {
+  return sequentialRuns.get(projectId)?.last ?? null
 }
 
 /** Turns every clip that has an image but no AI video yet into a video. */

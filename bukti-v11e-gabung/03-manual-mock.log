@@ -1,0 +1,42 @@
+PASS formatSceneKey 1
+PASS formatSceneKey 12
+PASS formatSceneKey 100
+PASS sceneKeyOf 0
+PASS nextSceneKey empty
+PASS nextSceneKey max+1
+PASS nextSceneKey ignores junk
+PASS match 03.png
+PASS match 03-v2.mp4
+PASS match scene-03.png
+PASS match clip-12.mp4
+PASS match 3.png pads
+PASS match 03.PNG case
+PASS no match name-first
+PASS no match txt
+PASS no match no ext
+PASS no match digits later
+PASS splitAvoid scene
+PASS splitAvoid avoid
+PASS clipPrompt has scene
+PASS clipPrompt has avoid as instruction
+PASS clipPrompt has aspect
+PASS videoPrompt default derives from scene
+PASS videoPrompt default has motion
+PASS videoPrompt custom kept
+PASS videoPrompt reference prefix
+PASS rows count
+PASS row1 sceneKey
+PASS row1 kind image
+PASS row2 kind video
+PASS row2 videoPrompt custom
+PASS row1 prompt is clipPrompt
+PASS manifest version
+PASS manifest clips
+PASS manifest projectId
+PASS text numbers scenes
+PASS image text has no Video: lines
+PASS video text has one Video: per scene, no Gambar:
+PASS video text numbers scenes
+PASS text image prompt shared with auto path
+
+manual service test: 40 passed, 0 failed

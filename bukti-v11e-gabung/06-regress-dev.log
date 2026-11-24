@@ -1,0 +1,47 @@
+
+> kenstory@1.0.0 dev
+> electron-vite dev
+
+vite v7.3.6 building ssr environment for development...
+transforming...
+✓ 59 modules transformed.
+rendering chunks...
+out/main/index.js  434.75 kB
+✓ built in 1.89s
+
+electron main process built successfully
+
+-----
+
+vite v7.3.6 building ssr environment for development...
+transforming...
+✓ 2 modules transformed.
+rendering chunks...
+out/preload/index.js  4.98 kB
+✓ built in 58ms
+
+electron preload scripts built successfully
+
+-----
+
+dev server running for the electron renderer process at:
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: use --host to expose
+
+starting electron app...
+
+[22946:1121/132932.664557:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Failed to connect to socket /run/dbus/system_bus_socket: No such file or directory
+[22946:1121/132932.737103:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are "tcp" and on UNIX "unix")
+[22946:1121/132934.750621:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Failed to connect to socket /run/dbus/system_bus_socket: No such file or directory
+[22946:1121/132934.750774:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Failed to connect to socket /run/dbus/system_bus_socket: No such file or directory
+[22946:1121/132935.177405:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are "tcp" and on UNIX "unix")
+[22946:1121/132935.313304:ERROR:dbus/object_proxy.cc:572] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: 
+[22946:1121/132935.313491:ERROR:dbus/bus.cc:406] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are "tcp" and on UNIX "unix")
+[22946:1121/132935.356000:ERROR:dbus/object_proxy.cc:572] Failed to call method: org.freedesktop.DBus.NameHasOwner: object_path= /org/freedesktop/DBus: unknown error type: 
+[job export] Error: Klip 01 (“Senja di Majapahit”) belum punya gambar.
+    at renderSegment (/home/hatch/workspace/fase0-0.2a/bang-story-03-v11e-gabung/out/main/index.js:4170:11)
+    at worker (/home/hatch/workspace/fase0-0.2a/bang-story-03-v11e-gabung/out/main/index.js:4212:26)
+    at renderProject (/home/hatch/workspace/fase0-0.2a/bang-story-03-v11e-gabung/out/main/index.js:4217:24)
+    at /home/hatch/workspace/fase0-0.2a/bang-story-03-v11e-gabung/out/main/index.js:4365:23
+    at /home/hatch/workspace/fase0-0.2a/bang-story-03-v11e-gabung/out/main/index.js:2872:28

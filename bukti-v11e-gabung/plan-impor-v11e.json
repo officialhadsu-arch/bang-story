@@ -1,0 +1,148 @@
+[
+  {
+    "main": "seed",
+    "wait": 1500
+  },
+  {
+    "js": "(async () => { \n    const list = await window.api.projects.list();\n    const demo = list.find((p) => p.title.includes('Sumpah Palapa'));\n    window.__demoId = demo.id;\n    const b = await window.api.projects.get(demo.id);\n    console.log('IMPOR-SETUP id=' + demo.id + ' clips=' + b.clips.length + ' durationSec=' + b.project.durationSec + ' step=' + b.project.step);\n   })()",
+    "wait": 800
+  },
+  {
+    "js": "(async () => { \n    const res = await window.api.story.importScript(window.__demoId, \"## 1. Pagi di Pasar\\nAlur: Sari membuka lapaknya saat matahari terbit.\\nNarasi: Pagi itu Sari membuka lapaknya saat matahari baru terbit di pasar.\\n## 2. Pelanggan Pertama\\nAlur: Seorang pembeli datang dan menawar dagangan Sari.\\nNarasi: Pelanggan pertama datang dan menawar dagangan Sari dengan ramah.\\n## 3. Pulang\\nAlur: Sari pulang membawa uang dan senyum.\\nNarasi: Sore harinya Sari pulang membawa uang dan senyum lebar.\");\n    const b = await window.api.projects.get(window.__demoId);\n    const est = (n) => Math.round(Math.min(15, Math.max(3, n / 2.6 + 0.6)) * 1000);\n    const words = (s) => s.trim().split(/\\s+/).filter(Boolean).length;\n    const expMs = b.clips.reduce((t, c) => t + est(words(c.narration)), 0);\n    const ok = res.imported === 3 && res.skipped.length === 0 && b.clips.length === 3\n      && b.clips[0].title === 'Pagi di Pasar' && b.clips[1].title === 'Pelanggan Pertama' && b.clips[2].title === 'Pulang'\n      && b.clips[0].story.includes('membuka lapaknya') && b.clips[0].narration.includes('Pagi itu Sari')\n      && b.project.durationSec === Math.max(10, Math.round(expMs / 1000));\n    console.log('IMPOR-A ' + (ok ? 'LULUS' : 'GAGAL') + ' imported=' + res.imported + ' skipped=' + JSON.stringify(res.skipped)\n      + ' durationSec=' + b.project.durationSec + ' expMs=' + expMs + ' titles=' + JSON.stringify(b.clips.map((c) => c.title)));\n   })()",
+    "wait": 800
+  },
+  {
+    "js": "(async () => { \n    const res = await window.api.story.importScript(window.__demoId, \"# Kisah Pasar Pagi\\n## 1. Awal\\nAlur: Pasar baru buka.\\nNarasi: Pasar baru saja buka dan para pedagang menata dagangannya.\\n## 2. Akhir\\nAlur: Pasar tutup.\\nNarasi: Saat senja pasar tutup dan semua orang pulang.\");\n    const b = await window.api.projects.get(window.__demoId);\n    const ok = res.title === 'Kisah Pasar Pagi' && b.project.title === 'Kisah Pasar Pagi' && b.clips.length === 2;\n    console.log('IMPOR-C ' + (ok ? 'LULUS' : 'GAGAL') + ' title=' + b.project.title + ' clips=' + b.clips.length);\n   })()",
+    "wait": 800
+  },
+  {
+    "js": "(async () => { \n    const before = await window.api.projects.get(window.__demoId);\n    let err = '';\n    try { await window.api.story.importScript(window.__demoId, 'Hanya teks biasa tanpa adegan.'); } catch (e) { err = e.message || String(e); }\n    const after = await window.api.projects.get(window.__demoId);\n    const ok = err.includes('tidak ada adegan') && after.clips.length === before.clips.length\n      && after.clips[0].title === before.clips[0].title && after.project.title === before.project.title;\n    console.log('IMPOR-D ' + (ok ? 'LULUS' : 'GAGAL') + ' err=' + err + ' clipsBefore=' + before.clips.length + ' clipsAfter=' + after.clips.length);\n   })()",
+    "wait": 800
+  },
+  {
+    "js": "(async () => { \n    const res = await window.api.story.importScript(window.__demoId, \"## 1. Satu\\nNarasi: Adegan pertama yang berisi narasi.\\n## 2. Kosong\\n## 3. Tiga\\nNarasi: Adegan ketiga yang berisi narasi.\");\n    const b = await window.api.projects.get(window.__demoId);\n    const ok = res.imported === 2 && JSON.stringify(res.skipped) === '[2]' && b.clips.length === 2\n      && b.clips[0].title === 'Satu' && b.clips[1].title === 'Tiga';\n    console.log('IMPOR-E ' + (ok ? 'LULUS' : 'GAGAL') + ' imported=' + res.imported + ' skipped=' + JSON.stringify(res.skipped)\n      + ' titles=' + JSON.stringify(b.clips.map((c) => c.title)));\n   })()",
+    "wait": 800
+  },
+  {
+    "main": "importScriptFile",
+    "projectTitle": "Kisah Pasar Pagi",
+    "file": "/home/hatch/workspace/fase0-0.2a/bang-story-03-v11e-gabung/bukti-v11e-gabung/contoh-impor.txt",
+    "wait": 800
+  },
+  {
+    "js": "(async () => { \n    const b = await window.api.projects.get(window.__demoId);\n    const ok = b.project.title === 'Judul Dari Berkas' && b.clips.length === 2 && b.clips[0].title === 'Dari Berkas Satu';\n    console.log('IMPOR-B ' + (ok ? 'LULUS' : 'GAGAL') + ' title=' + b.project.title + ' titles=' + JSON.stringify(b.clips.map((c) => c.title)));\n   })()",
+    "wait": 800
+  },
+  {
+    "js": "location.reload()",
+    "wait": 3000
+  },
+  {
+    "js": "(async () => { \n    const list = await window.api.projects.list();\n    const demo = list.find((p) => p.title.includes('Judul Dari Berkas'));\n    window.__demoId = demo.id;\n    window.__teksF = \"## 1. Dari Dialog Satu\\nAlur: Adegan pertama dari dialog impor.\\nNarasi: Ini adegan pertama yang diimpor lewat dialog.\\n## 2. Dari Dialog Dua\\nAlur: Adegan kedua dari dialog impor.\\nNarasi: Ini adegan kedua yang diimpor lewat dialog.\";\n    console.log('IMPOR-UI-SETUP id=' + demo.id);\n   })()",
+    "wait": 800
+  },
+  {
+    "js": "(async () => { \n    const btn = [...document.querySelectorAll('button')].find((e) => e.textContent.includes('Judul Dari Berkas'));\n    if (!btn) { console.log('IMPOR-UI GAGAL: kartu proyek tidak ditemukan'); } else { btn.click(); console.log('IMPOR-UI kartu diklik'); }\n   })()",
+    "wait": 800
+  },
+  {
+    "wait": 2500
+  },
+  {
+    "js": "(async () => { \n    // Round-trip through another step, so the Naskah nav button itself is exercised\n    // (the project opens at step 2 already, because replaceScript sets step=2).\n    const nav = [...document.querySelectorAll('nav[aria-label=\"Langkah pembuatan\"] button')];\n    const go = (t) => nav.find((e) => e.textContent.includes(t));\n    const sb = go('Storyboard');\n    if (!sb) { console.log('IMPOR-UI GAGAL: tombol Storyboard tidak ditemukan'); } else { sb.click(); console.log('IMPOR-UI ke Storyboard'); }\n   })()",
+    "wait": 800
+  },
+  {
+    "wait": 1500
+  },
+  {
+    "js": "(async () => { \n    const nav = [...document.querySelectorAll('nav[aria-label=\"Langkah pembuatan\"] button')];\n    const nk = nav.find((e) => e.textContent.includes('Naskah'));\n    if (!nk) { console.log('IMPOR-UI GAGAL: tombol Naskah tidak ditemukan'); } else { nk.click(); console.log('IMPOR-UI ke langkah Naskah'); }\n   })()",
+    "wait": 800
+  },
+  {
+    "wait": 2000
+  },
+  {
+    "js": "(async () => { \n    const cards = [...document.querySelectorAll('article[id^=\"scene-\"]')];\n    const titles = cards.map((a) => a.querySelector('input')?.value);\n    const target = document.body.innerText.includes('Target');\n    console.log('IMPOR-UI-A ' + (cards.length === 2 && titles[0] === 'Dari Berkas Satu' ? 'LULUS' : 'GAGAL')\n      + ' cards=' + cards.length + ' titles=' + JSON.stringify(titles) + ' targetTerlihat=' + target);\n   })()",
+    "wait": 800
+  },
+  {
+    "shot": "/home/hatch/workspace/fase0-0.2a/bang-story-03-v11e-gabung/bukti-v11e-gabung/langkah-naskah.png",
+    "wait": 500
+  },
+  {
+    "js": "(async () => { \n    const btn = [...document.querySelectorAll('button')].find((e) => e.textContent.includes('Impor naskah'));\n    if (!btn) { console.log('IMPOR-F GAGAL: tombol Impor naskah tidak ditemukan'); } else { btn.click(); console.log('IMPOR-F dialog dibuka'); }\n   })()",
+    "wait": 800
+  },
+  {
+    "wait": 1200
+  },
+  {
+    "js": "(async () => { \n    const el = document.getElementById('import-script-text');\n    if (!el) { console.log('IMPOR-F GAGAL: textarea dialog tidak ada'); } else {\n      const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set;\n      setter.call(el, window.__teksF);\n      el.dispatchEvent(new Event('input', { bubbles: true }));\n      console.log('IMPOR-F teks ditempel');\n    }\n   })()",
+    "wait": 800
+  },
+  {
+    "wait": 1200
+  },
+  {
+    "js": "(async () => { \n    const dlg = [...document.querySelectorAll('[role=\"dialog\"]')].pop();\n    const ok = !!dlg && dlg.innerText.includes('2 adegan') && dlg.innerText.includes('Dari Dialog Satu');\n    console.log('IMPOR-F-PRATINJAU ' + (ok ? 'LULUS' : 'GAGAL') + ' pratinjau=' + (dlg ? JSON.stringify(dlg.innerText.slice(0, 200)) : 'tidak ada dialog'));\n   })()",
+    "wait": 800
+  },
+  {
+    "shot": "/home/hatch/workspace/fase0-0.2a/bang-story-03-v11e-gabung/bukti-v11e-gabung/dialog-pratinjau.png",
+    "wait": 500
+  },
+  {
+    "js": "(async () => { \n    const dlg = [...document.querySelectorAll('[role=\"dialog\"]')].pop();\n    const btn = dlg && [...dlg.querySelectorAll('button')].find((e) => e.textContent.trim() === 'Ganti naskah');\n    if (!btn) { console.log('IMPOR-F GAGAL: tombol Ganti naskah tidak ditemukan'); } else { btn.click(); console.log('IMPOR-F klik Ganti naskah'); }\n   })()",
+    "wait": 800
+  },
+  {
+    "wait": 1200
+  },
+  {
+    "js": "(async () => { \n    const dlg = [...document.querySelectorAll('[role=\"dialog\"]')].pop();\n    const ok = !!dlg && dlg.innerText.includes('Ganti naskah yang ada?');\n    console.log('IMPOR-F-KONFIRMASI ' + (ok ? 'LULUS' : 'GAGAL') + ' teks=' + (dlg ? JSON.stringify(dlg.innerText.slice(0, 160)) : 'tidak ada dialog'));\n   })()",
+    "wait": 800
+  },
+  {
+    "shot": "/home/hatch/workspace/fase0-0.2a/bang-story-03-v11e-gabung/bukti-v11e-gabung/dialog-konfirmasi.png",
+    "wait": 500
+  },
+  {
+    "js": "(async () => { \n    const dlg = [...document.querySelectorAll('[role=\"dialog\"]')].pop();\n    const btn = dlg && [...dlg.querySelectorAll('button')].find((e) => e.textContent.trim() === 'Batal');\n    if (!btn) { console.log('IMPOR-F GAGAL: tombol Batal konfirmasi tidak ditemukan'); } else { btn.click(); console.log('IMPOR-F klik Batal'); }\n   })()",
+    "wait": 800
+  },
+  {
+    "wait": 1200
+  },
+  {
+    "js": "(async () => { \n    const b = await window.api.projects.get(window.__demoId);\n    const ok = b.clips.length === 2 && b.clips[0].title === 'Dari Berkas Satu';\n    console.log('IMPOR-F-BATAL ' + (ok ? 'LULUS' : 'GAGAL') + ' clips=' + b.clips.length + ' first=' + (b.clips[0] && b.clips[0].title));\n   })()",
+    "wait": 800
+  },
+  {
+    "js": "(async () => { \n    const dlg = [...document.querySelectorAll('[role=\"dialog\"]')].pop();\n    const btn = dlg && [...dlg.querySelectorAll('button')].find((e) => e.textContent.trim() === 'Ganti naskah');\n    if (!btn) { console.log('IMPOR-F2 GAGAL: tombol Ganti naskah tidak ditemukan'); } else { btn.click(); console.log('IMPOR-F2 klik Ganti naskah'); }\n   })()",
+    "wait": 800
+  },
+  {
+    "wait": 1200
+  },
+  {
+    "js": "(async () => { \n    const dlg = [...document.querySelectorAll('[role=\"dialog\"]')].pop();\n    const btn = dlg && [...dlg.querySelectorAll('button')].find((e) => e.textContent.trim() === 'Ganti naskah');\n    if (!btn) { console.log('IMPOR-F2 GAGAL: tombol konfirmasi Ganti naskah tidak ditemukan'); } else { btn.click(); console.log('IMPOR-F2 konfirmasi Ganti'); }\n   })()",
+    "wait": 800
+  },
+  {
+    "wait": 2500
+  },
+  {
+    "js": "(async () => { \n    const b = await window.api.projects.get(window.__demoId);\n    const cards = [...document.querySelectorAll('article[id^=\"scene-\"]')];\n    const titles = cards.map((a) => a.querySelector('input')?.value);\n    const ok = b.clips.length === 2 && b.clips[0].title === 'Dari Dialog Satu' && titles[0] === 'Dari Dialog Satu';\n    console.log('IMPOR-F2 ' + (ok ? 'LULUS' : 'GAGAL') + ' clips=' + b.clips.length + ' titles=' + JSON.stringify(titles) + ' durationSec=' + b.project.durationSec);\n   })()",
+    "wait": 800
+  },
+  {
+    "shot": "/home/hatch/workspace/fase0-0.2a/bang-story-03-v11e-gabung/bukti-v11e-gabung/langkah-naskah-setelah-impor.png",
+    "wait": 500
+  },
+  {
+    "js": "(() => { console.log('IMPOR-SELESAI'); })()",
+    "wait": 500,
+    "quit": true
+  }
+]

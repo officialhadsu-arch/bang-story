@@ -1,0 +1,40 @@
+== 08-audit-grep (gabung v1.1e, HEAD bc5bdba) ==
+-- story handlers di main/ipc.ts --
+141:  handle('story:continueScript', (projectId: string) => continueScript(projectId))
+142:  handle('story:cancelScript', (projectId: string) => cancelScriptGeneration(projectId))
+143:  handle('story:importScript', (projectId: string, text: string) => importScript(projectId, text))
+386:  handle('assets:pickSheet', async (projectId: string, characterId: string) => {
+-- story handlers di shared/api.ts --
+47:    continueScript(projectId: string): Promise<ProjectBundle>
+49:    cancelScript(projectId: string): Promise<void>
+53:    importScript(projectId: string, text: string): Promise<ScriptImportSummary & { bundle: ProjectBundle }>
+160:    pickSheet(projectId: string, characterId: string): Promise<Asset | null>
+-- story handlers di preload/index.ts --
+28:    continueScript: call('story:continueScript'),
+29:    cancelScript: call('story:cancelScript'),
+31:    importScript: call('story:importScript'),
+92:    pickSheet: call('assets:pickSheet')
+-- sequential handlers ipc/api/preload --
+166:  handle('generate:sequentialImages', (projectId: string) => startSequentialImages(projectId))
+167:  handle('generate:cancelSequential', (projectId: string) => cancelSequentialImages(projectId))
+168:  handle('generate:sequentialStatus', (projectId: string) => sequentialStatus(projectId))
+src/shared/api.ts:70:     * file). The run itself is in-memory; cancel with cancelSequential.
+src/shared/api.ts:72:    sequentialImages(projectId: string): Promise<SequentialProgress>
+src/shared/api.ts:74:    cancelSequential(projectId: string): Promise<SequentialProgress | null>
+src/shared/api.ts:76:    sequentialStatus(projectId: string): Promise<SequentialProgress | null>
+src/preload/index.ts:41:    sequentialImages: call('generate:sequentialImages'),
+src/preload/index.ts:42:    cancelSequential: call('generate:cancelSequential'),
+src/preload/index.ts:43:    sequentialStatus: call('generate:sequentialStatus'),
+-- story.ts fungsi --
+37:export function cancelScriptGeneration(projectId: string): void {
+90:export async function generateScript(projectId: string): Promise<ProjectBundle> {
+102:export async function continueScript(projectId: string): Promise<ProjectBundle> {
+221:export async function importScript(projectId: string, text: string): Promise<ScriptImportSummary & { bundle: ProjectBundle }> {
+-- story.ts per-bagian --
+2:import { LANGUAGES, SCRIPT_CHUNK_SIZE, clipCountFor, scriptChunkRanges } from '@shared/models'
+120: * Writes scenes `startScene..total` in chunks of SCRIPT_CHUNK_SIZE, saving each chunk as soon as it
+126:  const chunks = scriptChunkRanges(total - startScene + 1).length
+132:    const to = Math.min(total, from + SCRIPT_CHUNK_SIZE - 1)
+-- repo.ts --
+548:export function setProjectDurationSec(projectId: string, durationSec: number): void {
+575:export function appendScenes(projectId: string, scenes: ScriptScene[]): void {

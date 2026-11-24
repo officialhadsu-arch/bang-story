@@ -10,6 +10,7 @@ import {
   FolderSearch,
   Image as ImageIcon,
   ImagePlus,
+  ListOrdered,
   MoreHorizontal,
   Move,
   Pause,
@@ -28,7 +29,7 @@ import { idrLabel, isNexaModelId, nexaPriceIdr } from '@shared/nexabot'
 import { CAMERA_PRESETS, MOTION_STRENGTHS, cameraAt, cameraCss } from '@shared/motion'
 import { needsVisual } from '@shared/script'
 import { geminiVoiceName, geminiVoiceTone } from '@shared/models'
-import type { Asset, Clip } from '@shared/types'
+import type { Asset, Clip, SequentialProgress } from '@shared/types'
 import { AutoTextarea } from '../../components/AutoTextarea'
 import { CharacterAvatar } from '../../components/CharacterAvatar'
 import { ClipVisual } from '../../components/ClipVisual'
@@ -297,7 +298,7 @@ function ClipPanel({ clip, index, total, motionEnabled }: { clip: Clip; index: n
           />
           <p className="text-xs leading-relaxed text-muted">
             {clip.visualProvider === 'manual'
-              ? 'Manual: tombol Generate membuat job yang menunggu. Salin Semua Prompt, generate di mana pun, lalu Pindai Folder Kerja.'
+              ? 'Manual: tombol Generate membuat job yang menunggu. Salin Prompt Teks to Image untuk gambar, Salin Prompt Image to Video untuk video, generate di mana pun, lalu Pindai Folder Kerja.'
               : clip.visualProvider === 'extension'
                 ? 'Ekstensi: prompt yang sama, tapi generate lewat Google Flow di browser (ekstensi/agen). Hasilnya jatuh ke folder kerja, lalu Pindai.'
                 : clip.visualProvider === 'auto'
@@ -534,6 +535,33 @@ export function StoryboardStep() {
   const [motionEnabled, setMotionEnabled] = useState(false)
   const [view, setView] = useState<'storyboard' | 'rancangan'>('storyboard')
   const lastNarration = useRef<string | null>(null)
+  /** Live state of a "Generate berurutan" run for this project, if any. */
+  const [seq, setSeq] = useState<SequentialProgress | null>(null)
+  const seqActive = !!seq && (seq.status === 'running' || seq.status === 'waiting')
+  const lastSeqToast = useRef<string | null>(null)
+
+  // A sequential run survives navigation between steps, so the strip is restored
+  // from main and live events keep it current while this step is open.
+  useEffect(() => {
+    if (!project) return
+    void window.api.generate.sequentialStatus(project.id).then((p) => {
+      if (p) setSeq(p)
+    })
+    return window.api.on.sequential((p) => {
+      if (p.projectId === project.id) setSeq(p)
+    })
+  }, [project?.id])
+
+  // The end of a run is toasted once (the status restore above must not re-toast an old run).
+  useEffect(() => {
+    if (!seq || seqActive) return
+    const key = `${seq.projectId}:${seq.status}:${seq.done}:${seq.failed}`
+    if (lastSeqToast.current === key) return
+    lastSeqToast.current = key
+    if (seq.status === 'done') toast(seq.failed > 0 ? 'error' : 'success', seq.message ?? 'Selesai.')
+    else if (seq.status === 'stopped') toast('error', seq.message ?? 'Berhenti.')
+    else toast('success', seq.message ?? 'Dibatalkan.')
+  }, [seq, seqActive])
 
   useEffect(() => {
     void window.api.settings.get().then((s) => setMotionEnabled(s.motionEnabled))
@@ -692,8 +720,11 @@ export function StoryboardStep() {
     if (ok) await bulk(() => window.api.generate.missingVideos(project!.id))
   }
 
-  // A NexaBot image batch charges per generate, so it gets the same cost confirmation as videos (D3-05b).
-  const makeImages = async (): Promise<void> => {
+  // A paid image batch (NexaBot / kie.ai) charges per generate, so it gets a cost
+  // confirmation before it starts (D3-05b, K4-05b). Shared by the parallel batch
+  // ("Generate N gambar") and the sequential run — the gate must never depend
+  // on which button starts the batch.
+  const confirmImageCost = async (): Promise<boolean> => {
     const n = stats.needImg
     if (nexaImg && n > 0) {
       // The catalog price is the fallback when the estimate has not arrived (yet) — the gate never depends on the estimate alone.
@@ -707,9 +738,8 @@ export function StoryboardStep() {
           'Biaya dipotong dari kredit NexaBot kamu saat setiap gambar dibuat; membatalkan di tengah jalan tidak mengembalikan kredit gambar yang sudah jadi.',
         confirm: `Generate ${n} gambar`
       })
-      if (!ok) return
+      if (!ok) return false
     }
-    // A kie.ai image batch charges per generate in USD, so it gets the same cost confirmation (K4-05b).
     if (kieImg && n > 0) {
       // The catalog price is the fallback when the estimate has not arrived (yet) — the gate never depends on the estimate alone.
       const perIdr = credits != null ? Math.round(credits * KIE_CREDIT_IDR) : kieImgPrice
@@ -723,9 +753,36 @@ export function StoryboardStep() {
           'kie.ai menagih dalam USD (kurs katalog Rp18.200). Biaya dipotong dari kredit kie.ai kamu saat setiap gambar dibuat; membatalkan di tengah jalan tidak mengembalikan kredit gambar yang sudah jadi.',
         confirm: `Generate ${n} gambar`
       })
-      if (!ok) return
+      if (!ok) return false
     }
+    return true
+  }
+
+  const makeImages = async (): Promise<void> => {
+    if (!(await confirmImageCost())) return
     await bulk(() => window.api.generate.missingImages(project!.id))
+  }
+
+  // Sequential mode (0.3): one scene at a time in storyboard order, with a random
+  // 0-20 s pause between scenes. The pause is a human-like rhythm, not a promise
+  // that Google will not flag the account — the guide says so in plain words.
+  const makeSequentialImages = async (): Promise<void> => {
+    if (!(await confirmImageCost())) return
+    try {
+      await flush()
+      setSeq(await window.api.generate.sequentialImages(project!.id))
+    } catch (e) {
+      toast('error', errorText(e))
+    }
+  }
+
+  const cancelSequential = async (): Promise<void> => {
+    try {
+      const p = await window.api.generate.cancelSequential(project!.id)
+      if (p) setSeq(p)
+    } catch (e) {
+      toast('error', errorText(e))
+    }
   }
 
   // Scenes added or rewritten in the script since the last visual plan.
@@ -751,7 +808,23 @@ export function StoryboardStep() {
       await window.api.app.copyText(r.text)
       setWorkFolder(r.workFolder)
       setFolderHint(false)
-      toast('success', `${r.fileCount} prompt adegan disalin. Hasil generate nanti masuk ke folder kerja.`)
+      toast('success', `${r.fileCount} prompt gambar adegan disalin. Hasil generate nanti masuk ke folder kerja.`)
+    } catch (e) {
+      toast('error', errorText(e))
+    }
+  }
+
+  // The video twin of copyAllPrompts: one `Video:` per scene, for pasting scene by
+  // scene into an image-to-video tool (e.g. KenFlow). The two lists stay separate —
+  // each job needs one list only.
+  const copyVideoPrompts = async (): Promise<void> => {
+    try {
+      await flush()
+      const r = await window.api.manual.prepareVideoWorkFolder(project.id)
+      await window.api.app.copyText(r.text)
+      setWorkFolder(r.workFolder)
+      setFolderHint(false)
+      toast('success', `${r.fileCount} prompt video adegan disalin. Tempel ke mode image-to-video, lalu simpan hasilnya ke folder kerja.`)
     } catch (e) {
       toast('error', errorText(e))
     }
@@ -828,8 +901,8 @@ export function StoryboardStep() {
     )
 
   return (
-    <div className="grid h-full grid-rows-[64px_minmax(0,1fr)_80px]">
-      <div className="flex items-center gap-2 border-b border-line bg-paper px-6">
+    <div className="flex h-full flex-col">
+      <div className="flex h-16 shrink-0 items-center gap-2 border-b border-line bg-paper px-6">
         <span className="mr-1 text-[13px] font-semibold text-ink-2">Pemeran</span>
         <div className="scroll-thin flex min-w-0 gap-2 overflow-x-auto py-1">
           {characters.map((c) => {
@@ -872,6 +945,15 @@ export function StoryboardStep() {
               : narration.stale
                 ? `Perbarui suara narasi (${narration.stale})`
                 : 'Rekam ulang suara narasi'}
+        </Button>
+        <Button
+          icon={<ListOrdered className="size-[17px]" />}
+          loading={seqActive}
+          disabled={!stats.needImg || seqActive}
+          title="Satu adegan demi satu adegan, dengan jeda acak 0–20 detik antar-adegan — ritme yang lebih mirip manusia untuk Google Flow. Jeda ini bukan jaminan akun tidak dibatasi."
+          onClick={() => void makeSequentialImages()}
+        >
+          {seqActive ? `Adegan ${seq!.current} dari ${seq!.total}` : 'Generate berurutan'}
         </Button>
         <Button
           className="border-[1.5px] border-ink font-semibold"
@@ -919,7 +1001,35 @@ export function StoryboardStep() {
         )}
       </div>
 
-      <div className={cx('grid min-h-0', view === 'rancangan' && hasMotion ? 'grid-cols-[minmax(0,1fr)]' : 'grid-cols-[minmax(0,1fr)_540px]')}>
+      {seq && (
+        <div className="flex shrink-0 items-center gap-3 border-b border-line bg-sand px-6 py-2.5 text-[13px]">
+          <ListOrdered className="size-4 shrink-0 text-ink-2" />
+          <span className="min-w-0 flex-1 truncate font-medium">
+            {seq.status === 'waiting' && seq.waitSecondsLeft != null
+              ? `Adegan ${seq.current} dari ${seq.total} selesai — adegan berikut dalam ${seq.waitSecondsLeft} detik`
+              : seq.status === 'running'
+                ? seq.current === 0
+                  ? 'Memulai generate berurutan…'
+                  : `Membuat gambar adegan ${seq.current} dari ${seq.total}${seq.attempt > 1 ? ` (percobaan ke-${seq.attempt})` : ''}`
+                : (seq.message ?? 'Selesai.')}
+          </span>
+          <span className="shrink-0 text-ink-2">
+            {seq.done} berhasil · {seq.failed} gagal{seq.skipped > 0 ? ` · ${seq.skipped} manual dilewati` : ''}
+          </span>
+          <Progress value={seq.total ? (seq.done + seq.failed) / seq.total : 0} className="w-32 shrink-0" />
+          {seqActive ? (
+            <Button size="sm" onClick={() => void cancelSequential()}>
+              Batalkan
+            </Button>
+          ) : (
+            <Button size="sm" onClick={() => setSeq(null)}>
+              Tutup
+            </Button>
+          )}
+        </div>
+      )}
+
+      <div className={cx('grid min-h-0 flex-1', view === 'rancangan' && hasMotion ? 'grid-cols-[minmax(0,1fr)]' : 'grid-cols-[minmax(0,1fr)_540px]')}>
         {view === 'rancangan' && hasMotion ? (
           <RancanganStep />
         ) : (
@@ -944,10 +1054,18 @@ export function StoryboardStep() {
             <Button
               size="sm"
               icon={<Copy className="size-4" />}
-              title="Tulis prompts.txt + manual.json ke folder kerja dan salin semua prompt bernomor adegan"
+              title="Tulis prompts.txt + manual.json ke folder kerja dan salin prompt gambar bernomor adegan (satu Gambar: per adegan)"
               onClick={() => void copyAllPrompts()}
             >
-              Salin Semua Prompt
+              Salin Prompt Teks to Image
+            </Button>
+            <Button
+              size="sm"
+              icon={<Copy className="size-4" />}
+              title="Tulis prompts-video.txt + manual.json ke folder kerja dan salin prompt video bernomor adegan (satu Video: per adegan) — untuk ditempel ke mode image-to-video"
+              onClick={() => void copyVideoPrompts()}
+            >
+              Salin Prompt Image to Video
             </Button>
             <Button size="sm" icon={<ImagePlus className="size-4" />} title="Pilih berkas gambar untuk adegan yang dipilih" onClick={() => void importImage()}>
               Impor Gambar
@@ -1095,7 +1213,7 @@ export function StoryboardStep() {
         {view !== 'rancangan' && sel && <ClipPanel key={sel.id} clip={sel} index={selIndex} total={clips.length} motionEnabled={motionEnabled} />}
       </div>
 
-      <footer className="flex items-center gap-4 border-t border-line bg-surface px-6">
+      <footer className="flex h-20 shrink-0 items-center gap-4 border-t border-line bg-surface px-6">
         <div className="flex w-[320px] flex-col gap-1.5">
           <div className="flex justify-between text-[13px]">
             <span className="font-semibold">

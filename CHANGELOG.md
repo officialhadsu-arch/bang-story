@@ -8,11 +8,64 @@ Cara menaikkan versi ada di [docs/pengembangan.md](docs/pengembangan.md#versi-da
 
 ## [Belum dirilis]
 
+- **Gabung 4 branch Tier 1 untuk paket uji v1.1e** — pacing berurutan + tombol Unggah lembar + naskah per bagian
+  (lanjutkan + durasi custom sampai 30 menit) + impor naskah bawa sendiri, digabung di branch `v1.1e-gabung`
+  (tanpa merge ke main). Semua bentrok diselesaikan dengan kedua sisi dipertahankan; tidak ada perubahan perilaku
+  di luar keempat fitur itu. Bukti verifikasi di `bukti-v11e-gabung/`.
+- **Generate berurutan (gambar, 0.3)** — tombol baru di header Storyboard, di antara "Rekam ulang suara narasi" dan
+  "Generate N gambar": gambar dibuat satu adegan demi satu adegan sesuai urutan storyboard, dengan jeda acak 0–20
+  detik antar-adegan (bukan sebelum adegan pertama), hitung mundur "Adegan berikut dalam X detik", dan tombol
+  Batalkan (berhenti sesudah job yang sedang jalan selesai). Tiap adegan dicoba maks 3× (1 + 2 retry); bila tetap
+  gagal, adegan ditandai gagal dan batch lanjut. Pengaman gerbang G3: gagal dengan 401 / 429 / UNUSUAL_ACTIVITY /
+  reCAPTCHA menghentikan seluruh batch segera tanpa retry. Adegan manual/extension dilewati (job-nya menunggu berkas
+  dan tidak pernah selesai). Antrean in-memory, tanpa migrasi DB dan tanpa setelan baru; mode batch lama tidak
+  berubah; konfirmasi biaya NexaBot/kie.ai dipakai kedua tombol. Jeda adalah ritme yang lebih mirip manusia mengikuti
+  pola KenFlow v3.6.6 — bukan jaminan lolos dari kontrol risiko Google. Mesin di `src/main/sequential.ts` (murni,
+  bisa diuji) + wiring di `generation.ts` + IPC `generate:sequentialImages` / `cancelSequential` /
+  `sequentialStatus` + event `event:sequential`.
+- **Panduan Flow2API diperjelas** (dalam aplikasi, Pengaturan › Panduan Flow2API, dan `docs/layanan-ai.md`):
+  pemasangan ekstensi Token-Updater langkah-demi-langkah (ZIP → ekstrak → `chrome://extensions` → Developer mode →
+  Load unpacked; folder `extension/` di dalam server adalah ekstensi CAPTCHA, bukan Token-Updater), jebakan
+  placeholder abu-abu di popup addon (ketik ulang sampai hitam pekat), langkah sambung token (Random → Copy → Save
+  settings → Simpan → Allow → Tes sekarang; berhasil = Total 1, Active 1 + Credits), metode CAPTCHA bawaan YesCaptcha
+  itu berbayar dan kuncinya kosong (ganti ke Built-in browser atau Flow2API Team, lalu klik Save settings), cara isi
+  Kunci API server yang benar (klik Simpan sampai kolom jadi titik-titik; tulisan hijau "Terhubung" hanya mengecek
+  servernya jalan) dan arti dua pesan 401, jendela login Google yang bisa menutup sendiri (jalan pintas: login
+  flow.google.com di Chrome sendiri), `Failed to obtain reCAPTCHA token`, dan UNUSUAL_ACTIVITY (berhenti, jangan
+  Generate berulang, pakai jalur Manual / Generate berurutan). Urutan uji minimal: isi kunci → Uji Koneksi →
+  1 gambar + 1 video dulu, baru batch.
+- **Dua tombol salin prompt Manual (Storyboard)** — "Salin Semua Prompt" menjadi "Salin Prompt Teks to Image" (satu
+  `Gambar:` per adegan, `prompts.txt` + `manual.json`), dan tombol baru di sebelahnya "Salin Prompt Image to Video"
+  (satu `Video:` per adegan dari field `videoPrompt` yang sama, `prompts-video.txt` + `manual.json`). Kedua daftar
+  sengaja terpisah — tiap langkah kerja butuh satu daftar saja. `manual.json` tetap memuat kedua field; pemindai
+  mengabaikan `prompts-video.txt` seperti `prompts.txt`.
+- **Naskah per bagian + Lanjutkan naskah + durasi custom sampai 30 menit** — naskah kini ditulis
+  per bagian 30 adegan dan tiap bagian langsung disimpan, jadi video 20 menit (218 adegan, 8 panggilan)
+  atau 30 menit (327 adegan, 11 panggilan) tidak lagi mentok di batas keluaran model; bila berhenti di
+  tengah jalan (gagal, rate limit, atau dibatalkan), adegan yang sudah tersimpan tetap utuh dan tombol
+  "Lanjutkan naskah" di langkah Naskah melanjutkannya dari adegan terakhir yang tersimpan — adegan
+  terakhir yang narasinya terpotong (kosong, kurang dari 10 kata, atau tanpa tanda baca akhir) dibuang
+  dulu. Selama belum lengkap, langkah Naskah menampilkan "Tersimpan X dari Y adegan". Progres tampil
+  ("Menulis adegan 31–60 dari 218…") dengan tombol Batalkan. Durasi video bisa diisi bebas 15–1800
+  detik lewat kolom "Atau durasi lain" di langkah Ide; lima preset tetap sama (30 detik→5, 1 menit→11,
+  3 menit→33, 5 menit→55, 10 menit→109 adegan). Rumus adegan tidak berubah (1 adegan per ~5,5 detik).
+- **Impor naskah bawa sendiri** — tombol "Impor naskah" di langkah Naskah (header dan empty state): tempel teks
+  atau pilih berkas `.txt`/`.md`, pratinjau hasil parse (jumlah adegan, total ±menit, judul adegan), lalu ganti
+  seluruh naskah. Format: `# Judul Video` (opsional) + `## Judul Adegan` + `Alur:`/`Narasi:` per adegan; adegan
+  tanpa label dibaca sebagai narasi; adegan kosong dilewati dan dilaporkan nomornya; teks tanpa adegan valid
+  ditolak dan naskah lama utuh. Durasi proyek mengikuti total estimasi narasi impor (min. 10 detik), bukan preset.
+  Penulisan memakai `replaceScript` yang sama dengan naskah hasil generate. Mode tambah belum ada (v1 hanya ganti).
 - Rebrand aplikasi menjadi **KenStory** (fork dari bangtutorial/bang-story tetap berlisensi MIT, lihat NOTICE.md).
 - **Flow2API: kunci API server (Bearer)** — server Flow2API versi sekarang menuntut `Authorization: Bearer <kunci>` di
   tiap permintaan; tanpanya generate gagal HTTP 401 (terbukti di uji live PC, 20 Nov 2026). Kolom baru "Kunci API
   server" di Pengaturan › Google Flow, tersimpan terenkripsi; kosong berarti permintaan tanpa header seperti
   sebelumnya. Pesan galat 401 kini membedakan kunci belum diisi vs kunci tersimpan yang ditolak.
+- **Unggah lembar karakter (0.3+)** — modal Lembar karakter kini punya tombol "Unggah lembar" di sebelah
+  "Buat lembar karakter": gambar karakter yang sudah dimiliki (PNG/JPG/WebP) bisa dipakai sebagai lembar
+  referensi, tanpa harus digenerate dulu. Berkas diperiksa bisa dibaca dengan dimensi nyata sebelum disimpan;
+  lembar yang diunggah bekerja identik dengan lembar hasil generate untuk semua generate berikutnya.
+  Mengganti lembar meminta konfirmasi dulu; gambar adegan yang sudah jadi tidak berubah. Semua pesan galat
+  di jalur ini berbahasa Indonesia sederhana (apa yang terjadi + apa yang harus dilakukan).
 - **Motion (Fase 4, 0.4+)**: adegan motion sebagai provider visual tingkat 3 — agent coding (Claude/Kiro/
   Antigravity) menulis babak HTML+GSAP di `motion-work/`, pengguna menyetujui tiap beat di langkah Rancangan,
   aplikasi merender MP4 di jendela tersembunyi (D-22, diputus spike 4.0). Sakelar induk mati bawaan, preset

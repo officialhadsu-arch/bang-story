@@ -1,0 +1,176 @@
+[debug] [vite] connecting...
+[debug] [vite] connected.
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[info] LISTENER OK
+[info] JOB export queued p=0% msg= err=
+[info] JOB export running p=2% msg= err=
+[info] DEMO STARTED job=b28d2fa8-9a81-432e-aead-60a06784760e status=queued
+[info] JOB export running p=18% msg=Merender klip 1 dari 4 err=
+[info] JOB export running p=33% msg=Merender klip 2 dari 4 err=
+[info] JOB export running p=48% msg=Merender klip 3 dari 4 err=
+[info] JOB export running p=63% msg=Merender klip 4 dari 4 err=
+[info] JOB export running p=64% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=66% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=67% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=68% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=68% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=69% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=70% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=71% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=72% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=73% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=74% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=75% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=76% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=77% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=78% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=79% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=79% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=80% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=82% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=83% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=83% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=85% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=85% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=86% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=87% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=88% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=88% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=89% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=90% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=91% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=92% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=93% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=98% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export done p=100% msg=/home/hatch/workspace/fase0-0.2a/bang-story-03-v11e-gabung/bukti-v11e-gabung/regress/demo-reg/demo-720p.mp4 err=
+[info] DEMO LAST: {"kind":"export","status":"done","progress":1,"message":"/home/hatch/workspace/fase0-0.2a/bang-story-03-v11e-gabung/bukti-v11e-gabung/regress/demo-reg/demo-720p.mp4","error":null}
+[info] DEMO COUNT: 40 done=1 failed=0
+[info] DEMO LAST: {"kind":"export","status":"done","progress":1,"message":"/home/hatch/workspace/fase0-0.2a/bang-story-03-v11e-gabung/bukti-v11e-gabung/regress/demo-reg/demo-720p.mp4","error":null}
+[info] DEMO COUNT: 40 done=1 failed=0
+[info] JOB export queued p=0% msg= err=
+[info] JOB export running p=2% msg= err=
+[info] P30-30KLIP STARTED job=5a7428b1-a822-41a1-86c0-0d58229c0b9d status=queued
+[info] JOB export failed p=2% msg= err=Klip 01 (“Senja di Majapahit”) belum punya gambar.
+[info] P30-30KLIP LAST: {"kind":"export","status":"failed","progress":0.02,"message":null,"error":"Klip 01 (“Senja di Majapahit”) belum punya gambar."}
+[info] P30-30KLIP COUNT: 43 done=1 failed=1
+[info] P30-30KLIP LAST: {"kind":"export","status":"failed","progress":0.02,"message":null,"error":"Klip 01 (“Senja di Majapahit”) belum punya gambar."}
+[info] P30-30KLIP COUNT: 43 done=1 failed=1
+[info] JOB export queued p=0% msg= err=
+[info] JOB export running p=2% msg= err=
+[info] P30-4KLIP STARTED job=6765ee54-34f2-4394-954e-e2fe378c1fcb status=queued
+[info] JOB export running p=18% msg=Merender klip 1 dari 4 err=
+[info] JOB export running p=33% msg=Merender klip 2 dari 4 err=
+[info] JOB export running p=48% msg=Merender klip 3 dari 4 err=
+[info] JOB export running p=64% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=65% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=66% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=67% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=68% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=69% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=70% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=71% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=71% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=72% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=73% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=74% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=75% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=76% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=77% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=78% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=79% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=80% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=81% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=82% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=83% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=84% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=85% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=85% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=86% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=87% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=88% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=88% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=89% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=90% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=91% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=92% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=93% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=94% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=98% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export done p=100% msg=/home/hatch/workspace/fase0-0.2a/bang-story-03-v11e-gabung/bukti-v11e-gabung/regress/p30-4klip-reg/p30-4klip-720p.mp4 err=
+[info] P30-4KLIP LAST: {"kind":"export","status":"done","progress":1,"message":"/home/hatch/workspace/fase0-0.2a/bang-story-03-v11e-gabung/bukti-v11e-gabung/regress/p30-4klip-reg/p30-4klip-720p.mp4","error":null}
+[info] P30-4KLIP COUNT: 84 done=2 failed=1
+[info] P30-4KLIP LAST: {"kind":"export","status":"done","progress":1,"message":"/home/hatch/workspace/fase0-0.2a/bang-story-03-v11e-gabung/bukti-v11e-gabung/regress/p30-4klip-reg/p30-4klip-720p.mp4","error":null}
+[info] P30-4KLIP COUNT: 84 done=2 failed=1
+[info] JOB export queued p=0% msg= err=
+[info] JOB export running p=2% msg= err=
+[info] P30-SPLIT STARTED job=31404154-8a1a-47b6-abc6-68fef80683bf status=queued
+[info] JOB export running p=5% msg=Merender klip 1 dari 30 err=
+[info] JOB export running p=7% msg=Merender klip 2 dari 30 err=
+[info] JOB export running p=9% msg=Merender klip 3 dari 30 err=
+[info] JOB export running p=11% msg=Merender klip 4 dari 30 err=
+[info] JOB export running p=13% msg=Merender klip 5 dari 30 err=
+[info] JOB export running p=15% msg=Merender klip 6 dari 30 err=
+[info] JOB export running p=17% msg=Merender klip 7 dari 30 err=
+[info] JOB export running p=19% msg=Merender klip 8 dari 30 err=
+[info] JOB export running p=21% msg=Merender klip 9 dari 30 err=
+[info] JOB export running p=23% msg=Merender klip 10 dari 30 err=
+[info] JOB export running p=25% msg=Merender klip 11 dari 30 err=
+[info] JOB export running p=27% msg=Merender klip 12 dari 30 err=
+[info] JOB export running p=29% msg=Merender klip 13 dari 30 err=
+[info] JOB export running p=31% msg=Merender klip 14 dari 30 err=
+[info] JOB export running p=33% msg=Merender klip 15 dari 30 err=
+[info] JOB export running p=35% msg=Merender klip 16 dari 30 err=
+[info] JOB export running p=39% msg=Merender klip 18 dari 30 err=
+[info] JOB export running p=43% msg=Merender klip 20 dari 30 err=
+[info] JOB export running p=47% msg=Merender klip 22 dari 30 err=
+[info] JOB export running p=49% msg=Merender klip 23 dari 30 err=
+[info] JOB export running p=51% msg=Merender klip 24 dari 30 err=
+[info] JOB export running p=53% msg=Merender klip 25 dari 30 err=
+[info] JOB export running p=55% msg=Merender klip 26 dari 30 err=
+[info] JOB export running p=57% msg=Merender klip 27 dari 30 err=
+[info] JOB export running p=59% msg=Merender klip 28 dari 30 err=
+[info] JOB export running p=61% msg=Merender klip 29 dari 30 err=
+[info] JOB export running p=63% msg=Merender klip 30 dari 30 err=
+[info] JOB export running p=64% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=65% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=66% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=67% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=68% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=68% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=69% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=70% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=71% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=71% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=72% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=73% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=74% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=75% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=76% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=77% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=78% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=79% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=79% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=80% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=81% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=82% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=82% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=83% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=84% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=85% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=86% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=87% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=87% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=88% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=88% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=89% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=90% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=91% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=92% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=93% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export running p=98% msg=Menggabungkan klip, suara, dan caption err=
+[info] JOB export done p=100% msg=/home/hatch/workspace/fase0-0.2a/bang-story-03-v11e-gabung/bukti-v11e-gabung/regress/p30-split-reg/p30-split-720p.mp4 err=
+[info] P30-SPLIT LAST: {"kind":"export","status":"done","progress":1,"message":"/home/hatch/workspace/fase0-0.2a/bang-story-03-v11e-gabung/bukti-v11e-gabung/regress/p30-split-reg/p30-split-720p.mp4","error":null}
+[info] P30-SPLIT COUNT: 151 done=3 failed=1
+[info] P30-SPLIT LAST: {"kind":"export","status":"done","progress":1,"message":"/home/hatch/workspace/fase0-0.2a/bang-story-03-v11e-gabung/bukti-v11e-gabung/regress/p30-split-reg/p30-split-720p.mp4","error":null}
+[info] P30-SPLIT COUNT: 151 done=3 failed=1
+[info] REGRESS-SELESAI

@@ -25,6 +25,10 @@ const api: StudioApi = {
   },
   story: {
     script: call('story:script'),
+    continueScript: call('story:continueScript'),
+    cancelScript: call('story:cancelScript'),
+    pickScriptFile: call('story:pickScriptFile'),
+    importScript: call('story:importScript'),
     visuals: call('story:visuals'),
     musicPrompt: call('story:musicPrompt')
   },
@@ -34,6 +38,9 @@ const api: StudioApi = {
     clipTts: call('generate:clipTts'),
     characterSheet: call('generate:characterSheet'),
     missingImages: call('generate:missingImages'),
+    sequentialImages: call('generate:sequentialImages'),
+    cancelSequential: call('generate:cancelSequential'),
+    sequentialStatus: call('generate:sequentialStatus'),
     missingVideos: call('generate:missingVideos'),
     missingTts: call('generate:missingTts'),
     narration: call('generate:narration'),
@@ -43,6 +50,7 @@ const api: StudioApi = {
   },
   manual: {
     prepareWorkFolder: call('manual:prepareWorkFolder'),
+    prepareVideoWorkFolder: call('manual:prepareVideoWorkFolder'),
     scanWorkFolder: call('manual:scanWorkFolder'),
     importFile: call('manual:importFile'),
     openWorkFolder: call('manual:openWorkFolder')
@@ -80,7 +88,8 @@ const api: StudioApi = {
     pickMusic: call('assets:pickMusic'),
     pickImage: call('assets:pickImage'),
     pickClipImage: call('assets:pickClipImage'),
-    pickClipVideo: call('assets:pickClipVideo')
+    pickClipVideo: call('assets:pickClipVideo'),
+    pickSheet: call('assets:pickSheet')
   },
   settings: {
     get: call('settings:get'),
@@ -129,7 +138,9 @@ const api: StudioApi = {
     clip: listen(EVENTS.clip),
     character: listen(EVENTS.character),
     asset: listen(EVENTS.asset),
-    manual: listen(EVENTS.manual)
+    manual: listen(EVENTS.manual),
+    sequential: listen(EVENTS.sequential),
+    scriptProgress: listen(EVENTS.scriptProgress)
   }
 }
 

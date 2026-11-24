@@ -1,0 +1,19 @@
+[debug] [vite] connecting...
+[debug] [vite] connected.
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[info] FITUR-SHEET char=Gajah Mada sheet=images/1cd696d1-2b4c-447b-bbb4-657f0134c36f.png 320x180
+[debug] [vite] connecting...
+[debug] [vite] connected.
+[info] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[info] FITUR-OPEN klik proyek
+[info] FITUR-SB ke Storyboard
+[info] FITUR-PACING tombol=ADA disabled=true headerGenerate=["Rekam ulang suara narasi","Generate berurutan","Generate 0 gambar","Generate ulang"]
+[info] FITUR-MODAL chip diklik
+[info] FITUR-MODAL dialog=true unggahLembar=true imgRendered=320x180
+[info] FITUR-MODAL tutup
+[info] FITUR-IDE ke Ide
+[info] FITUR-DURASI input=ADA labelAtauDurasiLain=true isi90=true klikPakai=true
+[info] FITUR-DURASI-90 teks=["15–1800 detik (30 menit) · sekitar 16 klip.","Sekitar 16 klip, masing-masing kurang lebih 6 detik. Durasi akhir mengikuti panjang suara narasi.","Gambar klip","Kling 3.0 · Standard · Image to video3–15 dtk · mulai dari gambar klip","3–15 dtk · mulai dari gambar klip"]
+[info] FITUR-DURASI-1800 isi=true klik=true
+[info] FITUR-DURASI-1800 teks=["15–1800 detik (30 menit) · sekitar 327 klip.","Sekitar 327 klip, masing-masing kurang lebih 6 detik. Durasi akhir mengikuti panjang suara narasi.","Gambar klip","Kling 3.0 · Standard · Image to video3–15 dtk · mulai dari gambar klip","3–15 dtk · mulai dari gambar klip"]
+[info] FITUR-UI-SELESAI

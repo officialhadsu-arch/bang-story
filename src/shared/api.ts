@@ -2,6 +2,7 @@ import type { ManualScanResult, ManualWatchEvent, ManualWorkFolder, VisualProvid
 import type { BeatsJson, MotionBabakStatus, MotionWorkFolderResult, RenderBabakResult } from './motion-contract'
 import type { MotionTemplate } from './motion-templates'
 import type { ArrangeResult, SceneDef } from './talkinghead'
+import type { ScriptImportSummary } from './script-import'
 import type {
   ApiProvider,
   AspectRatio,
@@ -10,6 +11,7 @@ import type {
   CharacterPatchEvent,
   ClipPatchEvent,
   CreditEstimate,
+  SequentialProgress,
   WhisperStatus,
   WordTiming,
   ExportOptions,
@@ -23,6 +25,7 @@ import type {
   ProjectBundle,
   ProjectSnapshot,
   ProjectSummary,
+  ScriptProgressEvent,
   TtsProvider,
   VoiceOption
 } from './types'
@@ -40,6 +43,14 @@ export interface StudioApi {
   story: {
     /** Idea → scene-by-scene script (story and voice-over). */
     script(projectId: string): Promise<ProjectBundle>
+    /** Continues a script that stopped early, after dropping a doubtful last scene if there is one. */
+    continueScript(projectId: string): Promise<ProjectBundle>
+    /** Stops a running script write between chunks; scenes already saved stay saved. */
+    cancelScript(projectId: string): Promise<void>
+    /** Reads a .txt/.md script file the user picked; null when they cancel the dialog. */
+    pickScriptFile(): Promise<{ fileName: string; text: string } | null>
+    /** Replaces the whole script with the user's own text (same parser the dialog previewed). */
+    importScript(projectId: string, text: string): Promise<ScriptImportSummary & { bundle: ProjectBundle }>
     /** Script → one image plan per scene; "missing" skips scenes whose plan still matches their story. */
     visuals(projectId: string, mode: 'missing' | 'all'): Promise<ProjectBundle>
     /** A background-music prompt that fits the finished script, for use in Suno or another music AI. */
@@ -51,6 +62,18 @@ export interface StudioApi {
     clipTts(clipId: string): Promise<Job>
     characterSheet(characterId: string): Promise<Job>
     missingImages(projectId: string): Promise<Job[]>
+    /**
+     * Images one scene at a time, in storyboard order, with a random 0-20 s
+     * pause between scenes (never before the first). A scene gets 2 retries,
+     * then the run moves on; a 401 / 429 / UNUSUAL_ACTIVITY / reCAPTCHA error
+     * stops the whole run at once. Manual scenes are skipped (they wait for a
+     * file). The run itself is in-memory; cancel with cancelSequential.
+     */
+    sequentialImages(projectId: string): Promise<SequentialProgress>
+    /** Stops after the scene that is currently generating; the running job is left alone. */
+    cancelSequential(projectId: string): Promise<SequentialProgress | null>
+    /** Last known state of the project's sequential run, if any. */
+    sequentialStatus(projectId: string): Promise<SequentialProgress | null>
     /** An AI video for every clip that has an image but no video yet. */
     missingVideos(projectId: string): Promise<Job[]>
     missingTts(projectId: string): Promise<Job[]>
@@ -65,6 +88,8 @@ export interface StudioApi {
   manual: {
     /** Writes prompts.txt + manual.json into the project's work folder and returns the numbered prompt text. */
     prepareWorkFolder(projectId: string): Promise<ManualWorkFolder>
+    /** Writes prompts-video.txt (one `Video:` per scene) + manual.json, and returns the numbered video-prompt text. */
+    prepareVideoWorkFolder(projectId: string): Promise<ManualWorkFolder>
     /** Pairs result files in the work folder with their scenes; files with no scene come back as unmatched. */
     scanWorkFolder(projectId: string): Promise<ManualScanResult>
     /** Attaches one work-folder file to the scene the user picked. */
@@ -131,6 +156,8 @@ export interface StudioApi {
     pickClipImage(projectId: string, clipId: string): Promise<Asset | null>
     /** A local video file to use as this clip's video (also links it to the clip). */
     pickClipVideo(projectId: string, clipId: string): Promise<Asset | null>
+    /** A local image file to use as this character's reference sheet (also links it to the character). */
+    pickSheet(projectId: string, characterId: string): Promise<Asset | null>
   }
   settings: {
     get(): Promise<AppSettings>
@@ -187,6 +214,10 @@ export interface StudioApi {
     asset(cb: (asset: Asset) => void): () => void
     /** A file arrived or changed in a watched work folder (a hint to press Pindai). */
     manual(cb: (e: ManualWatchEvent) => void): () => void
+    /** Progress of a "Generate berurutan" run: scene n of total, pause countdown, end state. */
+    sequential(cb: (p: SequentialProgress) => void): () => void
+    /** Which scenes a chunked script write is working on right now. */
+    scriptProgress(cb: (e: ScriptProgressEvent) => void): () => void
   }
 }
 
@@ -196,5 +227,7 @@ export const EVENTS = {
   character: 'event:character',
   asset: 'event:asset',
   whisper: 'event:whisper',
-  manual: 'event:manual'
+  manual: 'event:manual',
+  sequential: 'event:sequential',
+  scriptProgress: 'event:script-progress'
 } as const
