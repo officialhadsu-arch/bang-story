@@ -89,7 +89,9 @@ const api: StudioApi = {
     pickImage: call('assets:pickImage'),
     pickClipImage: call('assets:pickClipImage'),
     pickClipVideo: call('assets:pickClipVideo'),
-    pickSheet: call('assets:pickSheet')
+    pickSheet: call('assets:pickSheet'),
+    previewBulkImport: call('assets:previewBulkImport'),
+    applyBulkImport: call('assets:applyBulkImport')
   },
   settings: {
     get: call('settings:get'),

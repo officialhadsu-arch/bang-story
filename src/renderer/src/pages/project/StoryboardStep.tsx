@@ -40,6 +40,8 @@ import { useNarration } from '../../lib/useNarration'
 import { useApp } from '../../store/app'
 import { isRunning, jobFor, useProject } from '../../store/project'
 import { CharacterModal } from './CharacterModal'
+import { BulkImportDialog } from './BulkImportDialog'
+import type { BulkImportPreview } from '@shared/bulk-import'
 import { RancanganStep } from './RancanganStep'
 
 function useAudio(): { play: (url: string) => void; stop: () => void; playing: string | null } {
@@ -112,7 +114,7 @@ function MotionPreview({ image, clip }: { image: Asset; clip: Clip }) {
 }
 
 function ClipPanel({ clip, index, total, motionEnabled }: { clip: Clip; index: number; total: number; motionEnabled: boolean }) {
-  const { project, clips, characters, assets, jobs, updateClip, updateProject, removeClip, moveClip, addClip, select, flush } = useProject()
+  const { project, clips, characters, assets, jobs, updateClip, updateProject, removeClip, moveClip, addClip, select, flush, addAsset } = useProject()
   const { toast } = useApp()
   const audio = useAudio()
   const [editPrompt, setEditPrompt] = useState(false)
@@ -267,6 +269,30 @@ function ClipPanel({ clip, index, total, motionEnabled }: { clip: Clip; index: n
           )}
           <Button size="sm" icon={<Pencil className="size-4" />} onClick={() => setEditPrompt(!editPrompt)}>
             {editPrompt ? 'Tutup prompt' : 'Edit prompt visual'}
+          </Button>
+          <Button
+            size="sm"
+            icon={<ImagePlus className="size-4" />}
+            onClick={() =>
+              void run(async () => {
+                const a = await window.api.assets.pickClipImage(project.id, clip.id)
+                if (a) addAsset(a)
+              })
+            }
+          >
+            Impor gambar
+          </Button>
+          <Button
+            size="sm"
+            icon={<Clapperboard className="size-4" />}
+            onClick={() =>
+              void run(async () => {
+                const a = await window.api.assets.pickClipVideo(project.id, clip.id)
+                if (a) addAsset(a)
+              })
+            }
+          >
+            Impor video
           </Button>
         </div>
 
@@ -851,22 +877,49 @@ export function StoryboardStep() {
     }
   }
 
-  const importImage = async (): Promise<void> => {
-    if (!sel) return
+  // Bulk import (tier 1, 0.3): the header buttons take a whole folder of generated results and
+  // install them in order onto the scenes that still need a picture or a video. One file per
+  // scene lives on the scene card and in the clip panel instead.
+  const [bulkPreview, setBulkPreview] = useState<BulkImportPreview | null>(null)
+  const [bulkKind, setBulkKind] = useState<'image' | 'video'>('image')
+
+  const bulkImport = async (kind: 'image' | 'video'): Promise<void> => {
     try {
       await flush()
-      const a = await window.api.assets.pickClipImage(project.id, sel.id)
-      if (a) addAsset(a)
+      const p = await window.api.assets.previewBulkImport(project.id, kind)
+      if (!p) return
+      setBulkKind(kind)
+      setBulkPreview(p)
     } catch (e) {
       toast('error', errorText(e))
     }
   }
 
-  const importVideo = async (): Promise<void> => {
-    if (!sel) return
+  const applyBulk = async (): Promise<void> => {
+    if (!bulkPreview) return
+    try {
+      const r = await window.api.assets.applyBulkImport(project.id, bulkPreview.folder, bulkKind)
+      setBulkPreview(null)
+      load(await window.api.projects.get(project.id))
+      const parts = [`${r.installed.length} berkas terpasang`]
+      if (r.skipped.length) parts.push(`${r.skipped.length} dilewati (${r.skipped.map((s) => s.file).join(', ')})`)
+      if (r.emptyLeft > 0) parts.push(`${r.emptyLeft} adegan masih kosong`)
+      toast('success', `${parts.join(', ')}.`)
+    } catch (e) {
+      toast('error', errorText(e))
+    }
+  }
+
+  // One file for one scene: no picture yet → import a picture; picture but no video → import
+  // a video; both already there → import a picture, which replaces the active one (as before).
+  const importForClip = async (clip: Clip): Promise<void> => {
     try {
       await flush()
-      const a = await window.api.assets.pickClipVideo(project.id, sel.id)
+      const a = !clip.imageAssetId
+        ? await window.api.assets.pickClipImage(project.id, clip.id)
+        : !clip.videoAssetId
+          ? await window.api.assets.pickClipVideo(project.id, clip.id)
+          : await window.api.assets.pickClipImage(project.id, clip.id)
       if (a) addAsset(a)
     } catch (e) {
       toast('error', errorText(e))
@@ -1067,10 +1120,20 @@ export function StoryboardStep() {
             >
               Salin Prompt Image to Video
             </Button>
-            <Button size="sm" icon={<ImagePlus className="size-4" />} title="Pilih berkas gambar untuk adegan yang dipilih" onClick={() => void importImage()}>
+            <Button
+              size="sm"
+              icon={<ImagePlus className="size-4" />}
+              title="Pilih folder hasil generate — semua berkas dipasang berurutan ke adegan yang belum punya visual"
+              onClick={() => void bulkImport('image')}
+            >
               Impor Gambar
             </Button>
-            <Button size="sm" icon={<Clapperboard className="size-4" />} title="Pilih berkas video untuk adegan yang dipilih" onClick={() => void importVideo()}>
+            <Button
+              size="sm"
+              icon={<Clapperboard className="size-4" />}
+              title="Pilih folder hasil generate — semua berkas dipasang berurutan ke adegan yang belum punya visual"
+              onClick={() => void bulkImport('video')}
+            >
               Impor Video
             </Button>
             <Button
@@ -1162,11 +1225,20 @@ export function StoryboardStep() {
                         ? { label: 'Gagal', tone: 'bad' as const }
                         : { label: 'Draf', tone: 'draft' as const }
               return (
-                <button
+                // A <div role="button">, not a <button>: the card holds its own Impor button,
+                // and a button inside a button is invalid HTML.
+                <div
                   key={c.id}
-                  type="button"
+                  role="button"
+                  tabIndex={0}
                   aria-pressed={on}
                   onClick={() => select(c.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      select(c.id)
+                    }
+                  }}
                   className={cx(
                     'flex flex-col overflow-hidden rounded-[14px] bg-surface text-left',
                     on ? 'border-2 border-accent shadow-ink-md' : 'border border-line hover:border-line-3'
@@ -1202,9 +1274,22 @@ export function StoryboardStep() {
                         <Volume2 className="size-3.5" />
                         {ttsRunning ? 'Membuat suara…' : c.audioAssetId ? 'Suara siap' : 'Belum ada suara'}
                       </span>
+                      <span className="flex-1" />
+                      <button
+                        type="button"
+                        title={!c.imageAssetId ? 'Impor satu gambar untuk adegan ini' : !c.videoAssetId ? 'Impor satu video untuk adegan ini' : 'Impor satu gambar untuk adegan ini (mengganti gambar aktif)'}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          void importForClip(c)
+                        }}
+                        className="inline-flex shrink-0 items-center gap-1 rounded-md border border-line-2 bg-surface px-2 py-1 text-xs font-semibold text-ink hover:border-ink-2"
+                      >
+                        <ImagePlus className="size-3.5" />
+                        Impor
+                      </button>
                     </div>
                   </div>
-                </button>
+                </div>
               )
             })}
           </div>
@@ -1241,6 +1326,9 @@ export function StoryboardStep() {
         </Button>
       </footer>
       <CharacterModal characterId={openChar} onClose={() => setOpenChar(null)} onCreated={(id) => setOpenChar(id)} />
+      {bulkPreview && (
+        <BulkImportDialog preview={bulkPreview} kind={bulkKind} onClose={() => setBulkPreview(null)} onPasang={() => applyBulk()} />
+      )}
     </div>
   )
 }

@@ -65,7 +65,7 @@ import * as hf from './services/higgsfield'
 import * as kie from './services/kieai'
 import * as llm from './services/llm'
 import * as nexa from './services/nexabot'
-import { importManualFile, prepareVideoWorkFolder, prepareWorkFolder, scanWorkFolder } from './services/manual'
+import { applyBulkImport, importManualFile, prepareVideoWorkFolder, prepareWorkFolder, previewBulkImportFolder, scanWorkFolder } from './services/manual'
 import {
   approveMotionBeat,
   motionBabaksOf,
@@ -428,7 +428,19 @@ export function registerIpc(): void {
       throw new Error(friendlyPickSheetError(e))
     }
   })
-
+  // Tier 1 (0.3): bulk import — a folder of generated results, installed in order onto the
+  // scenes that still need a picture or a video. openDirectory is supported on every Electron
+  // platform, so no openFile+multiSelections fallback is needed.
+  handle('assets:previewBulkImport', async (projectId: string, kind: WorkFileKind) => {
+    const win = BrowserWindow.getFocusedWindow()
+    const res = await dialog.showOpenDialog(win!, {
+      title: kind === 'image' ? 'Pilih folder hasil gambar' : 'Pilih folder hasil video',
+      properties: ['openDirectory']
+    })
+    if (res.canceled || !res.filePaths[0]) return null
+    return previewBulkImportFolder(projectId, res.filePaths[0], kind)
+  })
+  handle('assets:applyBulkImport', (projectId: string, folder: string, kind: WorkFileKind) => applyBulkImport(projectId, folder, kind))
   handle('settings:get', () => getSettings())
   handle('settings:set', (patch: Partial<AppSettings>) => setSettings(patch))
   handle('settings:keys', () => keyStatuses())

@@ -1,7 +1,14 @@
 import { randomUUID } from 'node:crypto'
 import { copyFileSync, existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs'
 import { basename, dirname, extname, join } from 'node:path'
-import { buildWorkFolderContent, matchWorkFile, type ManualScanResult, type ManualWorkFolder, type WorkFileKind } from '@shared/manual'
+import { buildWorkFolderContent, kindOfWorkFileExtension, matchWorkFile, type ManualScanResult, type ManualWorkFolder, type WorkFileKind } from '@shared/manual'
+import {
+  planBulkImport,
+  sortBulkFiles,
+  type BulkImportEmptyClip,
+  type BulkImportPreview,
+  type BulkImportResult
+} from '@shared/bulk-import'
 import type { Asset, Clip } from '@shared/types'
 import { getDb } from '../db'
 import { emit } from '../events'
@@ -111,6 +118,86 @@ export async function importManualFile(projectId: string, fileName: string, clip
   const clip = getClip(clipId)
   if (clip.projectId !== projectId) throw new Error('Klip tidak cocok dengan proyek ini')
   return attachWorkFile(projectId, abs, fileName, clip, kind)
+}
+
+/**
+ * Attaches one file from ANY folder (e.g. the folder a generator wrote to) to one scene.
+ * A thin wrapper around attachWorkFile, so the copy/probe/register steps live in one place;
+ * the bulk import and the single-file paths share them instead of duplicating them.
+ */
+export async function importExternalFile(projectId: string, absPath: string, fileName: string, clipId: string, kind: WorkFileKind): Promise<Asset> {
+  if (!existsSync(absPath)) throw new Error(`Berkas tidak ditemukan: ${fileName}`)
+  const clip = getClip(clipId)
+  if (clip.projectId !== projectId) throw new Error('Klip tidak cocok dengan proyek ini')
+  return attachWorkFile(projectId, absPath, fileName, clip, kind)
+}
+
+/** The project's clips, in storyboard order, as the bulk planner's "empty scenes" input. */
+function emptyClipsOf(projectId: string): BulkImportEmptyClip[] {
+  return [...clipsOf(projectId)]
+    .sort((a, b) => a.sort - b.sort)
+    .map((c) => ({ clipId: c.id, sceneKey: c.sceneKey, title: c.title, hasImage: !!c.imageAssetId, hasVideo: !!c.videoAssetId }))
+}
+
+/** The bare file names inside a folder (subfolders ignored), for the bulk planner. */
+function folderFileNames(folder: string): string[] {
+  if (!existsSync(folder)) throw new Error('Folder tidak ditemukan.')
+  return readdirSync(folder, { withFileTypes: true })
+    .filter((e) => e.isFile())
+    .map((e) => e.name)
+}
+
+/**
+ * Plans a bulk import from a folder without installing anything: the preview dialog shows
+ * exactly this, and applyBulkImport plans again from the same folder before installing.
+ */
+export function previewBulkImportFolder(projectId: string, folder: string, kind: WorkFileKind): BulkImportPreview {
+  getProject(projectId)
+  const sorted = sortBulkFiles(folderFileNames(folder), kind)
+  const { entries, excessFiles, emptyLeft } = planBulkImport(sorted, emptyClipsOf(projectId), kind)
+  return { folder, entries, excessFiles, emptyLeft }
+}
+
+/**
+ * Installs a folder's files in order onto the scenes that still need this kind of visual.
+ * The folder is read again here (never trusted from the renderer), and the plan is rebuilt,
+ * so a file added or removed between preview and install is handled by the fresh state.
+ * A file that cannot be read is skipped and reported; the rest still install. Scenes that
+ * already have a visual are never overwritten. Nothing changes when the folder holds no
+ * usable file of this kind.
+ */
+export async function applyBulkImport(projectId: string, folder: string, kind: WorkFileKind): Promise<BulkImportResult> {
+  getProject(projectId)
+  const names = folderFileNames(folder)
+  const sorted = sortBulkFiles(names, kind)
+  if (sorted.length === 0) {
+    throw new Error(
+      kind === 'image'
+        ? 'Tidak ada berkas gambar di folder ini. Pakai file PNG, JPG, atau WebP.'
+        : 'Tidak ada berkas video di folder ini. Pakai file MP4, MOV, atau WebM.'
+    )
+  }
+  const { entries, excessFiles } = planBulkImport(sorted, emptyClipsOf(projectId), kind)
+  const installed: BulkImportResult['installed'] = []
+  const skipped: BulkImportResult['skipped'] = []
+  // Files the app cannot use at all (not a picture/video) are reported, not silently dropped.
+  for (const file of names) {
+    if (kindOfWorkFileExtension(file) === null) skipped.push({ file, reason: 'format tidak didukung' })
+  }
+  for (const entry of entries) {
+    try {
+      await importExternalFile(projectId, join(folder, entry.file), entry.file, entry.clipId, kind)
+      installed.push({ file: entry.file, clipId: entry.clipId, sceneKey: entry.sceneKey })
+    } catch {
+      // attachWorkFile throws when the file cannot be probed (corrupt or unreadable);
+      // one bad file must not stop the rest of the folder.
+      skipped.push({ file: entry.file, reason: 'tidak bisa dibaca' })
+    }
+  }
+  // Counted fresh after the install: a file that failed to read leaves its scene empty,
+  // so the planned count would under-report it.
+  const emptyLeft = emptyClipsOf(projectId).filter((c) => (kind === 'image' ? !c.hasImage : !c.hasVideo)).length
+  return { installed, skipped, excess: excessFiles, emptyLeft }
 }
 
 /**
