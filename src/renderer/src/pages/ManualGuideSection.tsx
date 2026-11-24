@@ -206,6 +206,8 @@ export function ManualGuideSection({ baseUrl }: { baseUrl: string }) {
           ['prompts.txt', 'Prompt gambar bernomor adegan, untuk dibaca manusia (satu adegan satu blok: Gambar).', 'Kamu'],
           ['prompts-video.txt', 'Prompt video bernomor adegan, untuk dibaca manusia (satu adegan satu blok: Video) — untuk ditempel ke mode image-to-video.', 'Kamu'],
           ['manual.json', 'Manifest mesin: sceneKey, clipId, judul, kind (image/video), prompt, videoPrompt, aspek, durasi per adegan.', 'Agen/ekstensi luar'],
+          ['kenflow-gambar.txt', 'Prompt bersih untuk KenFlow Text to Image: satu paragraf per adegan, tanpa label.', 'KenFlow'],
+          ['kenflow-video.txt', 'Prompt bersih untuk KenFlow Image to Video: satu paragraf per adegan video saja.', 'KenFlow'],
           ['03.png, 03-v2.mp4, …', 'Hasil generate, bernama nomor adegan. Disalin ke images//videos/ saat dipindai; berkas aslinya tetap di folder kerja.', 'Pindai']
         ]}
       />
@@ -215,6 +217,8 @@ export function ManualGuideSection({ baseUrl }: { baseUrl: string }) {
         rows={[
           ['03.png', 'Terpasang ke adegan 03 sebagai gambar'],
           ['03-v2.mp4', 'Terpasang ke adegan 03 sebagai video (akhiran -v2 bebas, untuk revisi)'],
+          ['000_gajah-di-istana_a.png', 'Terpasang ke adegan 01 sebagai gambar (nama unduhan KenFlow: nomor 0-based + 1)'],
+          ['001_gajah-di-istana_a.mp4', 'Terpasang ke adegan 02 sebagai video (nama unduhan KenFlow)'],
           ['scene-03.png', 'Terpasang ke adegan 03 (awalan scene- diabaikan)'],
           ['clip-12.mp4', 'Terpasang ke adegan 12 sebagai video'],
           ['gajah-mada.png', 'Tidak terpasang — tidak diawali nomor adegan; masuk daftar belum terpasang'],
@@ -225,6 +229,38 @@ export function ManualGuideSection({ baseUrl }: { baseUrl: string }) {
         Satu batas yang diketahui: nomor adegan bersifat stabil per adegan, bukan posisi urutan. Bila sebuah adegan dihapus lalu adegan baru
         memakai nomor yang sama, berkas lama bernomor itu di folder kerja bisa terpasang ke adegan baru. Daftar belum terpasang + tombol
         Ganti adalah pengamannya — periksa gambar yang terpasang sebelum ekspor.
+      </P>
+
+      <H2>Rute KenFlow: salin bersih, tempel, unduh, pindai</H2>
+      <P>
+        KenFlow memecah teks tempelan per baris kosong — satu paragraf jadi satu prompt. Tombol KenFlow di Storyboard menyalin teks yang
+        sudah dibersihkan: satu paragraf per adegan, tanpa label, tanpa judul berkas, dan tokoh yang punya lembar disebut{' '}
+        <Code>@NamaTokoh</Code> di baris pertama paragrafnya. Berkasnya juga ditulis ke folder kerja (<Code>kenflow-gambar.txt</Code> dan{' '}
+        <Code>kenflow-video.txt</Code>) supaya bisa disalin ulang tanpa membuka aplikasi.
+      </P>
+      <Steps
+        items={[
+          <>
+            Klik <strong className="text-ink">Salin untuk KenFlow (Gambar)</strong>, tempel ke KenFlow <strong className="text-ink">Text to Image</strong>{' '}
+            (satu paragraf = satu adegan), lalu unduh semua gambar ke folder kerja.
+          </>,
+          <>
+            Klik <strong className="text-ink">Pindai Folder Kerja</strong> — nama unduhan KenFlow (<Code>000_…_a.png</Code>) terpasang ke adegan 01,{' '}
+            <Code>001_…_a.png</Code> ke adegan 02, dan seterusnya. Bila KenFlow memberi varian a/b/c untuk satu adegan, hapus varian yang tidak
+            dipakai sebelum memindai: varian yang tersisa terakhir yang menang.
+          </>,
+          <>
+            Klik <strong className="text-ink">Salin untuk KenFlow (Video)</strong>, lalu di KenFlow <strong className="text-ink">Image to Video</strong>{' '}
+            pakai gambar adegan yang sama sebagai gambar awal dan tempel paragraf videonya. Unduh videonya ke folder kerja, lalu{' '}
+            <strong className="text-ink">Pindai Folder Kerja</strong> lagi. Tombol video tidak aktif bila belum ada adegan video.
+          </>
+        ]}
+      />
+      <P>
+        Tiga catatan: (1) upload lembar karakter tiap tokoh sekali ke Flow (menu Characters) dan samakan namanya dengan{' '}
+        <Code>@Nama</Code> di prompt — itu langkah manual di Flow, bukan dari KenStory; (2) samakan rasio di KenFlow dengan rasio proyek,
+        supaya gambar tidak terpotong saat dipasangkan; (3) video hasil generate yang lebih panjang dari durasi adegan tetap dipotong
+        mengikuti durasi adegan saat ekspor — jadi klip Veo 8 detik untuk adegan 5,5 detik hanya dipakai 5,5 detiknya.
       </P>
 
       <H2>Langkah B: memasang Extension Worker</H2>

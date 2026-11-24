@@ -51,6 +51,7 @@ const api: StudioApi = {
   manual: {
     prepareWorkFolder: call('manual:prepareWorkFolder'),
     prepareVideoWorkFolder: call('manual:prepareVideoWorkFolder'),
+    kenflowTexts: call('manual:kenflowTexts'),
     scanWorkFolder: call('manual:scanWorkFolder'),
     importFile: call('manual:importFile'),
     openWorkFolder: call('manual:openWorkFolder')

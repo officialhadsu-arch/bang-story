@@ -56,6 +56,11 @@ Cara menaikkan versi ada di [docs/pengembangan.md](docs/pengembangan.md#versi-da
   ditolak dan naskah lama utuh. Durasi proyek mengikuti total estimasi narasi impor (min. 10 detik), bukan preset.
   Penulisan memakai `replaceScript` yang sama dengan naskah hasil generate. Mode tambah belum ada (v1 hanya ganti).
 - **Impor massal (Tier 1, 0.3)** — tombol header Impor Gambar/Video di Storyboard kini memasang satu folder hasil generate sekaligus: pilih folder mana pun, lihat pratinjau (berkas apa ke adegan mana, berurutan), lalu Pasang ke adegan yang belum punya visual. Urutan alami: angka sebagai angka (1, 2, 10), huruf abjad tanpa bedakan besar/kecil. Adegan yang sudah punya visual dilewati; berkas berlebih dilaporkan; berkas rusak/tidak didukung dilewati dengan alasannya. Tombol 1-per-1 pindah ke tiap adegan: tombol Impor di kartu adegan (belum ada gambar → gambar; ada gambar belum ada video → video; keduanya ada → ganti gambar) dan Impor gambar/video di panel klip. Pindai Folder Kerja tidak berubah.
+- **Mode KenFlow (jalur Manual Tier 2)** — dua tombol baru di Storyboard, di samping "Salin Semua Prompt": "Salin untuk KenFlow (Gambar)"
+  dan "Salin untuk KenFlow (Video)". Masing-masing menyalin teks bersih (satu paragraf per adegan, tanpa label, tokoh berlembar disebut
+  `@Nama` di baris pertama) dan menulis `kenflow-gambar.txt` / `kenflow-video.txt` ke folder kerja. Tombol video nonaktif bila belum ada
+  adegan video. Pemindai kini mengenali nama unduhan KenFlow (`000_…_a.png` → adegan 01, `001_…` → adegan 02); nama lama (`03.png`,
+  `scene-03.mp4`) tetap jalan seperti sebelumnya. Rute lengkapnya ada di panduan Manual (bagian KenFlow).
 - Rebrand aplikasi menjadi **KenStory** (fork dari bangtutorial/bang-story tetap berlisensi MIT, lihat NOTICE.md).
 - **Flow2API: kunci API server (Bearer)** — server Flow2API versi sekarang menuntut `Authorization: Bearer <kunci>` di
   tiap permintaan; tanpanya generate gagal HTTP 401 (terbukti di uji live PC, 20 Nov 2026). Kolom baru "Kunci API

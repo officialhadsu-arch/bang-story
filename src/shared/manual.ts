@@ -69,8 +69,10 @@ export function kindOfWorkFileExtension(fileName: string): WorkFileKind | null {
 
 /**
  * Matches a result file back to its scene: `<sceneKey>[-suffix].<ext>` (e.g. `03.png`, `03-v2.mp4`).
- * A `scene-`/`clip-` prefix is ignored; what counts is the leading number. Files whose name does not
- * start with a number, or whose extension is not a picture/video the app can use, do not match.
+ * A `scene-`/`clip-` prefix is ignored; what counts is the leading number. KenFlow downloads are
+ * also recognised: exactly 3 digits + underscore (`000_<prompt>_a.png`) is KenFlow's 0-based prompt
+ * index, so the scene is that number + 1 (`000_…` → scene 01, `001_…` → scene 02). Files whose name
+ * does not start with a number, or whose extension is not a picture/video the app can use, do not match.
  */
 export function matchWorkFile(fileName: string): { sceneKey: string; kind: WorkFileKind; ext: string } | null {
   const dot = fileName.lastIndexOf('.')
@@ -79,6 +81,8 @@ export function matchWorkFile(fileName: string): { sceneKey: string; kind: WorkF
   const kind = kindOfWorkFileExtension(fileName)
   if (!kind) return null
   const base = fileName.slice(0, dot).replace(/^(scene|clip)[-_ ]?/i, '')
+  const kenflow = /^(\d{3})_/.exec(base)
+  if (kenflow) return { sceneKey: formatSceneKey(parseInt(kenflow[1], 10) + 1), kind, ext }
   const m = /^(\d+)/.exec(base)
   if (!m) return null
   return { sceneKey: formatSceneKey(parseInt(m[1], 10)), kind, ext }
@@ -113,6 +117,65 @@ export interface ManualWorkFolder {
   manifest: ManualManifest
   workFolder: string
   fileCount: number
+}
+
+/** What `manual:kenflowTexts` writes and returns (the texts are what the renderer copies). */
+export interface KenflowTexts {
+  imageText: string
+  videoText: string
+  imageCount: number
+  videoCount: number
+  workFolder: string
+}
+
+/**
+ * Collapses blank lines inside one prompt into a single newline. `clipPrompt()` joins its parts
+ * with blank lines, and KenFlow splits pasted text on blank lines — without this, one scene would
+ * arrive in KenFlow as several prompts instead of one.
+ */
+function tightenPrompt(text: string): string {
+  return text.replace(/\n\s*\n+/g, '\n').trim()
+}
+
+/**
+ * The clean KenFlow texts: one paragraph per scene, in story order, no labels, no file title, one
+ * blank line between paragraphs. Characters that have a reference sheet are mentioned as `@Name`
+ * on the first line of the paragraph, so Flow/KenFlow sees the mention before the description.
+ * The image text covers every scene (a video scene's picture is its first frame); the video text
+ * covers video scenes only. The prompts come from the same `buildWorkFolderContent` rows as
+ * prompts.txt, so a KenFlow generate and an automatic one start from identical words.
+ */
+export function buildKenflowTexts(
+  project: Project,
+  clips: Clip[],
+  characters: Character[]
+): { imageText: string; videoText: string; imageCount: number; videoCount: number } {
+  const { rows } = buildWorkFolderContent(project, clips, characters)
+  const byId = new Map(clips.map((c) => [c.id, c]))
+  const paragraphs = rows.map((row) => {
+    const clip = byId.get(row.clipId)
+    const refNames = clip
+      ? characters.filter((c) => clip.characterIds.includes(c.id) && c.sheetAssetId).map((c) => c.name)
+      : []
+    const mention = refNames.length ? `${refNames.map((n) => `@${n}`).join(', ')}\n` : ''
+    return `${mention}${tightenPrompt(row.prompt)}`
+  })
+  const videoParagraphs = rows
+    .filter((row) => row.kind === 'video')
+    .map((row) => {
+      const clip = byId.get(row.clipId)
+      const refNames = clip
+        ? characters.filter((c) => clip.characterIds.includes(c.id) && c.sheetAssetId).map((c) => c.name)
+        : []
+      const mention = refNames.length ? `${refNames.map((n) => `@${n}`).join(', ')}\n` : ''
+      return `${mention}${tightenPrompt(row.videoPrompt)}`
+    })
+  return {
+    imageText: paragraphs.join('\n\n'),
+    videoText: videoParagraphs.join('\n\n'),
+    imageCount: paragraphs.length,
+    videoCount: videoParagraphs.length
+  }
 }
 
 /** One file the scan attached to a scene. */

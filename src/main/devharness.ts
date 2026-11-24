@@ -7,6 +7,7 @@ import ffmpegStatic from 'ffmpeg-static'
 import { estimateWordTimings, WHISPER_TIMING } from '@shared/captions'
 import { anchorPoint } from '@shared/overlays'
 import { autoDroppedIndexes, DEFAULT_FILLERS } from '@shared/talkinghead'
+import { getDb } from './db'
 import { startExport } from './exporter'
 import { emit } from './events'
 import { setActiveAsset } from './generation'
@@ -17,7 +18,7 @@ import { applyBulkImport } from './services/manual'
 import { renderBabakRange, type RenderRangeResult } from './services/renderer'
 import { setSettings } from './settings'
 import { importScript } from './story'
-import { createProject, getBundle, insertAsset, listProjects, patchClip, replaceStory, saveSnapshot, setCharacterSheet, touchProject, updateAssetMeta } from './repo'
+import { charactersOf, clipsOf, createProject, getBundle, insertAsset, listProjects, patchClip, replaceStory, saveSnapshot, setCharacterSheet, touchProject, updateAssetMeta } from './repo'
 import { recordCheck, setTestKey } from './secrets'
 import { importFootage } from './talkinghead'
 import type { ApiProvider, WordTiming } from '@shared/types'
@@ -447,7 +448,7 @@ export function attachDevHarness(win: BrowserWindow): void {
   const planPath = process.env.STUDIO_CAPTURE_PLAN
   if (!planPath) return
   let plan: {
-    main?: 'seed' | 'export' | 'key' | 'overlays' | 'speech' | 'videos' | 'importClipImages' | 'uploadSheet' | 'importScriptFile' | 'importBulkImages' | 'importBulkVideos' | 'clearClipVisuals' | 'manualFixture' | 'motionFixture' | 'motionApprove' | 'motionSpike' | 'motionSpikeVert' | 'talkingHeadFixture' | 'mockLlm'
+    main?: 'seed' | 'export' | 'key' | 'overlays' | 'speech' | 'videos' | 'importClipImages' | 'uploadSheet' | 'importScriptFile' | 'importBulkImages' | 'importBulkVideos' | 'clearClipVisuals' | 'manualFixture' | 'kenflowFixture' | 'motionFixture' | 'motionApprove' | 'motionSpike' | 'motionSpikeVert' | 'talkingHeadFixture' | 'mockLlm'
     exportTo?: string
     /** For main "mockLlm": a control body for the mock LLM server (POST /__control). */
     control?: Record<string, unknown>
@@ -613,6 +614,39 @@ export function attachDevHarness(win: BrowserWindow): void {
           execFileSync(ff, ['-y', '-f', 'lavfi', '-i', 'color=c=0xE4572E:s=640x360', '-frames:v', '1', join(dir, 'hasil-tanpa-nomor.png')], {
             windowsHide: true
           })
+        }
+        if (step.main === 'kenflowFixture' && demoId) {
+          // Test-only (0.3 KenFlow): scene 03 becomes a video scene with a blank line inside
+          // its video prompt, Gajah Mada gets a character sheet (for the @mention), and the
+          // work folder gets KenFlow-named results — two variants for scene 01, one for 02,
+          // one old-style number for 03, and one file with no scene number.
+          const clips = clipsOf(demoId)
+          const third = clips[2]
+          if (third) {
+            patchClip(third.id, { motionType: 'video' })
+            // patchClip's column whitelist has no videoPrompt, so the test's own direction
+            // goes in with a direct update (test-only fixture, not app behaviour).
+            getDb().prepare('UPDATE clips SET video_prompt = ? WHERE id = ?').run('Gajah Mada mengangkat tangan di balairung.\n\nKamera perlahan mendekat.', third.id)
+          }
+          const dir = manualWorkFolder(demoId)
+          mkdirSync(dir, { recursive: true })
+          const ff = binPath(ffmpegStatic!)
+          const frame = (file: string, color: string): void => {
+            execFileSync(ff, ['-y', '-f', 'lavfi', '-i', `color=c=${color}:s=1280x720`, '-frames:v', '1', join(dir, file)], { windowsHide: true })
+          }
+          frame('000_gajah-di-istana_a.png', '0x2E86AB')
+          frame('000_gajah-di-istana_b.png', '0xE4572E')
+          frame('001_gajah-maju_a.png', '0x2A9D8F')
+          frame('03.png', '0xF4A261')
+          frame('hasil-tanpa-nomor.png', '0xE4572E')
+          const chars = charactersOf(demoId)
+          if (chars[0]) {
+            const sheetRel = 'images/kenflow-sheet.png'
+            mkdirSync(dirname(assetAbsPath(demoId, sheetRel)), { recursive: true })
+            copyFileSync(join(dir, '000_gajah-di-istana_a.png'), assetAbsPath(demoId, sheetRel))
+            const sheet = insertAsset({ projectId: demoId, kind: 'image', provider: 'demo', prompt: 'kenflow-sheet.png', localPath: sheetRel, width: 1280, height: 720 })
+            setCharacterSheet(chars[0].id, sheet.id)
+          }
         }
         if (step.main === 'motionFixture' && demoId) addMotionFixture(demoId, log)
         if (step.main === 'motionApprove' && demoId) approveMotionBabak(demoId, log)
